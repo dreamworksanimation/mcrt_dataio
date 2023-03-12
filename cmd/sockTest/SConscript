@@ -1,0 +1,12 @@
+Import('env')
+# ------------------------------------------
+name       = 'sockTest'
+sources    = env.DWAGlob('*.cc')
+components = [
+	   'share_sock'
+]
+# ------------------------------------------
+
+env.DWAUseComponents(components)
+prog = env.DWAProgram(name, sources)
+env.DWAInstallBin(prog)

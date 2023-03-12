@@ -1,0 +1,11 @@
+Import('env')
+ 
+env.Tool('dwa_doxygen')
+ 
+#the name of the folio
+folioName = "mcrt_dataio"
+ 
+# Files and directories to use as input to Doxygen
+inputFiles = ['#lib']
+ 
+dox = env.DWADoxygenSimple(folioName, inputFiles)

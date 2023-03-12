@@ -1,0 +1,12 @@
+Import('env')
+# ------------------------------------------
+name       = 'infoRecDump'
+sources    = env.DWAGlob('*.cc')
+components = [
+	   'share_codec'
+]
+# ------------------------------------------
+()
+env.DWAUseComponents(components)
+prog = env.DWAProgram(name, sources)
+env.DWAInstallBin(prog)

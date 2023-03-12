@@ -1,0 +1,9 @@
+name: Checkmarx Scan
+on: [push, workflow_dispatch]
+
+jobs:
+  scan:
+    runs-on: [self-hosted, rez]
+    steps:
+      - name: Scan Repository
+        uses: CM/cm-actions/checkmarx-scan@CM-17143

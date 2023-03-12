@@ -1,0 +1,24 @@
+# SCons symlinks
+bamboo_tools
+SConstruct
+site_scons
+boot
+
+# ignore build/install/build_env dirs
+build
+build_env
+install
+
+# Ignore Eclipse/IDE files
+*.pydevproject
+*.project
+*.cproject
+*.settings
+
+# Ignore vim tmp files
+.*.swp
+
+
+# Ignore Gedit tmp files
+*~
+

@@ -81,7 +81,7 @@ InfoRecGlobal::setDispatch(const std::string& hostName,
 {
     mArray["dp"]["name"] = hostName;
     mArray["dp"]["cpu"] = cpuTotal;
-    mArray["dp"]["mem"] = static_cast<unsigned long long>(memTotal);
+    mArray["dp"]["mem"] = (Json::UInt64)memTotal;
 }
 
 bool
@@ -101,7 +101,7 @@ InfoRecGlobal::setMcrt(const int machineId,
     std::string mIdStr = mIdStrGen(machineId);
     mArray["mc"][mIdStr]["name"] = hostName;
     mArray["mc"][mIdStr]["cpu"] = cpuTotal;
-    mArray["mc"][mIdStr]["mem"] = static_cast<unsigned long long>(memTotal);
+    mArray["mc"][mIdStr]["mem"] = (Json::UInt64)memTotal;
 }
 
 size_t
@@ -124,7 +124,7 @@ InfoRecGlobal::setMerge(const std::string& hostName,
 {
     mArray["mg"]["name"] = hostName;
     mArray["mg"]["cpu"] = cpuTotal;
-    mArray["mg"]["mem"] = static_cast<unsigned long long>(memTotal);
+    mArray["mg"]["mem"] = (Json::UInt64)memTotal;
 }
 
 std::string
@@ -567,7 +567,7 @@ void
 InfoRecItem::setTimeStamp()
 {
     mTimeStamp = MiscUtil::getCurrentMicroSec();
-    mArray["time"] = (unsigned long long)(mTimeStamp);
+    mArray["time"] = (Json::UInt64)(mTimeStamp);
 }
 
 int

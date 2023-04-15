@@ -4,6 +4,7 @@
 
 #include <iomanip>
 #include <sstream>
+#include <cstdint>
 
 namespace mcrt_dataio {
 

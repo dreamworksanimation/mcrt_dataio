@@ -16,6 +16,7 @@
 
 #include <functional>
 #include <iostream>
+#include <cstdint>
 
 namespace mcrt_dataio {
 

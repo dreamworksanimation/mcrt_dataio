@@ -8,6 +8,7 @@ boot
 build
 build_env
 install
+/Testing
 
 # Ignore Eclipse/IDE files
 *.pydevproject

@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "FbMsgMultiFrames.h"
 #include "GlobalNodeInfo.h"
 
@@ -27,6 +24,11 @@ FbMsgMultiFrames::initTotalCacheFrames(const size_t totalCacheFrames)
         mDisplaySyncFrameInitialize = false;
         mDisplaySyncFrameId = 0;
         mDisplayFrame = &mFbMsgMultiFrames[0];
+
+        if (mMergeType == MergeType::SEAMLESS_COMBINE) {
+            // does not support feedback logic under SEAMLESS_COMBINE mode
+            mFbMsgMultiFrames[0].resetFeedback(false);
+        }
 
     } else if (mMergeType == MergeType::SYNCID_LINEUP) {
         mFbMsgMultiFrames.resize(totalCacheFrames);
@@ -106,7 +108,8 @@ FbMsgMultiFrames::changeTaskType(const FbMsgSingleFrame::TaskType &taskType)
 }
 
 bool
-FbMsgMultiFrames::push(const mcrt::ProgressiveFrame &progressive)
+FbMsgMultiFrames::push(const mcrt::ProgressiveFrame &progressive,
+                       const std::function<bool()>& feedbackInitCallBack)
 {
     if (progressive.getProgress() < 0.0f) {
         //
@@ -129,8 +132,8 @@ FbMsgMultiFrames::push(const mcrt::ProgressiveFrame &progressive)
     bool rt = true;
     switch (mMergeType) {
     case MergeType::SEAMLESS_COMBINE: rt = push_seamlessCombine(progressive); break;
-    case MergeType::PICKUP_LATEST:    rt = push_pickupLatest(progressive);    break;
-    case MergeType::SYNCID_LINEUP:    rt = push_syncidLineup(progressive);    break;
+    case MergeType::PICKUP_LATEST: rt = push_pickupLatest(progressive, feedbackInitCallBack); break;
+    case MergeType::SYNCID_LINEUP: rt = push_syncidLineup(progressive); break;
     }
     return rt;
 }
@@ -184,6 +187,11 @@ FbMsgMultiFrames::push_seamlessCombine(const mcrt::ProgressiveFrame &progressive
 //   mDisplaySyncFrameId is always pick newest id from all of the MCRT computation result.
 //   This means combined image might includes older information than mDisplaySyncFrameId.
 //
+//   This seamlessCombine mode is working well with uniform sampling but not working with
+//   adaptive sampling by using feedback logic. There is fundamental restriction and hard
+//   to support the current version of feedback logic by SEAMLESS_COMBINE mode..
+//   So, SEAMLESS_COMBINE does not support image synchronization feedback logic at this moment.
+//    
 {
     uint32_t syncFrameId = progressive.mHeader.mFrameId;
     
@@ -217,7 +225,8 @@ FbMsgMultiFrames::push_seamlessCombine(const mcrt::ProgressiveFrame &progressive
 }
 
 bool
-FbMsgMultiFrames::push_pickupLatest(const mcrt::ProgressiveFrame &progressive)
+FbMsgMultiFrames::push_pickupLatest(const mcrt::ProgressiveFrame &progressive,
+                                    const std::function<bool()>& feedbackInitCallBack)
 //
 // This is a push logic for MergeType::PICKUP_LATEST
 //
@@ -225,6 +234,9 @@ FbMsgMultiFrames::push_pickupLatest(const mcrt::ProgressiveFrame &progressive)
 //   when processed newer syncFrameId data. This logic is designed for "Multiplex pixel"
 //   task distribution mode.
 //   mDisplaySyncFrameId is always set by newest syncFrameid.
+//    
+//   This PICK_LATEST mode is considered with image synchronization feedback logic that is
+//   designed for multi-machine adaptive sampling.
 //    
 {
     uint32_t syncFrameId = progressive.mHeader.mFrameId;
@@ -241,6 +253,8 @@ FbMsgMultiFrames::push_pickupLatest(const mcrt::ProgressiveFrame &progressive)
         FbMsgSingleFrame *currFbMsgSingleFrame = &mFbMsgMultiFrames[0]; // SEAMLESS_COMBINE only has 1 item
         currFbMsgSingleFrame->resetWholeHistory(syncFrameId); // reset whole history
         currFbMsgSingleFrame->resetAllReceivedMessagesCount();
+        currFbMsgSingleFrame->resetFeedback(*mFeedback);
+        if (!feedbackInitCallBack()) return false;
     }
 
     if (syncFrameId < mDisplaySyncFrameId) {
@@ -260,6 +274,8 @@ FbMsgMultiFrames::push_pickupLatest(const mcrt::ProgressiveFrame &progressive)
         mDisplaySyncFrameId = syncFrameId;
         currFbMsgSingleFrame->resetWholeHistory(syncFrameId); // reset whole history
         currFbMsgSingleFrame->resetAllReceivedMessagesCount();
+        currFbMsgSingleFrame->resetFeedback(*mFeedback);
+        if (!feedbackInitCallBack()) return false;
 #       ifdef DEBUG_MSG_PUSH
         std::cerr << ">+> Fbmsg.cc FbMsgMultiFrames::push_pickupLatest() NEW-SYNCID :"
                   << " mDisplaySyncFrameId:" << mDisplaySyncFrameId << std::endl;
@@ -290,6 +306,10 @@ FbMsgMultiFrames::push_syncidLineup(const mcrt::ProgressiveFrame &progressive)
 //
 //   This SYNCID_LINEUP mode should be only used for realtime rendering context.
 //   
+//   This SYNCID_LINEUP mode does not support image synchronization feedback logic due to this mode is
+//   designed only for real-time rendering (i.e. pretty small rendering time budget) and does not make
+//   sense to support image synchronization feedback logic.
+//    
 {
     uint32_t syncFrameId = progressive.mHeader.mFrameId;
     
@@ -384,4 +404,3 @@ FbMsgMultiFrames::showPtrTable(const std::string &hd) const
 }
 
 } // namespace mcrt_dataio
-

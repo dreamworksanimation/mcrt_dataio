@@ -14,6 +14,7 @@ components = [
 	   'engine_mcrt',
            'mcrt_messages',
            'message_api',
+	   'render_cache',
 	   'render_util',
 	   'scene_rdl2',
 	   'tbb'
@@ -26,7 +27,11 @@ publicHeaders = [
 	      'FbMsgSingleChan.h',
 	      'FbMsgSingleFrame.h',
 	      'GlobalNodeInfo.h',
+	      'MergeActionTracker.h',
 	      'MergeFbSender.h',
+	      'MergeSequenceDequeue.h',
+	      'MergeSequenceEnqueue.h',
+	      'MergeSequenceKey.h',
 	      'MergeStats.h',
 	      'MsgSendHandler.h'
 	      ]

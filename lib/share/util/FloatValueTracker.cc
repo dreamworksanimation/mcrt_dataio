@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "FloatValueTracker.h"
 
 #include <iostream>
@@ -22,7 +19,7 @@ FloatValueTracker::set(float v)
 }
 
 float
-FloatValueTracker::getAvg()
+FloatValueTracker::getAvg() const
 {
     if (mEventList.empty()) return 0.0f;
     return std::accumulate(mEventList.begin(), mEventList.end(), 0.0f) / static_cast<float>(mEventList.size());
@@ -33,17 +30,20 @@ FloatValueTracker::show() const
 {
     std::ostringstream ostr;
     ostr << "FloatValueTracker {\n"
-         << "  mKeepEventTotal:" << mKeepEventTotal << '\n'
-         << "  mEventList (size:" << mEventList.size() << ") {\n";
-    int idx = 0;
-    for (auto itr : mEventList) {
-        ostr << "    idx:" << idx << " val:" << itr << '\n';
-        idx++;
+         << "  mKeepEventTotal:" << mKeepEventTotal << '\n';
+    if (mEventList.empty()) {
+        ostr << "  mEventList is empty\n";
+    } else {
+        ostr << "  mEventList (size:" << mEventList.size() << ") {\n";
+        int idx = 0;
+        for (auto itr : mEventList) {
+            ostr << "    idx:" << idx << " val:" << itr << '\n';
+            idx++;
+        }
+        ostr << "  }\n";
     }
-    ostr << "  }\n"
-         << "}";
+    ostr << "}";
     return ostr.str();
 }
 
 } // namespace mcrt_dataio
-

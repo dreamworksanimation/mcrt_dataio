@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "GlobalNodeInfo.h"
 
 #include <mcrt_dataio/engine/mcrt/McrtControl.h>
@@ -143,6 +140,36 @@ void
 GlobalNodeInfo::setMergeProgress(const float fraction)
 {
     mInfoCodec.setFloat("mergeProgress", fraction, &mMergeProgress);
+}
+
+void
+GlobalNodeInfo::setMergeFeedbackActive(const bool flag)
+{
+    mInfoCodec.setBool("mergeFeedbackActive", flag, &mMergeFeedbackActive);
+}
+
+void    
+GlobalNodeInfo::setMergeFeedbackInterval(const float sec) // sec
+{
+    mInfoCodec.setFloat("mergeFeedbackInterval", sec, &mMergeFeedbackInterval);
+}
+
+void    
+GlobalNodeInfo::setMergeEvalFeedbackTime(const float ms) // millisec
+{
+    mInfoCodec.setFloat("mergeEvalFeedbackTime", ms, &mMergeEvalFeedbackTime);
+}
+
+void
+GlobalNodeInfo::setMergeSendFeedbackFps(const float fps) // fps
+{
+    mInfoCodec.setFloat("mergeSendFeedbackFps", fps, &mMergeSendFeedbackFps);
+}
+
+void    
+GlobalNodeInfo::setMergeSendFeedbackBps(const float bps) // Byte/Sec
+{
+    mInfoCodec.setFloat("mergeSendFeedbackBps", bps, &mMergeSendFeedbackBps);
 }
 
 //------------------------------------------------------------------------------------------
@@ -300,6 +327,7 @@ GlobalNodeInfo::decode(const std::string &inputData)
             float f;
             int i;
             size_t t;
+            bool b;
             if (mInfoCodec.getString("clientHostName", str)) {
                 setClientHostName(str);
             } else if (mInfoCodec.getFloat("clientClockTimeShift", f)) {
@@ -335,6 +363,17 @@ GlobalNodeInfo::decode(const std::string &inputData)
             } else if (mInfoCodec.getFloat("mergeProgress", f)) {
                 setMergeProgress(f);
                 
+            } else if (mInfoCodec.getBool("mergeFeedbackActive", b)) {
+                setMergeFeedbackActive(b);
+            } else if (mInfoCodec.getFloat("mergeFeedbackInterval", f)) {
+                setMergeFeedbackInterval(f);
+            } else if (mInfoCodec.getFloat("mergeEvalFeedbackTime", f)) {
+                setMergeEvalFeedbackTime(f);
+            } else if (mInfoCodec.getFloat("mergeSendFeedbackFps", f)) {
+                setMergeSendFeedbackFps(f);
+            } else if (mInfoCodec.getFloat("mergeSendFeedbackBps", f)) {
+                setMergeSendFeedbackBps(f);
+
             } else if (mInfoCodec.decodeTable("mcrtNodeInfoMap", itemKeyStr, str)) {
                 return decodeMcrtNodeInfoMap(std::stoi(itemKeyStr), str);
 
@@ -506,52 +545,14 @@ GlobalNodeInfo::getNodeStat() const
 std::string
 GlobalNodeInfo::show() const
 {
-    auto pctShow = [&](float fraction) -> std::string {
-        std::ostringstream ostr;
-        ostr << std::setw(6) << std::fixed << std::setprecision(2) << fraction * 100.0f << " %";
-        return ostr.str();
-    };
-    auto msShow = [&](float ms) -> std::string {
-        std::ostringstream ostr;
-        ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
-        return ostr.str();
-    };
-    auto bpsShow = [&](float bps) -> std::string {
-        std::ostringstream ostr;
-        ostr << scene_rdl2::str_util::byteStr((size_t)bps) << "/sec";
-        return ostr.str();
-    };
+    using scene_rdl2::str_util::addIndent;
 
     std::ostringstream ostr;
     ostr << "GlobalNodeInfo {\n"
-         << "  client {\n"
-         << "          mClientHostName:" << mClientHostName << '\n'
-         << "    mClientClockTimeShift:" << msShow(mClientClockTimeShift) << '\n'
-         << "     mClientRoundTripTime:" << msShow(mClientRoundTripTime) << '\n'
-         << "  }\n"
-         << "  displatch {\n"
-         << "          mDispatchHostName:" << mDispatchHostName << '\n'
-         << "    mDispatchClockTimeShift:" << msShow(mDispatchClockTimeShift) << '\n'
-         << "     mDispatchRoundTripTime:" << msShow(mDispatchRoundTripTime) << '\n'
-         << "  }\n"
-         << "  merge {\n"
-         << "             mMergeHostName:" << mMergeHostName << '\n'
-         << "    mMergeClockDeltaSvrPort:" << mMergeClockDeltaSvrPort << '\n'
-         << "    mMergeClockDeltaSvrPath:" << mMergeClockDeltaSvrPath << '\n'
-         << "             mMergeCpuTotal:" << mMergeCpuTotal << '\n'
-         << "             mMergeCpuUsage:" << pctShow(mMergeCpuUsage) << '\n'
-         << "             mMergeMemTotal:" << scene_rdl2::str_util::byteStr(mMergeMemTotal) << '\n'
-         << "             mMergeMemUsage:" << pctShow(mMergeMemUsage) << '\n'
-         << "              mMergeRecvBps:" << bpsShow(mMergeRecvBps) << '\n'
-         << "              mMergeSendBps:" << bpsShow(mMergeSendBps) << '\n'
-         << "             mMergeProgress:" << pctShow(mMergeProgress) << '\n'
-         << "  }\n"
-         << "  mMcrtNodeInfoMap (total:" << mMcrtNodeInfoMap.size() << ") {\n";
-    for (auto& itr : mMcrtNodeInfoMap) {
-        const McrtNodeInfoShPtr currPtr = itr.second;
-        ostr << scene_rdl2::str_util::addIndent(currPtr->show(), 2) << '\n';
-    }
-    ostr << "  }\n"
+         << addIndent(showClientInfo()) << '\n'
+         << addIndent(showDispatchInfo()) << '\n'
+         << addIndent(showMergeInfo()) << '\n'
+         << addIndent(showAllNodeInfo()) << '\n'
          << "  getNodeStat():" << McrtNodeInfo::nodeStatStr(getNodeStat()) << '\n'
          << "}";
     return ostr.str();
@@ -686,11 +687,191 @@ GlobalNodeInfo::parserConfigure()
                         return mMcrtNodeInfoMap[rankId]->getParser().main(arg.childArg());
                     }
                 });
+    mParser.opt("renderPrepStat", "", "show all node's renderPrep stat",
+                [&](Arg& arg) -> bool { return arg.msg(showRenderPrepStatus() + '\n'); });
+    mParser.opt("hostsName", "", "show all hostname info",
+                [&](Arg& arg) -> bool { return arg.msg(showAllHostsName() + '\n'); });
+    mParser.opt("clientInfo", "", "show client info",
+                [&](Arg& arg) -> bool { return arg.msg(showClientInfo() + '\n'); });
+    mParser.opt("dispatchInfo", "", "show dispatch info",
+                [&](Arg& arg) -> bool { return arg.msg(showDispatchInfo() + '\n'); });
+    mParser.opt("mergeInfo", "", "show merge info",
+                [&](Arg& arg) -> bool { return arg.msg(showMergeInfo() + '\n'); });
+    mParser.opt("mergeFeedbackInfo", "", "show merge feedback info",
+                [&](Arg& arg) -> bool { return arg.msg(showMergeFeedbackInfo() + '\n'); });
+    mParser.opt("allNodeInfo", "", "show all node info",
+                [&](Arg& arg) -> bool { return arg.msg(showAllNodeInfo() + '\n'); });
     mParser.opt("nodeStat", "", "show current node status",
-                [&](Arg& arg) -> bool {
-                    return arg.msg(McrtNodeInfo::nodeStatStr(getNodeStat()) + '\n');
-                });
+                [&](Arg& arg) -> bool { return arg.msg(McrtNodeInfo::nodeStatStr(getNodeStat()) + '\n'); });
+    mParser.opt("feedbackAvg", "", "show feedback info of averaged about all mcrt computations",
+                [&](Arg& arg) -> bool { return arg.msg(showFeedbackAvg() + '\n'); });
+}
+
+// static function
+std::string
+GlobalNodeInfo::msShow(float ms)
+{
+    std::ostringstream ostr;
+    ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
+    return ostr.str();
+}
+
+// static function
+std::string
+GlobalNodeInfo::pctShow(float fraction)
+{
+    std::ostringstream ostr;
+    ostr << std::setw(6) << std::fixed << std::setprecision(2) << fraction * 100.0f << " %";
+    return ostr.str();
+}
+
+// static function
+std::string
+GlobalNodeInfo::bpsShow(float bps)
+{
+    std::ostringstream ostr;
+    ostr << scene_rdl2::str_util::byteStr((size_t)bps) << "/sec";
+    return ostr.str();
+}
+
+std::string
+GlobalNodeInfo::showClientInfo() const
+{
+    std::ostringstream ostr;
+    ostr << "client {\n"
+         << "  mClientHostName:" << mClientHostName << '\n'
+         << "  mClientClockTimeShift:" << msShow(mClientClockTimeShift) << '\n'
+         << "  mClientRoundTripTime:" << msShow(mClientRoundTripTime) << '\n'
+         << "}";
+    return ostr.str();
+}
+
+std::string
+GlobalNodeInfo::showDispatchInfo() const
+{
+    std::ostringstream ostr;    
+    ostr << "displatch {\n"
+         << "  mDispatchHostName:" << mDispatchHostName << '\n'
+         << "  mDispatchClockTimeShift:" << msShow(mDispatchClockTimeShift) << '\n'
+         << "  mDispatchRoundTripTime:" << msShow(mDispatchRoundTripTime) << '\n'
+         << "}";
+    return ostr.str();
+}
+    
+std::string
+GlobalNodeInfo::showMergeInfo() const
+{
+    using scene_rdl2::str_util::addIndent;
+
+    std::ostringstream ostr;
+    ostr << "merge {\n"
+         << "  mMergeHostName:" << mMergeHostName << '\n'
+         << "  mMergeClockDeltaSvrPort:" << mMergeClockDeltaSvrPort << '\n'
+         << "  mMergeClockDeltaSvrPath:" << mMergeClockDeltaSvrPath << '\n'
+         << "  mMergeCpuTotal:" << mMergeCpuTotal << '\n'
+         << "  mMergeCpuUsage:" << pctShow(mMergeCpuUsage) << '\n'
+         << "  mMergeMemTotal:" << scene_rdl2::str_util::byteStr(mMergeMemTotal) << '\n'
+         << "  mMergeMemUsage:" << pctShow(mMergeMemUsage) << '\n'
+         << "  mMergeRecvBps:" << bpsShow(mMergeRecvBps) << '\n'
+         << "  mMergeSendBps:" << bpsShow(mMergeSendBps) << '\n'
+         << "  mMergeProgress:" << pctShow(mMergeProgress) << '\n'
+         << addIndent(showMergeFeedbackInfo()) << '\n'
+         << "}";
+    return ostr.str();
+}
+    
+std::string
+GlobalNodeInfo::showMergeFeedbackInfo() const
+{
+    using scene_rdl2::str_util::boolStr;
+
+    std::ostringstream ostr;
+    ostr << "mergeFeedback {\n"
+         << "  mMergeFeedbackActive:" << boolStr(mMergeFeedbackActive) << '\n';
+    if (mMergeFeedbackActive) {
+        ostr << "  mMergeFeedbackInterval:" << mMergeFeedbackInterval << " sec\n"
+             << "  mMergeEvalFeedbackTime:" << msShow(mMergeEvalFeedbackTime) << '\n'
+             << "  mMergeSendFeedbackFps:" << mMergeSendFeedbackFps << '\n'
+             << "  mMergeSendFeedbackBps:" << bpsShow(mMergeSendFeedbackBps) << '\n';
+    }
+    ostr << "}";
+    return ostr.str();
+}
+
+std::string
+GlobalNodeInfo::showAllNodeInfo() const
+{
+    std::ostringstream ostr;    
+    ostr << "mMcrtNodeInfoMap (total:" << mMcrtNodeInfoMap.size() << ") {\n";
+    for (auto& itr : mMcrtNodeInfoMap) {
+        const McrtNodeInfoShPtr currPtr = itr.second;
+        ostr << scene_rdl2::str_util::addIndent(currPtr->show()) << '\n';
+    }
+    ostr << "}";
+    return ostr.str();
+}
+
+std::string
+GlobalNodeInfo::showFeedbackAvg() const
+{
+    float sendBpsAll = 0.0f;
+    float feedbackIntervalAll = 0.0f;
+    float recvFeedbackFpsAll = 0.0f;
+    float recvFeedbackBpsAll = 0.0f;
+    float evalFeedbackTimeAll = 0.0f;
+    float feedbackLatencyAll = 0.0f;
+    
+    unsigned totalNode = 0;
+    unsigned activeNode = 0;
+    crawlAllMcrtNodeInfo([&](McrtNodeInfoShPtr mcrtNodeInfo) -> bool {
+            sendBpsAll += mcrtNodeInfo->getSendBps();
+            if (mcrtNodeInfo->getFeedbackActive()) {
+                feedbackIntervalAll += mcrtNodeInfo->getFeedbackInterval();
+                recvFeedbackFpsAll += mcrtNodeInfo->getRecvFeedbackFps();
+                recvFeedbackBpsAll += mcrtNodeInfo->getRecvFeedbackBps();
+                evalFeedbackTimeAll += mcrtNodeInfo->getEvalFeedbackTime();
+                feedbackLatencyAll += mcrtNodeInfo->getFeedbackLatency();
+                activeNode++;
+            }
+            totalNode++;
+            return true;
+        });
+
+    if (!totalNode) {
+        return "empty";
+    }
+    if (!activeNode) {
+        return "no active feedback node";
+    }
+
+    float sendBpsAvg = sendBpsAll / static_cast<float>(activeNode);
+    float feedbackIntervalAvg = feedbackIntervalAll / static_cast<float>(activeNode);
+    float recvFeedbackFpsAvg = recvFeedbackFpsAll / static_cast<float>(activeNode);
+    float recvFeedbackBpsAvg = recvFeedbackBpsAll / static_cast<float>(activeNode);
+    float evalFeedbackTimeAvg = evalFeedbackTimeAll / static_cast<float>(activeNode);
+    float feedbackLatencyAvg = feedbackLatencyAll / static_cast<float>(activeNode);
+    
+    auto msShow = [](float ms) -> std::string {
+        std::ostringstream ostr;
+        ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
+        return ostr.str();
+    };
+    auto bpsShow = [](float bps) -> std::string {
+        std::ostringstream ostr;
+        ostr << scene_rdl2::str_util::byteStr(static_cast<size_t>(bps)) << "/sec";
+        return ostr.str();
+    };
+
+    std::ostringstream ostr;
+    ostr << "feedback status average (feedackActiveNode:" << activeNode << " totalNode:" << totalNode << ") {\n"
+         << "  sendBpsAvg:" << bpsShow(sendBpsAvg) << '\n'
+         << "  feedbackIntervalAvg:" << scene_rdl2::str_util::secStr(feedbackIntervalAvg) << " sec\n"
+         << "  recvFeedbackFpsAvg:" << recvFeedbackFpsAvg << '\n'
+         << "  recvFeedbackBpsAvg:" << bpsShow(recvFeedbackBpsAvg) << '\n'
+         << "  evalFeedbackTimeAvg:" << msShow(evalFeedbackTimeAvg) << '\n'
+         << "  feedbackLatencyAvg:" << msShow(feedbackLatencyAvg) << '\n'
+         << "}";
+    return ostr.str();
 }
 
 } // namespace mcrt_dataio
-

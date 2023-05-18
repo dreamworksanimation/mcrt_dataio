@@ -1,0 +1,6 @@
+# Copyright 2023 DreamWorks Animation LLC
+# SPDX-License-Identifier: Apache-2.0
+
+add_subdirectory("infoRecDump")
+add_subdirectory("sockTest")
+add_subdirectory("verifyMcrtFeedback")

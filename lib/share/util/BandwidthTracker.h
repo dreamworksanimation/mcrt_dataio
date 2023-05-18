@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include "MiscUtil.h"
@@ -54,8 +51,10 @@ public:
         mKeepIntervalSec(keepIntervalSec)
     {}
 
+    void setKeepIntervalSec(float sec) { mKeepIntervalSec = sec; }
+
     void set(size_t dataSize); // byte
-    float getBps(); // byte/sec
+    float getBps() const; // byte/sec
 
     std::string show() const;
 
@@ -69,9 +68,10 @@ private:
     // std::queue<T>.
     std::list<BandwidthEventShPtr> mEventList;
 
-    float deltaSecWhole();
-    static float deltaSec(const uint64_t currTIme, const uint64_t oldTime); // both microSec
+    size_t getMaxSize() const;
+    size_t getDataSizeWhole() const;
+    double getDeltaSecWhole() const;
+    static double getDeltaSec(const uint64_t currTIme, const uint64_t oldTime); // both microSec
 };
 
 } // namespace mcrt_dataio
-

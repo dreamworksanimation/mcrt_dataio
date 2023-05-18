@@ -1,0 +1,14 @@
+Import('env')
+# ------------------------------------------
+name       = 'verifyMcrtFeedback'
+sources    = env.DWAGlob('*.cc')
+components = [
+	   'common_fb_util',
+	   'common_grid_util',
+	   'common_math'
+]
+# ------------------------------------------
+()
+env.DWAUseComponents(components)
+prog = env.DWAProgram(name, sources)
+env.DWAInstallBin(prog)

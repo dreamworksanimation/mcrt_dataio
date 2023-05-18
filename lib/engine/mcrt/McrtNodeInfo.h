@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include <mcrt_dataio/share/codec/InfoCodec.h>
@@ -48,6 +45,12 @@ public:
     void setMemUsage(const float fraction); // MTsafe
     void setSnapshotToSend(const float ms); // MTsafe : millisec
     void setSendBps(const float bps); // MTsafe : Byte/Sec
+    void setFeedbackActive(const bool flag); // MTsafe
+    void setFeedbackInterval(const float sec); // MTsafe : sec
+    void setRecvFeedbackFps(const float fps); // MTsafe : fps
+    void setRecvFeedbackBps(const float bps); // MTsafe : Byte/Sec
+    void setEvalFeedbackTime(const float ms); // MTsafe : millisec
+    void setFeedbackLatency(const float ms); // MTsafe : millisec
     void setClockTimeShift(const float ms); // MTsafe : millisec
     void setRoundTripTime(const float ms); // MTsafe : millisec
     void setLastRunClockOffsetTime(const uint64_t us); // MTsafe : microsec
@@ -82,6 +85,12 @@ public:
     float getMemUsage() const { return mMemUsage; }
     float getSnapshotToSend() const { return mSnapshotToSend; }
     float getSendBps() const { return mSendBps; }
+    bool getFeedbackActive() const { return mFeedbackActive; }
+    float getFeedbackInterval() const { return mFeedbackInterval; } // sec
+    float getRecvFeedbackFps() const { return mRecvFeedbackFps; }
+    float getRecvFeedbackBps() const { return mRecvFeedbackBps; } // Byte/sec
+    float getEvalFeedbackTime() const { return mEvalFeedbackTime; } // millisec
+    float getFeedbackLatency() const { return mFeedbackLatency; } // millisec
     float getClockTimeShift() const { return mClockTimeShift; } // millisec
     uint64_t getLastRunClockOffsetTime() const { return mLastRunClockOffsetTime; }
     unsigned getSyncId() const { return mSyncId; }
@@ -120,47 +129,58 @@ private:
     void parserConfigure();
 
     std::string showTimeLog() const;
+    std::string showFeedback() const;
+
+    static std::string msShow(float ms);
+    static std::string bpsShow(float bps);
 
     //------------------------------
 
     std::string mHostName;
-    int mMachineId;
+    int mMachineId {0};
 
-    int mCpuTotal;              // CPU core total
-    float mCpuUsage;            // fraction 0.0~1.0
-    size_t mMemTotal;           // memory total byte
-    float mMemUsage;            // fraction 0.0~1.0
-    float mSnapshotToSend;      // millisec
-    float mSendBps;             // outgoing message bandwidth Byte/Sec
+    int mCpuTotal {0};            // CPU core total
+    float mCpuUsage {0.0f};       // fraction 0.0~1.0
+    size_t mMemTotal {0};         // memory total byte
+    float mMemUsage {0.0f};       // fraction 0.0~1.0
+    float mSnapshotToSend {0.0f}; // millisec
+    float mSendBps {0.0f};        // outgoing message bandwidth Byte/Sec
 
-    float mClockTimeShift;      // millisec
-    float mRoundTripTime;       // millisec
+    bool mFeedbackActive {false};   // feedback condition
+    float mFeedbackInterval {0.0f}; // feedback interval : sec
+    float mRecvFeedbackFps {0.0f};  // incoming feedback message receive fps
+    float mRecvFeedbackBps {0.0f};  // incoming feedback message bandwidth : Byte/Sec
+    float mEvalFeedbackTime {0.0f}; // feedback evaluation cost : millisec
+    float mFeedbackLatency {0.0f};  // feedback latency : millisec
 
-    uint64_t mLastRunClockOffsetTime; // microsec from Epoch
+    float mClockTimeShift {0.0f}; // millisec
+    float mRoundTripTime {0.0f};  // millisec
 
-    unsigned mSyncId;           // current processed syncId
-    bool mRenderActive;         // true:rendering false:not-rendering
-    bool mRenderPrepCancel;     // true:cancelActionOnGoing false:noCancelAction
+    uint64_t mLastRunClockOffsetTime {0}; // microsec from Epoch
+
+    unsigned mSyncId {0};           // current processed syncId
+    bool mRenderActive {false};     // true:rendering false:not-rendering
+    bool mRenderPrepCancel {false}; // true:cancelActionOnGoing false:noCancelAction
 
     RenderPrepStats mRenderPrepStats;
 
     std::mutex mRenderPrepStatsMutex;
-    bool mRenderPrepStatsLoadGeometriesRequestFlush;
-    bool mRenderPrepStatsTessellationRequestFlush;
+    bool mRenderPrepStatsLoadGeometriesRequestFlush {false};
+    bool mRenderPrepStatsTessellationRequestFlush {false};
     RenderPrepStats mRenderPrepStatsWork; // work memory
     
     // related to initial image send back timing
-    uint64_t mGlobalBaseFromEpoch;
-    unsigned mTotalMsg; // total processed rdlMessage for current render frame
-    float mOldestMessageRecvTiming; // sec from process start
-    float mNewestMessageRecvTiming; // sec from process start
-    float mRenderPrepStartTiming; // sec from process start
-    float mRenderPrepEndTiming; // sec from process start
-    float m1stSnapshotStartTiming; // sec from process start
-    float m1stSnapshotEndTiming; // sec from process start
-    float m1stSendTiming; // sec from process start
+    uint64_t mGlobalBaseFromEpoch {0};
+    unsigned mTotalMsg {0};                // total processed rdlMessage for current render frame
+    float mOldestMessageRecvTiming {0.0f}; // sec from process start
+    float mNewestMessageRecvTiming {0.0f}; // sec from process start
+    float mRenderPrepStartTiming {0.0f};   // sec from process start
+    float mRenderPrepEndTiming {0.0f};     // sec from process start
+    float m1stSnapshotStartTiming {0.0f};  // sec from process start
+    float m1stSnapshotEndTiming {0.0f};    // sec from process start
+    float m1stSendTiming {0.0f};           // sec from process start
 
-    float mProgress;            // render progress 0.0~1.0
+    float mProgress {0.0f}; // render progress 0.0~1.0
 
     // For the genericComment, we use different logic from another regular member for infoCodec operation.
     // The biggest difference between genericComment and other items in this object is that genericComment
@@ -175,4 +195,3 @@ private:
 };
 
 } // namespace mcrt_dataio
-

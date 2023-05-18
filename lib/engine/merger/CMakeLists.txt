@@ -17,7 +17,9 @@ target_sources(${component}
         FbMsgSingleFrame.cc
         FbMsgUtil.cc
         GlobalNodeInfo.cc
+	MergeActionTracker.cc
         MergeFbSender.cc
+	MergeSequenceEnqueue.cc
         MergeStats.cc
 )
 
@@ -27,9 +29,12 @@ set_property(TARGET ${component}
         FbMsgMultiFrames.h
         FbMsgSingleChan.h
         FbMsgSingleFrame.h
-        FbMsgUtil.h
         GlobalNodeInfo.h
+	MergeActionTracker.h
         MergeFbSender.h
+	MergeSequenceDequeue.h
+	MergeSequenceEnqueue.h
+	MergeSequenceKey.h
         MergeStats.h
         MsgSendHandler.h
 )
@@ -45,6 +50,7 @@ target_link_libraries(${component}
         SceneRdl2::common_fb_util
         SceneRdl2::common_grid_util
         SceneRdl2::common_platform
+	SceneRdl2::render_cache
         SceneRdl2::render_util
         SceneRdl2::scene_rdl2
         ${PROJECT_NAME}::engine_mcrt

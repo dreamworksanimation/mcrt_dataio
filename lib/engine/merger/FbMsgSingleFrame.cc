@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "FbMsgSingleFrame.h"
 
 #include <scene_rdl2/common/grid_util/LatencyLog.h>
@@ -31,6 +28,21 @@ FbMsgSingleFrame::changeTaskType(const TaskType &type)
     if (mTaskType == type) return;
 
     mTaskType = type;
+}
+
+void
+FbMsgSingleFrame::resetFeedback(bool feedbackActive)
+{
+    mFeedbackActive = feedbackActive;
+
+    if (!mFeedbackActive) return;
+
+    //
+    // initialize MergeActionTrackers
+    //
+    for (auto& currMergeActionTracker: mMergeActionTracker) {
+        currMergeActionTracker.resetEncode(); // free previous memory and reset all
+    }
 }
 
 bool
@@ -253,6 +265,42 @@ FbMsgSingleFrame::merge(const unsigned partialMergeTilesTotal,
 }
 
 void
+FbMsgSingleFrame::encodeMergeActionTracker(scene_rdl2::cache::CacheEnqueue& enqueue)
+{
+    for (size_t machineId = 0; machineId < static_cast<size_t>(mNumMachines); ++machineId) {
+        if (!mReceivedAll[machineId]) continue;
+
+        enqueue.enqVLInt(static_cast<int>(machineId));
+        mMergeActionTracker[machineId].encodeData(enqueue);
+    }
+    enqueue.enqVLInt(-1); // terminator
+    enqueue.finalize();
+}
+
+// static function
+std::string
+FbMsgSingleFrame::decodeMergeActionTrackerAndDump(scene_rdl2::cache::CacheDequeue& dequeue,
+                                                  unsigned targetMachineId)
+{
+    while (true) {
+        int machineId = dequeue.deqVLInt();
+        if (machineId < 0) break;
+
+        if (machineId != static_cast<int>(targetMachineId)) {
+            MergeActionTracker::decodeDataSkipOnMCRTComputation(dequeue);
+        } else {
+            MergeActionTracker currMergeActionTracker;
+            currMergeActionTracker.decodeDataOnMCRTComputation(dequeue);
+            return currMergeActionTracker.dumpData();
+        }
+    }
+
+    std::ostringstream ostr;
+    ostr << "Can not decode MergeActionTracker data (no data for targetMachineId:" << targetMachineId << ")";
+    return ostr.str();
+}
+
+void
 FbMsgSingleFrame::encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq &vContainerEnq)
 {
     if (mEncodeLatencyLogCountTotal == 0) {
@@ -385,7 +433,8 @@ FbMsgSingleFrame::decodeFirstPushedData()
     uint64_t startMicroSec = getCurrentMicroSec();
 #   endif // end DEBUG_TIMING_LOG
 
-    mMessage[machineId].decodeAll(mFb[machineId]);
+    MergeActionTracker* mergeActionTrackerPtr = (mFeedbackActive) ? &mMergeActionTracker[machineId] : nullptr;
+    mMessage[machineId].decodeAll(mFb[machineId], mergeActionTrackerPtr);
 
 #   ifdef DEBUG_TIMING_LOG
     uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
@@ -407,14 +456,18 @@ FbMsgSingleFrame::decodeAllPushedData()
 #   ifdef SINGLE_THREAD
     for (int machineId = 0; machineId < mNumMachines; ++machineId) {
         if (!mReceived[machineId]) continue;
-        mMessage[machineId].decodeAll(mFb[machineId]);
+        MergeActionTracker* mergeActionTrackerPtr =
+            (mFeedbackActive) ? &mMergeActionTracker[machineId] : nullptr;
+        mMessage[machineId].decodeAll(mFb[machineId], mergeActionTrackerPtr);
     }
 #   else // else SINGLE_THREAD
     tbb::blocked_range<size_t> range(0, mNumMachines);
     tbb::parallel_for(range, [&](const tbb::blocked_range<size_t> &r) {
             for (size_t machineId = r.begin(); machineId < r.end(); ++machineId) {
                 if (!mReceived[machineId]) continue;
-                mMessage[machineId].decodeAll(mFb[machineId]);
+                MergeActionTracker* mergeActionTrackerPtr =
+                    (mFeedbackActive) ? &mMergeActionTracker[machineId] : nullptr;
+                mMessage[machineId].decodeAll(mFb[machineId], mergeActionTrackerPtr);
             }
         });
 #   endif // end !SINGLE_THREAD
@@ -463,8 +516,24 @@ FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb &fb,
     latencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_DEQ_FBRESET);
     for (int machineId = 0; machineId < mNumMachines; ++machineId) {
         mergeSingleFb(nullptr, machineId, fb);
+
+        /* useful debug code
+        if (mReceivedAll[machineId]) {
+            if (!verifyMergedResultNumSampleSingleHost(machineId, fb)) {
+                std::cerr << ">> FbMsgSingleFrame.cc mergeAllFb RUNTIME-VERIFY failed. machineId:" << machineId << " +++++++++++++\n";
+            }
+        }
+        */
     }
     latencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_DEQ_ACCUMULATE);
+
+    /* useful debug code
+    { // verify merge result of numSample
+        if (!verifyMergedResultNumSample(fb)) {
+            std::cerr << ">> FbMsgSingleFrame.cc mergeAllFb RUNTIME-VERIFY failed <<<<<<<<<<<<<<<<<<\n";
+        }
+    }
+    */
 
 #   ifdef DEBUG_TIMING_LOG
     timeLogUpdate("-- merge --", mDebugTimeLogMerge, cMicroSec);
@@ -529,6 +598,17 @@ FbMsgSingleFrame::mergeSingleFb(const std::vector<char> *partialMergeTilesTbl,
             }
         });
 #   endif // end !SINGLE_THREAD
+
+    if (mFeedbackActive) {
+        //
+        // Update mergeActionTracker
+        //
+        if (!partialMergeTilesTbl) {
+            mMergeActionTracker[machineId].mergeFull();
+        } else {
+            mMergeActionTracker[machineId].mergePartial(*partialMergeTilesTbl);
+        }
+    }
 }
 
 #ifdef TEST
@@ -567,6 +647,79 @@ FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb &fb,
 }
 #endif // end TEST
 
+bool
+FbMsgSingleFrame::verifyMergedResultNumSample(const scene_rdl2::grid_util::Fb& mergedFb) const
+{
+    for (int machineId = 0; machineId < mNumMachines; ++machineId) {
+        if (mReceivedAll[machineId]) {
+            if (!verifyMergedResultNumSampleSingleHost(machineId, mergedFb)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+bool
+FbMsgSingleFrame::verifyMergedResultNumSampleSingleHost(int machineId,
+                                                        const scene_rdl2::grid_util::Fb& mergedFb) const
+{
+    auto verifyNumSampleBuff =
+        [&](int machineId,
+            unsigned totalTiles, unsigned numTileX, unsigned width, unsigned height,
+            const scene_rdl2::fb_util::ActivePixels& srcActivePixels,
+            const scene_rdl2::grid_util::Fb::NumSampleBuffer& srcNSBuff,
+            const scene_rdl2::grid_util::Fb::NumSampleBuffer& mrgNSBuff) -> bool
+        {
+            constexpr unsigned tilePixSize = 8; // 8 pixels x 8 pixels
+            for (unsigned tileId = 0; tileId < totalTiles; ++tileId) {
+                unsigned tileX = tileId % numTileX;
+                unsigned tileY = tileId / numTileX;
+                unsigned tilePixOffset = tileId * 64;
+                uint64_t srcMask = srcActivePixels.getTileMask(tileId);
+                for (unsigned y = 0; y < tilePixSize; ++y) {
+                    for (unsigned x = 0; x < tilePixSize; ++x) {
+                        unsigned gx = tileX * tilePixSize + x;
+                        unsigned gy = tileY * tilePixSize + y;
+                        if (gx >= width || gy >= height) continue;
+
+                        unsigned inTilePixOffset = y * tilePixSize + x;
+                        bool srcActiveFlag = srcMask & ((uint64_t)(0x1) << inTilePixOffset);
+                        
+                        unsigned pixOffset = tilePixOffset + inTilePixOffset;
+                        unsigned int srcNS = srcNSBuff.getData()[pixOffset];
+                        unsigned int mrgNS = mrgNSBuff.getData()[pixOffset];
+                        if (mrgNS < srcNS) {
+                            std::cerr << ">> FbMsgSingleFrame.cc verifyMergeResultNumSample FAILED"
+                                      << " machineId:" << machineId
+                                      << " pix(" << gx << ',' << gy << ")"
+                                      << " srcNS:" << srcNS
+                                      << " mrgNS:" << mrgNS
+                                      << " srcActiveFlag:" << scene_rdl2::str_util::boolStr(srcActiveFlag) 
+                                      << '\n';
+                            return false;
+                        }
+                    }
+                }
+            }
+            return true;
+        };
+
+    const scene_rdl2::grid_util::Fb& srcFb = mFb[machineId];
+    if (srcFb.getWidth() != mergedFb.getWidth() || srcFb.getHeight() != mergedFb.getHeight()) {
+        return false;
+    }
+
+    const scene_rdl2::fb_util::ActivePixels& srcActivePixels = srcFb.getActivePixels();
+    const scene_rdl2::grid_util::Fb::NumSampleBuffer& srcNSBuff = srcFb.getNumSampleBufferTiled();
+    const scene_rdl2::grid_util::Fb::NumSampleBuffer& mrgNSBuff = mergedFb.getNumSampleBufferTiled();
+
+    return verifyNumSampleBuff(machineId,
+                               srcFb.getTotalTiles(), srcFb.getNumTilesX(),
+                               srcFb.getWidth(), srcFb.getHeight(),
+                               srcActivePixels, srcNSBuff, mrgNSBuff);
+}
+
 void
 FbMsgSingleFrame::partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
                                           std::vector<char> &partialMergeTileTbl)
@@ -580,7 +733,7 @@ FbMsgSingleFrame::partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
 {
     if (mFb.empty()) return;    // just in case
 
-    unsigned totalTiles = mFb[0].getTileTotal();
+    unsigned totalTiles = mFb[0].getTotalTiles();
     partialMergeTileTbl.resize(totalTiles, (char)false);
 
     if (partialMergeTilesTotal == 0) {
@@ -659,5 +812,38 @@ FbMsgSingleFrame::showAllReceivedAndProgress(const std::string &hd) const
     return ostr.str();
 }
 
-} // namespace mcrt_dataio
+void
+FbMsgSingleFrame::parserConfigure()
+{
+    mParser.description("FbMsgSingleFrame command");
+    mParser.opt("multiChan", "<machineId> ...command...", "show info for particular machineId's multiChan data",
+                [&](Arg& arg) -> bool { return parserCommandMultiChan(arg); });
+    mParser.opt("fb", "<machineId> ...command...", "show interl received fb data",
+                [&](Arg& arg) -> bool { return parserCommandFb(arg); });
+}
 
+bool
+FbMsgSingleFrame::parserCommandMultiChan(Arg& arg)
+{
+    unsigned machineId = (arg++).as<unsigned>(0);
+    if (machineId > mMessage.size() - 1) {
+        arg.fmtMsg("machineId:%d is out of range. max:%d\n", machineId, mMessage.size());
+        return false;
+    }
+
+    return mMessage[machineId].getParser().main(arg.childArg());
+}
+
+bool
+FbMsgSingleFrame::parserCommandFb(Arg& arg)
+{
+    unsigned machineId = (arg++).as<unsigned>(0);
+    if (machineId > mFb.size() - 1) {
+        arg.fmtMsg("machineId:%d is out of range. max:%d\n", machineId, mMessage.size());
+        return false;
+    }
+
+    return mFb[machineId].getParser().main(arg.childArg());
+}
+
+} // namespace mcrt_dataio

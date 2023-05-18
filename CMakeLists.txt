@@ -13,6 +13,10 @@ string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 list(APPEND CMAKE_MESSAGE_CONTEXT ${PROJECT_NAME})
 list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+    include(CTest)
+endif()
+
 # ================================================
 # Options
 # ================================================
@@ -74,6 +78,13 @@ include(SConscriptStub)
 # Add project files
 # ================================================
 add_subdirectory(lib)
+add_subdirectory(cmd)
+
+if((CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME OR ${PROJECT_NAME_UPPER}_BUILD_TESTING)
+        AND BUILD_TESTING)
+    find_package(CppUnit REQUIRED)
+    add_subdirectory(tests)
+endif()
 
 # ================================================
 # Install

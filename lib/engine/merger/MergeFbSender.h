@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 //
@@ -53,19 +50,7 @@ public:
                 // FinePass   : Basically use H16. Only uses F32 if minimum precision is F32
     };
 
-    MergeFbSender() :
-        mPrecisionControl(PrecisionControl::AUTO16),
-        mLastBeautyBufferSize(0), mLastPixelInfoSize(0), mLastHeatMapSize(0), mLastWeightBufferSize(0), 
-        mLastRenderBufferOddSize(0),
-        mLastRenderOutputSize(0),
-        mMin(0), mMax(0),
-        mStartCondition(false),
-        mFrameStatus(mcrt::BaseFrame::ERROR),
-        mProgressFraction(0.0f),
-        mSnapshotStartTime(0),
-        mCoarsePassStatus(true),
-        mBeautyHDRITest(HdriTestCondition::INIT)
-    {}
+    MergeFbSender() = default;
 
     // Non-copyable
     MergeFbSender &operator = (const MergeFbSender) = delete;
@@ -79,7 +64,8 @@ public:
     scene_rdl2::grid_util::FbActivePixels &getFbActivePixels() { return mFbActivePixels; }
     scene_rdl2::grid_util::Fb &getFb() { return mFb; }
 
-    void setHeaderInfoAndFbReset(FbMsgSingleFrame *currFbMsgSingleFrame);
+    void setHeaderInfoAndFbReset(FbMsgSingleFrame* currFbMsgSingleFrame,
+                                 const mcrt::BaseFrame::Status* overwriteFrameStatusPtr = nullptr);
     mcrt::BaseFrame::Status getFrameStatus() const { return mFrameStatus; }
     float getProgressFraction() const { return mProgressFraction; }
     uint64_t getSnapshotStartTime() const { return mSnapshotStartTime; }
@@ -90,11 +76,15 @@ public:
     void encodeUpstreamLatencyLog(FbMsgSingleFrame *frame);
 
     void addBeautyBuff(mcrt::BaseFrame::Ptr message);
+    void addBeautyBuffWithNumSample(mcrt::BaseFrame::Ptr message);
     void addPixelInfo(mcrt::BaseFrame::Ptr message);
     void addHeatMap(mcrt::BaseFrame::Ptr message);
+    void addHeatMapWithNumSample(mcrt::BaseFrame::Ptr message);
     void addWeightBuffer(mcrt::BaseFrame::Ptr message);
     void addRenderBufferOdd(mcrt::BaseFrame::Ptr message);
+    void addRenderBufferOddWithNumSample(mcrt::BaseFrame::Ptr message);
     void addRenderOutput(mcrt::BaseFrame::Ptr message);
+    void addRenderOutputWithNumSample(mcrt::BaseFrame::Ptr message);
     void addLatencyLog(mcrt::BaseFrame::Ptr message);
     void addAuxInfo(mcrt::BaseFrame::Ptr message, const std::vector<std::string> &infoDataArray);
 
@@ -111,34 +101,38 @@ protected:
     using CoarsePassPrecision = scene_rdl2::grid_util::CoarsePassPrecision;
     using FinePassPrecision = scene_rdl2::grid_util::FinePassPrecision;
 
-    PrecisionControl mPrecisionControl;
+    PrecisionControl mPrecisionControl {PrecisionControl::AUTO16};
 
     scene_rdl2::grid_util::FbActivePixels mFbActivePixels; // snapshot result
     scene_rdl2::grid_util::Fb mFb;
 
     //------------------------------
 
-    size_t mLastBeautyBufferSize;    // last beauty buffer packTile data size
-    size_t mLastPixelInfoSize;       // last pixelInfo packTile data size
-    size_t mLastHeatMapSize;         // last heatMap packTile data size
-    size_t mLastWeightBufferSize;    // last weightBuffer packTile data size
-    size_t mLastRenderBufferOddSize; // last renderBufferOdd packTile data size
-    size_t mLastRenderOutputSize;    // last renderOutput packTile data size
-    size_t mMin, mMax;               // for performance analyze. packet size min/max info
+    size_t mLastBeautyBufferSize {0};             // last beauty buffer packTile data size
+    size_t mLastBeautyBufferNumSampleSize {0};    // last beauty buffer w/ numSample packTile data size
+    size_t mLastPixelInfoSize {0};                // last pixelInfo packTile data size
+    size_t mLastHeatMapSize {0};                  // last heatMap packTile data size
+    size_t mLastHeatMapNumSampleSize {0};         // last heatMap packTile data size
+    size_t mLastWeightBufferSize {0};             // last weightBuffer packTile data size
+    size_t mLastRenderBufferOddSize {0};          // last renderBufferOdd packTile data size
+    size_t mLastRenderBufferOddNumSampleSize {0}; // last renderBufferOdd w/ numSample packTile data size
+    size_t mLastRenderOutputSize {0};             // last renderOutput packTile data size
+    size_t mMin {0};                              // for performance analyze. packet size min info
+    size_t mMax {0};                              // for performance analyze. packet size max info
 
-    std::string mWork;               // work memory for encoding
+    std::string mWork; // work memory for encoding
 
     //------------------------------
 
-    bool mStartCondition;
+    bool mStartCondition {false};
     scene_rdl2::grid_util::LatencyLog mLatencyLog;
 
     //------------------------------
 
-    mcrt::BaseFrame::Status mFrameStatus; // current image's frame status
-    float mProgressFraction;              // current image's progress fraction
-    uint64_t mSnapshotStartTime;          // current image's snapshot start time on mcrt computation
-    bool mCoarsePassStatus;               // current image's coarse pass or not status
+    mcrt::BaseFrame::Status mFrameStatus {mcrt::BaseFrame::ERROR}; // current image's frame status
+    float mProgressFraction {0.0f};  // current image's progress fraction
+    uint64_t mSnapshotStartTime {0}; // current image's snapshot start time on mcrt computation
+    bool mCoarsePassStatus {true};   // current image's coarse pass or not status
     std::string mDenoiserAlbedoInputName;
     std::string mDenoiserNormalInputName;
 
@@ -147,7 +141,8 @@ protected:
         HDRI,    // The test has been completed and the result included HDRI pixel
         NON_HDRI // The test has been completed and the result did not include HDRI pixel
     };
-    HdriTestCondition mBeautyHDRITest; // status of execution of HDRI test for beauty buffer after done snapshotDelta
+    // status of execution of HDRI test for beauty buffer after done snapshotDelta
+    HdriTestCondition mBeautyHDRITest {HdriTestCondition::INIT};
 
     //------------------------------
 
@@ -184,4 +179,3 @@ MergeFbSender::duplicateWorkData(const std::string &work)
 }
 
 } // namespace mcrt_dataio
-

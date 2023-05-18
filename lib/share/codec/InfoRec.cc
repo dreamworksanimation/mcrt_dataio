@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "InfoRec.h"
 
 #include <mcrt_dataio/share/util/MiscUtil.h>
@@ -27,9 +24,91 @@ mIdStrGen(const int machineId)
     return std::to_string(machineId);
 }
 
+void
+unitAndTitleGen(const std::string& key, std::string& title, std::string& unit)
+{
+    title = "?";
+    unit = "?";
+
+    if (key == "cpu" || key == "mem" || key == "prg") {
+        unit = "%";
+        if (key == "cpu") title = "CPU-usage";
+        else if (key == "mem") title = "Memory-usage";
+        else if (key == "prg") title = "Progress";
+    } else if (key == "fIt") {
+        unit = "sec";
+        title = "FeedbackInterval";
+    } else if (key == "snp" || key == "ltc" || key == "clk" || key == "fEv" || key == "fLt") {
+        unit = "millisec";
+        if (key == "snp") title = "Snapshot-to-Send";
+        else if (key == "ltc") title = "Latency";
+        else if (key == "clk") title = "ClockShift";
+        else if (key == "fEv") title = "Feedback-eval";
+        else if (key == "fLt") title = "Feedback-latency";
+    } else if (key == "snd" || key == "rcv" || key == "fBp") {
+        unit = "Mbyte/Sec";
+        if (key == "snd") title = "Send-bandwitdh";
+        else if (key == "rcv") title = "Receive-bandwidth";
+        else if (key == "fBp") title = "Feedback-bandwidth";
+    } else if (key == "rnd" || key == "fAc") {
+        unit = "bool";
+        if (key == "rnd") title = "RenderActive";
+        else if (key == "fAc") title = "Feedback-active";
+    } else if (key == "rps") {
+        unit = "enum";
+        title = "RenderPrepStats";
+    } else if (key == "fFp") {
+        unit == "fps";
+        title = "Feedback-fps";
+    }
+}
+
 } // namespace
 
 namespace mcrt_dataio {
+
+bool
+InfoRecGlobal::isDispatchSet() const
+{
+    if (!mArray["dp"]) return false;
+    return true;
+}
+
+void
+InfoRecGlobal::setDispatch(const std::string& hostName,
+                           const int cpuTotal,
+                           const size_t memTotal)
+{
+    mArray["dp"]["name"] = hostName;
+    mArray["dp"]["cpu"] = cpuTotal;
+    mArray["dp"]["mem"] = static_cast<unsigned long long>(memTotal);
+}
+
+bool
+InfoRecGlobal::isMcrtSet(const int machineId) const
+{
+    std::string mIdStr = mIdStrGen(machineId);
+    if (!mArray["mc"][mIdStr]) return false;
+    return true;
+}
+
+void
+InfoRecGlobal::setMcrt(const int machineId,
+                       const std::string& hostName,
+                       const int cpuTotal,
+                       const size_t memTotal)
+{
+    std::string mIdStr = mIdStrGen(machineId);
+    mArray["mc"][mIdStr]["name"] = hostName;
+    mArray["mc"][mIdStr]["cpu"] = cpuTotal;
+    mArray["mc"][mIdStr]["mem"] = static_cast<unsigned long long>(memTotal);
+}
+
+size_t
+InfoRecGlobal::getMcrtTotal() const
+{
+    return mArray["mc"].size();
+}
 
 bool
 InfoRecGlobal::isMergeSet() const
@@ -39,40 +118,13 @@ InfoRecGlobal::isMergeSet() const
 }
 
 void
-InfoRecGlobal::setMerge(const std::string &hostName,
+InfoRecGlobal::setMerge(const std::string& hostName,
                         const int cpuTotal,
                         const size_t memTotal)
 {
     mArray["mg"]["name"] = hostName;
     mArray["mg"]["cpu"] = cpuTotal;
-    mArray["mg"]["mem"] = (unsigned long long)memTotal;
-}
-
-bool
-InfoRecGlobal::isMcrtSet(const int machineId) const
-{
-    std::string mIdStr = mIdStrGen(machineId);
-    
-    if (!mArray["mc"][mIdStr]) return false;
-    return true;
-}
-
-void
-InfoRecGlobal::setMcrt(const int machineId,
-                       const std::string &hostName,
-                       const int cpuTotal,
-                       const size_t memTotal)
-{
-    std::string mIdStr = mIdStrGen(machineId);
-    mArray["mc"][mIdStr]["name"] = hostName;
-    mArray["mc"][mIdStr]["cpu"] = cpuTotal;
-    mArray["mc"][mIdStr]["mem"] = (unsigned long long)memTotal;
-}
-
-size_t
-InfoRecGlobal::getMcrtTotal() const
-{
-    return mArray["mc"].size();
+    mArray["mg"]["mem"] = static_cast<unsigned long long>(memTotal);
 }
 
 std::string
@@ -97,6 +149,7 @@ InfoRecGlobal::show() const
 }
 
 //------------------------------------------------------------------------------------------
+//------------------------------------------------------------------------------------------
 
 std::string
 InfoRecItem::getTimeStampStr() const
@@ -106,25 +159,51 @@ InfoRecItem::getTimeStampStr() const
 }
 
 void
-InfoRecItem::setClient(const float latency,     // sec
-                       const float clockShift)  // millisec
+InfoRecItem::setClient(const float latency, // sec
+                       const float clockShift) // millisec
 {
     mArray["cl"]["ltc"] = latency;
     mArray["cl"]["clk"] = clockShift;
 }
 
 void
-InfoRecItem::setMerge(const float cpuUsage,      // fraction
-                      const float memUsage,      // fraction
-                      const float recvBps,       // Byte/Sec
-                      const float sendBps,       // Byte/Sec
-                      const float progress)      // fraction
+InfoRecItem::setMerge(const float cpuUsage, // fraction
+                      const float memUsage, // fraction
+                      const float recvBps,  // Byte/Sec
+                      const float sendBps,  // Byte/Sec
+                      const float progress) // fraction
 {
     mArray["mg"]["cpu"] = cpuUsage;
     mArray["mg"]["mem"] = memUsage;
     mArray["mg"]["rcv"] = recvBps;
     mArray["mg"]["snd"] = sendBps;
     mArray["mg"]["prg"] = progress;
+}
+
+void
+InfoRecItem::setMergeFeedbackOn(const float feedbackInterval, // sec
+                                const float evalFeedbackTime, // millisec
+                                const float sendFeedbackFps,  // fps
+                                const float sendFeedbackBps)  // Byte/Sec
+{
+    mArray["mg"]["fAc"] = true;
+    mArray["mg"]["fIt"] = feedbackInterval; // sec
+    mArray["mg"]["fEv"] = evalFeedbackTime; // millisec
+    mArray["mg"]["fFp"] = sendFeedbackFps;  // fps
+    mArray["mg"]["fBp"] = sendFeedbackBps;  // Byte/Sec
+}
+
+void
+InfoRecItem::setMergeFeedbackOff()
+{
+    mArray["mg"]["fAc"] = false;
+}
+
+bool
+InfoRecItem::isMergeFeedbackActive() const
+{
+    if (!mArray["mg"]["fAc"]) return false;
+    return mArray["mg"]["fAc"].asBool();
 }
 
 float
@@ -156,6 +235,55 @@ InfoRecItem::setMcrt(const int machineId,
     mArray["mc"][mIdStr]["rps"] = renderPrepStats;
     mArray["mc"][mIdStr]["prg"] = progress;
     mArray["mc"][mIdStr]["clk"] = clockShift;
+}
+
+void
+InfoRecItem::setMcrtFeedbackOn(const int machineId,
+                               const float feedbackInterval, // sec
+                               const float recvFeedbackFps,  // fps
+                               const float recvFeedbackBps,  // Byte/Sec
+                               const float evalFeedbackTime, // millisec
+                               const float feedbackLatency)  // millisec
+{
+    std::string mIdStr = mIdStrGen(machineId);
+
+    mArray["mc"][mIdStr]["fAc"] = true;
+    mArray["mc"][mIdStr]["fIt"] = feedbackInterval;
+    mArray["mc"][mIdStr]["fFp"] = recvFeedbackFps;
+    mArray["mc"][mIdStr]["fBp"] = recvFeedbackBps;
+    mArray["mc"][mIdStr]["fEv"] = evalFeedbackTime;
+    mArray["mc"][mIdStr]["fLt"] = feedbackLatency;
+}
+
+void
+InfoRecItem::setMcrtFeedbackOff(const int machineId)
+{
+    std::string mIdStr = mIdStrGen(machineId);
+    mArray["mc"][mIdStr]["fAc"] = false;
+}
+
+bool
+InfoRecItem::isMcrtFeedbackActive(const int machineId) const
+{
+    std::string mIdStr = mIdStrGen(machineId);
+    if (!mArray["mc"][mIdStr]["fAc"]) return false;
+    return mArray["mc"][mIdStr]["fAc"].asBool();
+}
+
+float
+InfoRecItem::getMcrtSummedProgress() const // return total fraction
+{
+    Json::Value jv = mArray["mc"];
+    if (jv.empty()) {
+        return 0.0f;
+    }
+
+    float progressTotal = 0.0f;
+    for (Json::ValueIterator itr = jv.begin(); itr != jv.end(); ++itr) {
+        float currProgress = (*itr)["prg"].asFloat();
+        if (currProgress > 0.0f) progressTotal += currProgress;
+    }
+    return progressTotal;
 }
 
 bool
@@ -190,22 +318,6 @@ InfoRecItem::isMcrtAllStart() const
     return true;                // can not find non active mcrt => all start
 }
 
-float
-InfoRecItem::getProgress() const // return total fraction
-{
-    Json::Value jv = mArray["mc"];
-    if (jv.empty()) {
-        return 0.0f;
-    }
-
-    float progressTotal = 0.0f;
-    for (Json::ValueIterator itr = jv.begin(); itr != jv.end(); ++itr) {
-        float currProgress = (*itr)["prg"].asFloat();
-        if (currProgress > 0.0f) progressTotal += currProgress;
-    }
-    return progressTotal;
-}
-
 std::string
 InfoRecItem::encode() const
 {
@@ -234,78 +346,63 @@ InfoRecItem::show() const
 std::string
 InfoRecItem::showTable(const std::string &key) const
 {
-    std::vector<char> bVec;
-    std::vector<float> fVec;
-    float fVal = 0.0f;
-    std::vector<int> iVec;
+    //
+    // Unit and Title
+    //
+    std::string title, unit;
+    unitAndTitleGen(key, title, unit);
 
-    if (key == "rnd") { // RenderActive status
-        bVec = getAllMcrtValAsBool(key);
-    } else if (key == "rcv") {  // Receive-bandwidth
-        fVal = getMergeVal(key);
-    } else if (key == "ltc") { // Latency
-        fVal = getClientVal(key);
+    //------------------------------
+    //
+    // setup data array
+    //
+    std::deque<bool> bVec;
+    std::vector<float> fVec;
+    std::vector<int> iVec;
+    size_t totalMcrt = 0;
+
+    // get mcrt data as array
+    if (key == "rnd" || // RenderActive status
+        key == "fAc") { // FeedbackActive condition
+        bVec = getMcrtValAsBool(key);
+        totalMcrt = bVec.size();
     } else if (key == "rps") { // RenderPrepStatus
-        iVec = getAllMcrtValAsInt(key);
+        iVec = getMcrtValAsInt(key);
+        totalMcrt = iVec.size();
     } else { // others
-        fVec = getAllMcrtValAsFloat(key);
+        fVec = getMcrtValAsFloat(key);
+        totalMcrt = fVec.size();
     }
     
-    std::string title, unit;
-
-    if (key == "cpu" || key == "mem" || key == "prg") {
-        if (key == "cpu") title = "CPU-usage";
-        else if (key == "mem") title = "Memory-usage";
-        else if (key == "prg") title = "Progress";
-        unit = "%";
-    } else if (key == "snp") {
-        title = "Snapshot-to-Send";
-        unit = "millisec";
-    } else if (key == "snd") {
-        title = "Send-bandwitdh";
-        unit = "Mbyte/Sec";
-    } else if (key == "rcv") {
-        title = "Receive-bandwidth";
-        unit = "Mbyte/Sec";
-    } else if (key == "rnd") {
-        title = "RenderActive";
-        unit = "bool";
-    } else if (key == "rps") {
-        title = "RenderPrepStats";
-        unit = "enum";
-    } else if (key == "ltc") {
-        title = "Latency";
-        unit = "millisec";
-    } else if (key == "clk") {
-        title = "ClockShift";
-        unit = "millisec";
-    }
-
+    //------------------------------
+    //
+    // output
+    //
     std::ostringstream ostr;
     if (key == "rcv" || key == "ltc") {
-        ostr << title << " " << unit;
+        ostr << title << ' ' << unit;
     } else {
-        int totalMcrt = 0;
-        if (key == "rnd") totalMcrt = static_cast<int>(bVec.size());      // RenderActive
-        else if (key == "rps") totalMcrt = static_cast<int>(iVec.size()); // RenderPrepStatus
-        else totalMcrt = static_cast<int>(fVec.size());                   // Others
-        ostr << title << " " << unit << " (total-mcrt:" << totalMcrt << ")";
+        ostr << title << ' ' << unit << " (total-mcrt:" << totalMcrt << ')';
     }
-    if (key == "cpu" || key == "mem" || key == "snd" || key == "prg" || key == "rcv") {
-        ostr << " mg:" << std::setw(4) << std::fixed << std::setprecision(1) << getMergeVal(key);
+    if (key == "cpu" || key == "mem" || key == "snd" || key == "prg" || key == "rcv" ||
+        key == "fAc" || key == "fBp" || key == "fFp" || key == "fEv" || key == "fIt") {
+        if (key == "fAc") {
+            ostr << " mg:" << showVal(getMergeValAsBool(key));
+        } else {
+            ostr << " mg:" << std::setw(4) << std::fixed << std::setprecision(1) << getMergeValAsFloat(key);
+        }
     }
     if (key == "ltc" || key == "clk") {
-        ostr << " cl:" << std::setw(4) << std::fixed << std::setprecision(1) << getClientVal(key);
+        ostr << " cl:" << std::setw(4) << std::fixed << std::setprecision(1) << getClientValAsFloat(key);
     }
+
     ostr << " " << getTimeStampStr();
     if (key != "rcv" && key != "ltc") {
         ostr << " {\n";
-        if (key == "rnd") {
+        if (key == "rnd" || key == "fAc") {
             ostr << scene_rdl2::str_util::addIndent(showArray(bVec, 10)) << '\n';
         } else if (key == "rps") {
             ostr << scene_rdl2::str_util::addIndent(showArray(iVec, 10)) << '\n';
-        } else if (key == "rcv" || key == "ltc") {
-            ostr << scene_rdl2::str_util::addIndent(showVal(fVal)) << '\n';
         } else {
             ostr << scene_rdl2::str_util::addIndent(showArray(fVec, 10)) << '\n';
         }
@@ -314,18 +411,18 @@ InfoRecItem::showTable(const std::string &key) const
     return ostr.str();
 }
 
-std::vector<char>
-InfoRecItem::getAllMcrtValAsBool(const std::string &key) const
+std::deque<bool>
+InfoRecItem::getMcrtValAsBool(const std::string &key) const
 {
-    std::vector<char> vec(getMaxMachineId() + 1, 0.0f);
+    std::deque<bool> vec(getMaxMachineId() + 1, 0.0f);
     crawlAllMcrt([&](Json::Value &jvMcrt) {
-            vec[jvMcrt["mId"].asInt()] = (jvMcrt[key].asBool())? (char)0x1: (char)0x0;
+            vec[jvMcrt["mId"].asInt()] = jvMcrt[key].asBool();
         });
     return vec;
 }
 
 std::vector<int>
-InfoRecItem::getAllMcrtValAsInt(const std::string &key) const
+InfoRecItem::getMcrtValAsInt(const std::string &key) const
 {
     std::vector<int> vec(getMaxMachineId() + 1, 0.0f);
     crawlAllMcrt([&](Json::Value &jvMcrt) {
@@ -335,27 +432,13 @@ InfoRecItem::getAllMcrtValAsInt(const std::string &key) const
 }
 
 std::vector<float>
-InfoRecItem::getAllMcrtValAsFloat(const std::string &key) const
+InfoRecItem::getMcrtValAsFloat(const std::string &key) const
 {
     std::vector<float> vec(getMaxMachineId() + 1, 0.0f);
     crawlAllMcrt([&](Json::Value &jvMcrt) {
             vec[jvMcrt["mId"].asInt()] = getSingleMcrtValAsFloat(jvMcrt, key);
         });
     return vec;
-}
-
-float
-InfoRecItem::getSingleMcrtValAsFloat(const Json::Value &jvMcrt, const std::string &key) const
-{
-    float fVal = 0.0f;
-    if (key == "cpu" || key == "mem" || key == "prg") {
-        fVal = jvMcrt[key].asFloat() * 100.0f;
-    } else if (key == "snd") {
-        fVal = jvMcrt[key].asFloat() / 1024.0f / 1024.0f;
-    } else if (key == "snp" || key == "clk") {
-        fVal = jvMcrt[key].asFloat();
-    }
-    return fVal;
 }
 
 float
@@ -404,20 +487,29 @@ InfoRecItem::opTypeFromKey(const std::string &opKey)
     return OpType::NOP;
 }
 
+bool
+InfoRecItem::getMergeValAsBool(const std::string& key) const
+{
+    return mArray["mg"][key].asBool();
+}
+
 float
-InfoRecItem::getMergeVal(const std::string &key) const
+InfoRecItem::getMergeValAsFloat(const std::string &key) const
 {
     float fVal = 0.0f;
     if (key == "cpu" || key == "mem" || key == "prg") {
         fVal = mArray["mg"][key].asFloat() * 100.0f; // convert to percentage
-    } else if (key == "rcv" || key == "snd") {
+    } else if (key == "rcv" || key == "snd" ||
+               key == "fBp") {
         fVal = mArray["mg"][key].asFloat() / 1024.0f / 1024.0f; // convert to MByte/Sec
+    } else if (key == "fFp" || key == "fEv" || key == "fIt") {
+        fVal = mArray["mg"][key].asFloat();
     }
     return fVal;
 }
 
 float    
-InfoRecItem::getClientVal(const std::string &key) const
+InfoRecItem::getClientValAsFloat(const std::string &key) const
 {
     float fVal = 0.0f;
     if (key == "ltc") {
@@ -428,23 +520,24 @@ InfoRecItem::getClientVal(const std::string &key) const
     return fVal;
 }
 
-std::vector<char>
+std::deque<bool>
 InfoRecItem::getAllValAsBool(const std::string &key, const size_t totalMcrt) const
 {
-    std::vector<char> mcrtVec = getAllMcrtValAsBool(key);
-    std::vector<char> vec(totalMcrt + 2, 0); // 2 extra for merge and client
+    std::deque<bool> mcrtVec = getMcrtValAsBool(key);
+    std::deque<bool> vec(totalMcrt + 2, 0); // 2 extra for merge and client
     size_t max = (mcrtVec.size() > totalMcrt)? totalMcrt: mcrtVec.size();
     for (size_t i = 0; i < max; ++i) {
         vec[i] = mcrtVec[i];
     }
-    // We don't have bool value for merge and client at this moment.
+    vec[totalMcrt] = getMergeValAsBool(key);
+    // we don't have bool value for client at this moment.
     return vec;
 }
 
 std::vector<int>
 InfoRecItem::getAllValAsInt(const std::string &key, const size_t totalMcrt) const
 {
-    std::vector<int> mcrtVec = getAllMcrtValAsInt(key);
+    std::vector<int> mcrtVec = getMcrtValAsInt(key);
     std::vector<int> vec(totalMcrt + 2, 0); // 2 extra for merge and client
     size_t max = (mcrtVec.size() > totalMcrt)? totalMcrt: mcrtVec.size();
     for (size_t i = 0; i < max; ++i) {
@@ -457,16 +550,18 @@ InfoRecItem::getAllValAsInt(const std::string &key, const size_t totalMcrt) cons
 std::vector<float>
 InfoRecItem::getAllValAsFloat(const std::string &key, const size_t totalMcrt) const
 {
-    std::vector<float> mcrtVec = getAllMcrtValAsFloat(key);
+    std::vector<float> mcrtVec = getMcrtValAsFloat(key);
     std::vector<float> vec(totalMcrt + 2, 0.0f); // 2 extra for merge and client
     size_t max = (mcrtVec.size() > totalMcrt)? totalMcrt: mcrtVec.size();
     for (size_t i = 0; i < max; ++i) {
         vec[i] = mcrtVec[i];
     }
-    vec[totalMcrt] = getMergeVal(key);
-    vec[totalMcrt + 1] = getClientVal(key);
+    vec[totalMcrt] = getMergeValAsFloat(key);
+    vec[totalMcrt + 1] = getClientValAsFloat(key);
     return vec;
 }
+
+//------------------------------------------------------------------------------------------
 
 void
 InfoRecItem::setTimeStamp()
@@ -486,8 +581,22 @@ InfoRecItem::getMaxMachineId() const
     return max;
 }
 
+float
+InfoRecItem::getSingleMcrtValAsFloat(const Json::Value &jvMcrt, const std::string &key) const
+{
+    float fVal = 0.0f;
+    if (key == "cpu" || key == "mem" || key == "prg") {
+        fVal = jvMcrt[key].asFloat() * 100.0f;
+    } else if (key == "snd" || key == "fBp") {
+        fVal = jvMcrt[key].asFloat() / 1024.0f / 1024.0f;
+    } else if (key == "snp" || key == "clk" || key == "fFp" || key == "fEv" || key == "fIt" || key == "fLt") {
+        fVal = jvMcrt[key].asFloat();
+    }
+    return fVal;
+}
+
 std::string
-InfoRecItem::showArray(const std::vector<char> &vec, int oneLineMaxItem) const
+InfoRecItem::showArray(const std::deque<bool> &vec, int oneLineMaxItem) const
 {
     std::ostringstream ostr;
     for (size_t i = 0; i < vec.size(); ++i) {
@@ -540,6 +649,12 @@ InfoRecItem::showVal(const float v) const
     return ostr.str();
 }
 
+std::string
+InfoRecItem::showVal(const bool v) const
+{
+    return (v) ? "T" : "F";
+}
+
 void
 InfoRecItem::crawlAllMcrt(std::function<void(Json::Value &jvMcrt)> func) const
 {
@@ -551,6 +666,7 @@ InfoRecItem::crawlAllMcrt(std::function<void(Json::Value &jvMcrt)> func) const
     }
 }
 
+//------------------------------------------------------------------------------------------
 //------------------------------------------------------------------------------------------
 
 void
@@ -570,7 +686,7 @@ InfoRecMaster::newRecItem()
 }
 
 InfoRecMaster::InfoRecItemShPtr
-InfoRecMaster::getRecItem(const size_t id)
+InfoRecMaster::getRecItem(const size_t id) const
 {
     if (id >= mData.size()) return InfoRecItemShPtr(nullptr);
 
@@ -683,65 +799,55 @@ InfoRecMaster::show() const
 std::string    
 InfoRecMaster::showTable(const std::string &key) const
 {
-    std::vector<std::vector<char>> bVec2D;
+    //
+    // Unit and Title
+    //
+    std::string title, unit;
+    unitAndTitleGen(key, title, unit);
+
+    //------------------------------
+    //
+    // setup data array
+    //
+    std::vector<std::deque<bool>> bVec2D;
     std::vector<std::vector<float>> fVec2D;
     std::vector<float> fVec1D;
     std::vector<std::vector<int>> iVec2D;
+    size_t totalData = 0;
 
-    if (key == "rnd") {
+    if (key == "rnd" || // RenderActive status
+        key == "fAc") { // FeedbackActive condition
         bVec2D = getAllValAsBool(key);
-    } else if (key == "rcv") {
-        fVec1D = getMergeVal(key);
-    } else if (key == "ltc") {
-        fVec1D = getClientVal(key);
-    } else if (key == "rps") {
+        totalData = bVec2D.size();
+    } else if (key == "rcv") { // Receive (merge)
+        fVec1D = getMergeValAsFloat(key);
+        totalData = fVec1D.size();
+    } else if (key == "ltc") { // Latency (client)
+        fVec1D = getClientValAsFloat(key);
+        totalData = fVec1D.size();
+    } else if (key == "rps") { // RenderPrepStatus
         iVec2D = getAllValAsInt(key);
-    } else {
+        totalData = iVec2D.size();
+    } else { // others
         fVec2D = getAllValAsFloat(key);
+        totalData = fVec2D.size();
     }
 
     std::vector<uint64_t> timeStamp = getTimeStamp();
 
-    std::string title, unit;
-    if (key == "cpu" || key == "mem" || key == "prg") {
-        if (key == "cpu") title = "CPU-usage";
-        else if (key == "mem") title = "Memory-usage";
-        else if (key == "prg") title = "Progress";
-        unit = "%";
-    } else if (key == "snp") {
-        title = "Snapshot-to-Send";
-        unit = "milliSec";
-    } else if (key == "snd") {
-        title = "Send-bandwitdh";
-        unit = "Mbyte/Sec";
-    } else if (key == "rcv") {
-        title = "Receive-bandwidth";
-        unit = "Mbyte/Sec";
-    } else if (key == "rnd") {
-        title = "RenderActive";
-        unit = "bool";
-    } else if (key == "rps") {
-        title = "RenderPrepStats";
-        unit = "enum";
-    } else if (key == "ltc") {
-        title = "Latency";
-        unit = "millisec";
-    } else if (key == "clk") {
-        title = "ClockShift";
-        unit = "millisec";
-    }
-
+    //------------------------------
+    //
+    // output
+    //
     std::ostringstream ostr;
     if (key == "rcv" || key == "ltc") {
-        ostr << title << " " << unit;
-    } else if (key == "rps") {
-        ostr << title << " " << unit << " (mcrt:" << iVec2D.size() << ")";
+        ostr << title << ' ' << unit;
     } else {
-        ostr << title << " " << unit << " (mcrt:" << fVec2D.size() << ")";
+        ostr << title << ' ' << unit << " (total-data:" << totalData << ')'; 
     }
 
     ostr << " {\n";
-    if (key == "rnd") {
+    if (key == "rnd" || key == "fAc") {
         ostr << scene_rdl2::str_util::addIndent(showArray2DHead(timeStamp, bVec2D)) << '\n';
         ostr << scene_rdl2::str_util::addIndent(showArray2D(timeStamp, bVec2D)) << '\n';
     } else if (key == "rps") {
@@ -841,7 +947,7 @@ InfoRecMaster::showRenderSpanOpValMerge(const std::string &key,
     float result = renderSpanOpMain(opType,
                                     0, // timeStampSkipOffset
                                     [&](const InfoRecItemShPtr infoRecItemShPtr) -> float {
-                                        return infoRecItemShPtr->getMergeVal(key);
+                                        return infoRecItemShPtr->getMergeValAsFloat(key);
                                     },
                                     startTimeStamp,
                                     completeTimeStamp,
@@ -877,7 +983,7 @@ InfoRecMaster::showRenderSpanOpValClient(const std::string &key,
     float result = renderSpanOpMain(opType,
                                     0, // timeStampSkipOffset
                                     [&](const InfoRecItemShPtr infoRecItemShPtr) -> float {
-                                        return infoRecItemShPtr->getClientVal(key);
+                                        return infoRecItemShPtr->getClientValAsFloat(key);
                                     },
                                     startTimeStamp,
                                     completeTimeStamp,
@@ -966,7 +1072,7 @@ InfoRecMaster::showRenderSpanValMerge(const std::string &key) const
     int id = 0;
     crawlAllRenderItems(startTimeStamp, completeTimeStamp,
                         [&](const InfoRecItemShPtr infoRecItemShPtr) {
-                            vec[id++] = infoRecItemShPtr->getMergeVal(key);
+                            vec[id++] = infoRecItemShPtr->getMergeValAsFloat(key);
                         });
 
     //------------------------------
@@ -1002,7 +1108,7 @@ InfoRecMaster::showRenderSpanValClient(const std::string &key) const
     int id = 0;
     crawlAllRenderItems(startTimeStamp, completeTimeStamp,
                         [&](const InfoRecItemShPtr infoRecItemShPtr) {
-                            vec[id++] = infoRecItemShPtr->getClientVal(key);
+                            vec[id++] = infoRecItemShPtr->getClientValAsFloat(key);
                         });
 
     //------------------------------
@@ -1023,6 +1129,8 @@ InfoRecMaster::showRenderSpanValClient(const std::string &key) const
     return ostr.str();
 }
 
+
+
 std::vector<uint64_t>
 InfoRecMaster::getTimeStamp() const
 {
@@ -1035,32 +1143,32 @@ InfoRecMaster::getTimeStamp() const
 }
 
 std::vector<float>
-InfoRecMaster::getMergeVal(const std::string &key) const
+InfoRecMaster::getMergeValAsFloat(const std::string &key) const
 {
     std::vector<float> vec(getItemTotal(), 0.0f);
     int id = 0;
     for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
-        vec[id++] = (*itr)->getMergeVal(key);
+        vec[id++] = (*itr)->getMergeValAsFloat(key);
     }
     return vec;
 }
 
 std::vector<float>
-InfoRecMaster::getClientVal(const std::string &key) const
+InfoRecMaster::getClientValAsFloat(const std::string &key) const
 {
     std::vector<float> vec(getItemTotal(), 0.0f);
     int id = 0;
     for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
-        vec[id++] = (*itr)->getClientVal(key);
+        vec[id++] = (*itr)->getClientValAsFloat(key);
     }
     return vec;
 }
 
-std::vector<std::vector<char>>
+std::vector<std::deque<bool>>
 InfoRecMaster::getAllValAsBool(const std::string &key) const
 {
     int totalMcrt = static_cast<int>(mGlobal.getMcrtTotal());
-    std::vector<std::vector<char>> vec(getItemTotal(), std::vector<char>(0));
+    std::vector<std::deque<bool>> vec(getItemTotal(), std::deque<bool>(false));
     int id = 0;
     for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
         vec[id++] = (*itr)->getAllValAsBool(key, totalMcrt);
@@ -1092,6 +1200,88 @@ InfoRecMaster::getAllValAsFloat(const std::string &key) const
     return vec;
 }
 
+std::string
+InfoRecMaster::showMcrt(const std::string& key, const unsigned startId, const unsigned endId) const
+{
+    std::ostringstream ostr;
+    ostr << "# showMcrt key:" << key << " startDataId:" << startId << " endDataId:" << endId << '\n'
+         << "# id deltaSec mcrt ...\n";
+
+    int w = scene_rdl2::str_util::getNumberOfDigits(endId - startId + 1);
+    uint64_t startTimeStamp = 0; // microsec from epoch
+    unsigned id = 0;
+    unsigned id2 = 0;
+    for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
+        if (startId <= id && id <= endId) {
+            if (id2 == 0) startTimeStamp = (*itr)->getTimeStamp(); // 1st data
+            float sec = MiscUtil::us2s((*itr)->getTimeStamp() - startTimeStamp);
+
+            std::vector<float> vec = (*itr)->getMcrtValAsFloat(key);
+
+            ostr << std::setw(w) << id2 << ' ' << sec << ' ';
+            for (size_t j = 0; j < vec.size(); ++j) {
+                ostr << vec[j] << ' ';
+            }
+            ostr << '\n';
+            id2++;
+        }
+        id++;
+    }
+    return ostr.str();
+}
+
+std::string
+InfoRecMaster::showMcrtAvg(const std::string& key, const unsigned startId, const unsigned endId) const
+{
+    std::ostringstream ostr;
+    ostr << "# showMcrtAvg key:" << key << " startDataId:" << startId << " endDataId:" << endId << '\n'
+         << "# id deltaSec val\n";
+
+    int w = scene_rdl2::str_util::getNumberOfDigits(endId - startId + 1);
+    uint64_t startTimeStamp = 0; // microsec from epoch
+    unsigned id = 0;
+    unsigned id2 = 0;
+    for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
+        if (startId <= id && id <= endId) {
+            if (id2 == 0) startTimeStamp = (*itr)->getTimeStamp(); // 1st data
+            float sec = MiscUtil::us2s((*itr)->getTimeStamp() - startTimeStamp);
+
+            float v = (*itr)->getOpMcrtValAsFloat(key, InfoRecItem::OpType::AVG);
+            ostr << std::setw(w) << id2 << ' ' << sec << ' ' << v << '\n';
+            id2++;
+        }
+        id++;
+    }
+    return ostr.str();
+}
+
+std::string
+InfoRecMaster::showMerge(const std::string& key, const unsigned startId, const unsigned endId) const
+{
+    std::ostringstream ostr;
+    ostr << "# showMerge key:" << key << " startDataId:" << startId << " endDataId:" << endId << '\n'
+         << "# id deltaSec val\n";
+
+    int w = scene_rdl2::str_util::getNumberOfDigits(endId - startId + 1);
+    uint64_t startTimeStamp = 0; // microsec from epoch
+    unsigned id = 0;
+    unsigned id2 = 0;
+    for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
+        if (startId <= id && id <= endId) {
+            if (id2 == 0) startTimeStamp = (*itr)->getTimeStamp(); // 1st data
+            float sec = MiscUtil::us2s((*itr)->getTimeStamp() - startTimeStamp);
+
+            float v = (*itr)->getMergeValAsFloat(key);
+            ostr << std::setw(w) << id2 << ' ' << sec << ' ' << v << '\n';
+            id2++;
+        }
+        id++;
+    }
+    return ostr.str();
+}
+
+//------------------------------------------------------------------------------------------
+
 void
 InfoRecMaster::calcRenderSpan(uint64_t &startTimeStamp,        // return 0 if undefined
                               uint64_t &completeTimeStamp,     // return 0 if undefined
@@ -1104,7 +1294,7 @@ InfoRecMaster::calcRenderSpan(uint64_t &startTimeStamp,        // return 0 if un
     float prevProgress = 0.0f;
     bool mcrtAllStart = false;
     for (auto itr = mData.begin(); itr != mData.end(); ++itr) {
-        float currProgress = (*itr)->getProgress();
+        float currProgress = (*itr)->getMcrtSummedProgress();
         uint64_t currTimeStamp = (*itr)->getTimeStamp();
         bool isMcrtAllStart = (*itr)->isMcrtAllStart();
         bool isMcrtAllStop = (*itr)->isMcrtAllStop();
@@ -1239,7 +1429,7 @@ InfoRecMaster::renderSpanOpMain(const InfoRecItem::OpType opType,
 
 std::string
 InfoRecMaster::showArray2DHead(const std::vector<uint64_t> &timeStamp,
-                               const std::vector<std::vector<char>> &vec) const
+                               const std::vector<std::deque<bool>> &vec) const
 {
     std::ostringstream ostr;
     
@@ -1264,7 +1454,7 @@ InfoRecMaster::showArray2DHead(const std::vector<uint64_t> &timeStamp,
 
 std::string
 InfoRecMaster::showArray2D(const std::vector<uint64_t> &timeStamp,
-                           const std::vector<std::vector<char>> &vec) const
+                           const std::vector<std::deque<bool>> &vec) const
 {
     std::ostringstream ostr;
     int w = static_cast<int>(std::to_string(vec.size()).size());
@@ -1405,4 +1595,3 @@ InfoRecMaster::showArray1D(const std::vector<uint64_t> &timeStamp,
 }
 
 } // namespace mcrt_dataio
-

@@ -1,12 +1,10 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "FbMsgSingleChan.h"
 #include "FbMsgUtil.h"
 
 #include <scene_rdl2/common/grid_util/LatencyLog.h>
+#include <scene_rdl2/render/util/StrUtil.h>
 
 namespace mcrt_dataio {
 
@@ -59,5 +57,18 @@ FbMsgSingleChan::show(const std::string &hd) const
     return ostr.str();
 }
 
-} // namespace mcrt_dataio
+std::string
+FbMsgSingleChan::show() const
+{
+    int w = scene_rdl2::str_util::getNumberOfDigits(static_cast<unsigned>(mDataSize.size()));
 
+    std::ostringstream ostr;
+    ostr << "FbMsgSingleChan (total:" << mDataArray.size() << ") {\n";
+    for (size_t i = 0; i < mDataSize.size(); ++i) {
+        ostr << "  i:" << std::setw(w) << i << " size:" << scene_rdl2::str_util::byteStr(mDataSize[i]) << '\n';
+    }
+    ostr << "}";
+    return ostr.str();
+}
+
+} // namespace mcrt_dataio

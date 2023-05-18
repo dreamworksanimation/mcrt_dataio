@@ -1,6 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "ClientReceiverFb.h"
 
 #include "ClientReceiverConsoleDriver.h"
@@ -46,41 +45,7 @@ public:
     using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
 
-    Impl()
-        : mRecvImgSenderMachineId(static_cast<int>(SenderMachineId::UNKNOWN))
-        , mViewId(0)
-        , mLastFrameId(!0)
-        , mFrameId(0)
-        , mStatus(mcrt::BaseFrame::FINISHED)
-        , mRenderPrepProgress(0.0f)
-        , mProgress(-1.0f)
-        , mFbActivityCounter(0)
-        , mCoarsePassStatus(0)
-        , mSnapshotStartTime(0)
-        , mCurrentLatencySec(0.0f)
-        , mRoiViewportStatus(false)
-        , mResetFbWithColorMode(false)
-        , mDenoiseEngine(DenoiseEngine::OPTIX)
-        , mBeautyDenoiseMode(DenoiseMode::DISABLE)
-        , mRecvMsgSize(0)
-        , mLastSyncId(0xffffffff)
-        , mLastProgress(0.0f)
-        , mGlobalNodeInfo(true, nullptr) // decodeOnly mode        
-        , mClockDeltaRun(false)
-        , mInfoRecInterval(0.0f) // disable infoRec logic
-        , mInfoRecDisplayInterval(10.0f) // every 10.0 sec interval
-        , mInfoRecFileName("./run_")
-        , mRecvImageDataFps(3.0f)
-        , mRenderPrepDetailedProgressDump(false)
-        , mRenderPrepDetailedProgressDumpMode(0)
-        , mRenderPrepDetailedProgressShowLastSyncId(std::numeric_limits<unsigned>::max())
-        , mRenderPrepDetailedProgressShowCompleteCount(0)
-        , mShowMcrtTotal(0)
-        , mTimingAnalysis(mGlobalNodeInfo)
-    {
-        parserConfigure();
-    }
-
+    Impl() { parserConfigure(); }
     ~Impl() {}
 
     /// This class is Non-copyable
@@ -279,32 +244,32 @@ public:
 
 private:
     // last received image data's sender machineId
-    int mRecvImgSenderMachineId; // 0orPositive:mcrt, or enum value of SenderMachineId
+    int mRecvImgSenderMachineId {static_cast<int>(SenderMachineId::UNKNOWN)}; // 0orPositive:mcrt, or enum value of SenderMachineId
 
-    size_t mViewId;
-    uint32_t mLastFrameId;
-    uint32_t mFrameId;
-    mcrt::BaseFrame::Status mStatus;
-    float mRenderPrepProgress;
-    float mProgress;
-    unsigned mFbActivityCounter;
+    size_t mViewId {0};
+    uint32_t mLastFrameId {!0};
+    uint32_t mFrameId {0};
+    mcrt::BaseFrame::Status mStatus {mcrt::BaseFrame::FINISHED};
+    float mRenderPrepProgress {0.0f};
+    float mProgress {-1.0f};
+    unsigned mFbActivityCounter {0};
 
-    int mCoarsePassStatus;       // 0:coarsePass 1:nonCoarsePass 2:unknown
+    int mCoarsePassStatus {0}; // 0:coarsePass 1:nonCoarsePass 2:unknown
     std::string mDenoiserAlbedoInputName;
     std::string mDenoiserNormalInputName;
-    uint64_t mSnapshotStartTime; // time of did snapshot at mcrt computation
-    float mCurrentLatencySec;
+    uint64_t mSnapshotStartTime {0}; // time of did snapshot at mcrt computation
+    float mCurrentLatencySec {0.0f};
 
     scene_rdl2::math::Viewport mRezedViewport;
 
-    bool mRoiViewportStatus;
+    bool mRoiViewportStatus {false};
     scene_rdl2::math::Viewport mRoiViewport;
 
-    bool mResetFbWithColorMode;
+    bool mResetFbWithColorMode {false};
     scene_rdl2::grid_util::Fb mFb;
 
-    DenoiseEngine mDenoiseEngine;
-    DenoiseMode mBeautyDenoiseMode;
+    DenoiseEngine mDenoiseEngine {DenoiseEngine::OPTIX};
+    DenoiseMode mBeautyDenoiseMode {DenoiseMode::DISABLE};
     std::string mErrorMsg;
     ClientReceiverDenoiser mDenoiser;
 
@@ -315,30 +280,30 @@ private:
 
     scene_rdl2::rec_time::RecTime mElapsedTimeFromStart; // elapsed time information from image = STARTED
 
-    uint64_t mRecvMsgSize;      // last message's size
+    uint64_t mRecvMsgSize {0};      // last message's size
 
     //------------------------------
 
     ClientReceiverStats mStats;
 
-    uint32_t mLastSyncId;
+    uint32_t mLastSyncId {0xffffffff};
     scene_rdl2::rec_time::RecTime mLastGetStatsTime; // for getStats()
-    float mLastProgress;
+    float mLastProgress {0.0f};
 
     //------------------------------
 
-    GlobalNodeInfo mGlobalNodeInfo;
+    GlobalNodeInfo mGlobalNodeInfo {true, nullptr};
 
-    bool mClockDeltaRun;
+    bool mClockDeltaRun {false};
 
-    float mInfoRecInterval;        // sec
-    float mInfoRecDisplayInterval; // sec
+    float mInfoRecInterval {0.0f}; // sec
+    float mInfoRecDisplayInterval {10.0f}; // sec
     InfoRecMaster mInfoRecMaster;
     scene_rdl2::rec_time::RecTime mDispInfoRec;
-    std::string mInfoRecFileName;
+    std::string mInfoRecFileName {"./run_"};
     scene_rdl2::rec_time::RecTime mLastInfoRecOut;
 
-    FpsTracker mRecvImageDataFps;
+    FpsTracker mRecvImageDataFps {3.0f};
 
     //------------------------------
 
@@ -346,14 +311,14 @@ private:
 
     Parser mParser;
 
-    bool mRenderPrepDetailedProgressDump; // for debug
-    int mRenderPrepDetailedProgressDumpMode; // 0:fraction 1:full-dump
-    unsigned mRenderPrepDetailedProgressShowLastSyncId; // last syncId of renderPrepDetailedProgress dump
-    unsigned mRenderPrepDetailedProgressShowCompleteCount; // for renderPrepDetailedProgress dump logic
-    size_t mShowMcrtTotal; // for debug
+    bool mRenderPrepDetailedProgressDump {false}; // for debug
+    int mRenderPrepDetailedProgressDumpMode {0}; // 0:fraction 1:full-dump
+    unsigned mRenderPrepDetailedProgressShowLastSyncId {std::numeric_limits<unsigned>::max()}; // last syncId of renderPrepDetailedProgress dump
+    unsigned mRenderPrepDetailedProgressShowCompleteCount {0}; // for renderPrepDetailedProgress dump logic
+    size_t mShowMcrtTotal {0}; // for debug
 
     std::shared_ptr<TimingRecorderHydra> mTimingRecorderHydra;
-    TimingAnalysis mTimingAnalysis;
+    TimingAnalysis mTimingAnalysis {mGlobalNodeInfo};
 
     //------------------------------
 
@@ -364,7 +329,14 @@ private:
     void decodeAuxInfo(const mcrt::BaseFrame::DataBuffer &buffer);
     void afterDecode(const CallBackGenericComment &callBackFuncForGenericComment);
     void processGenericComment(const CallBackGenericComment &callBackFuncForGenericComment);
+
     void infoRecUpdate();
+    void infoRecUpdateDataAll();
+    void infoRecUpdateGlobal();
+    void infoRecUpdateClient(InfoRecMaster::InfoRecItemShPtr recItem);
+    void infoRecUpdateMerge(InfoRecMaster::InfoRecItemShPtr recItem);
+    void infoRecUpdateAllNodes(InfoRecMaster::InfoRecItemShPtr recItem);
+
     uint64_t convertTimeBackend2Client(const uint64_t backendTimeUSec);
     std::string showProgress() const;
     void renderPrepDetailedProgress();
@@ -1901,47 +1873,11 @@ ClientReceiverFb::Impl::infoRecUpdate()
     
     //------------------------------
 
-    InfoRecGlobal &recGlobal = mInfoRecMaster.getGlobal();
-    if (!recGlobal.isMergeSet()) {
-        recGlobal.setMerge(mGlobalNodeInfo.getMergeHostName(),
-                           mGlobalNodeInfo.getMergeCpuTotal(),
-                           mGlobalNodeInfo.getMergeMemTotal());
-    }
+    infoRecUpdateDataAll();
+
+    //------------------------------
 
     float progress = mGlobalNodeInfo.getMergeProgress();
-
-    InfoRecMaster::InfoRecItemShPtr recItem = mInfoRecMaster.newRecItem();
-    recItem->setClient(mCurrentLatencySec,
-                       mGlobalNodeInfo.getClientClockTimeShift());
-    recItem->setMerge(mGlobalNodeInfo.getMergeCpuUsage(),
-                      mGlobalNodeInfo.getMergeMemUsage(),
-                      mGlobalNodeInfo.getMergeRecvBps(),
-                      mGlobalNodeInfo.getMergeSendBps(),
-                      progress);
-    mGlobalNodeInfo.crawlAllMcrtNodeInfo([&](GlobalNodeInfo::McrtNodeInfoShPtr mcrtNodeInfo) {
-            int mId = mcrtNodeInfo->getMachineId();
-            if (mId >= 0) {
-                // Just in case, we only accept mId = 0 or positive.
-                // Actually, mId < 0 is a user error and mostly this situation happens under a single mcrt
-                // configuration when user forgot to setup machineId inside sessiondef configuration file.
-                if (!recGlobal.isMcrtSet(mId)) {
-                    recGlobal.setMcrt(mId,
-                                      mcrtNodeInfo->getHostName(),
-                                      mcrtNodeInfo->getCpuTotal(),
-                                      mcrtNodeInfo->getMemTotal());
-                }
-                recItem->setMcrt(mId,
-                                 mcrtNodeInfo->getCpuUsage(),
-                                 mcrtNodeInfo->getMemUsage(),
-                                 mcrtNodeInfo->getSnapshotToSend(),
-                                 mcrtNodeInfo->getSendBps(),
-                                 mcrtNodeInfo->getRenderActive(),
-                                 static_cast<int>(mcrtNodeInfo->getRenderPrepStats().stage()),
-                                 mcrtNodeInfo->getProgress(),
-                                 mcrtNodeInfo->getClockTimeShift());
-            }
-            return true;
-        });
 
     // bool always = true; // for debug
     bool always = false;
@@ -1993,6 +1929,100 @@ ClientReceiverFb::Impl::infoRecUpdate()
         std::cerr << "== InfoRec Final SAVE complete:" << recTime.end() << " sec ==" << std::endl;
         mLastInfoRecOut.start();
     }
+}
+
+void
+ClientReceiverFb::Impl::infoRecUpdateDataAll()
+{
+    infoRecUpdateGlobal();
+
+    InfoRecMaster::InfoRecItemShPtr recItem = mInfoRecMaster.newRecItem();
+    infoRecUpdateClient(recItem);
+    infoRecUpdateMerge(recItem);
+    infoRecUpdateAllNodes(recItem);
+}
+
+void
+ClientReceiverFb::Impl::infoRecUpdateGlobal()
+{
+    InfoRecGlobal &recGlobal = mInfoRecMaster.getGlobal();
+
+    if (!recGlobal.isDispatchSet()) {
+        recGlobal.setDispatch(mGlobalNodeInfo.getDispatchHostName(),
+                              0, // cpuTotal : unknown (We don't have info)
+                              0); // memTotal : unknown (We don't have info)
+    }
+
+    if (!recGlobal.isMergeSet()) {
+        recGlobal.setMerge(mGlobalNodeInfo.getMergeHostName(),
+                           mGlobalNodeInfo.getMergeCpuTotal(),
+                           mGlobalNodeInfo.getMergeMemTotal());
+    }
+}
+
+void
+ClientReceiverFb::Impl::infoRecUpdateClient(InfoRecMaster::InfoRecItemShPtr recItem)
+{
+    recItem->setClient(mCurrentLatencySec,
+                       mGlobalNodeInfo.getClientClockTimeShift());
+}
+
+void
+ClientReceiverFb::Impl::infoRecUpdateMerge(InfoRecMaster::InfoRecItemShPtr recItem)
+{
+    recItem->setMerge(mGlobalNodeInfo.getMergeCpuUsage(),
+                      mGlobalNodeInfo.getMergeMemUsage(),
+                      mGlobalNodeInfo.getMergeRecvBps(),
+                      mGlobalNodeInfo.getMergeSendBps(),
+                      mGlobalNodeInfo.getMergeProgress());
+    if (mGlobalNodeInfo.getMergeFeedbackActive()) {
+        recItem->setMergeFeedbackOn(mGlobalNodeInfo.getMergeFeedbackInterval(), // sec
+                                    mGlobalNodeInfo.getMergeEvalFeedbackTime(), // millisec
+                                    mGlobalNodeInfo.getMergeSendFeedbackFps(),  // fps
+                                    mGlobalNodeInfo.getMergeSendFeedbackBps()); // Byte/Sec
+    } else {
+        recItem->setMergeFeedbackOff();
+    }
+}
+
+void
+ClientReceiverFb::Impl::infoRecUpdateAllNodes(InfoRecMaster::InfoRecItemShPtr recItem)
+{
+    InfoRecGlobal &recGlobal = mInfoRecMaster.getGlobal();
+    mGlobalNodeInfo.crawlAllMcrtNodeInfo([&](GlobalNodeInfo::McrtNodeInfoShPtr mcrtNodeInfo) {
+            int mId = mcrtNodeInfo->getMachineId();
+            if (mId >= 0) {
+                // Just in case, we only accept mId = 0 or positive.
+                // Actually, mId < 0 is a user error and mostly this situation happens under a single mcrt
+                // configuration when user forgot to setup machineId inside sessiondef configuration file.
+                if (!recGlobal.isMcrtSet(mId)) {
+                    recGlobal.setMcrt(mId,
+                                      mcrtNodeInfo->getHostName(),
+                                      mcrtNodeInfo->getCpuTotal(),
+                                      mcrtNodeInfo->getMemTotal());
+                }
+                recItem->setMcrt(mId,
+                                 mcrtNodeInfo->getCpuUsage(),
+                                 mcrtNodeInfo->getMemUsage(),
+                                 mcrtNodeInfo->getSnapshotToSend(),
+                                 mcrtNodeInfo->getSendBps(),
+                                 mcrtNodeInfo->getRenderActive(),
+                                 static_cast<int>(mcrtNodeInfo->getRenderPrepStats().stage()),
+                                 mcrtNodeInfo->getProgress(),
+                                 mcrtNodeInfo->getClockTimeShift());
+                if (mcrtNodeInfo->getFeedbackActive()) {
+                    recItem->setMcrtFeedbackOn(mId,
+                                               mcrtNodeInfo->getFeedbackInterval(), // sec
+                                               mcrtNodeInfo->getRecvFeedbackFps(),  // fps
+                                               mcrtNodeInfo->getRecvFeedbackBps(),  // Byte/Sec
+                                               mcrtNodeInfo->getEvalFeedbackTime(), // millisec
+                                               mcrtNodeInfo->getFeedbackLatency()); // millisec
+                } else {
+                    recItem->setMcrtFeedbackOff(mId);
+                }
+            }
+            return true;
+        });
 }
 
 uint64_t
@@ -2245,7 +2275,9 @@ ClientReceiverFb::Impl::showViewportInfo() const
          << "    getHeight():" << mFb.getHeight() << '\n'
          << "    getAlignedWidth():" << mFb.getAlignedWidth() << '\n'
          << "    getAlignedHeight():" << mFb.getAlignedHeight() << '\n'
-         << "    getTileTotal():" << mFb.getTileTotal() << '\n'
+         << "    getNumTilesX():" << mFb.getNumTilesX() << '\n'
+         << "    getNumTilesY():" << mFb.getNumTilesY() << '\n'
+         << "    getTotalTiles():" << mFb.getTotalTiles() << '\n'
          << "  }\n"
          << "}";
     return ostr.str();

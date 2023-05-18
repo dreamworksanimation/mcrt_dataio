@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 //
@@ -33,14 +30,9 @@ public:
         SYNCID_LINEUP           // get all syncId info to line up
     };
 
-    FbMsgMultiFrames(GlobalNodeInfo *globalNodeInfo) :
-        mGlobalNodeInfo(globalNodeInfo),
-        mNumMachines(0),
-        mMergeType(MergeType::PICKUP_LATEST),
-        mStartSyncFrameId(0), mEndSyncFrameId(0),
-        mDisplayFrame(nullptr),
-        mDisplaySyncFrameInitialize(false),
-        mDisplaySyncFrameId(0)
+    FbMsgMultiFrames(GlobalNodeInfo *globalNodeInfo, bool* feedback)
+        : mGlobalNodeInfo(globalNodeInfo)
+        , mFeedback(feedback)
     {}
 
     bool initTotalCacheFrames(const size_t totalCacheFrames);
@@ -50,7 +42,7 @@ public:
     bool changeMergeType(const MergeType type, const size_t totalCacheFrames);
     void changeTaskType(const FbMsgSingleFrame::TaskType &taskType);
 
-    bool push(const mcrt::ProgressiveFrame &progressive);
+    bool push(const mcrt::ProgressiveFrame &progressive, const std::function<bool()>& feedbackInitCallBack);
 
     FbMsgSingleFrame *getDisplayFbMsgSingleFrame() { return mDisplayFrame; }
     uint32_t getDisplaySyncFrameId() const { return mDisplaySyncFrameId; }
@@ -61,25 +53,27 @@ public:
     std::string showPtrTableInfo(const std::string &hd) const;
 
 protected:
-    GlobalNodeInfo *mGlobalNodeInfo;
+    GlobalNodeInfo *mGlobalNodeInfo {nullptr};
 
-    int mNumMachines;
+    int mNumMachines {0};
     scene_rdl2::math::Viewport mRezedViewport;
 
-    MergeType mMergeType;
+    MergeType mMergeType {MergeType::PICKUP_LATEST};
+    bool* mFeedback {nullptr};
 
     std::vector<FbMsgSingleFrame> mFbMsgMultiFrames;
 
-    uint32_t mStartSyncFrameId;   // oldest syncFrameId which keeps data in memory
-    uint32_t mEndSyncFrameId;     // newest syncFrameId which keeps data in memory
+    uint32_t mStartSyncFrameId {0}; // oldest syncFrameId which keeps data in memory
+    uint32_t mEndSyncFrameId {0};   // newest syncFrameId which keeps data in memory
     std::vector<FbMsgSingleFrame *> mPtrTable; // pointer table to mFbMsgMultiFrames items
 
-    FbMsgSingleFrame *mDisplayFrame;
-    bool mDisplaySyncFrameInitialize;
-    uint32_t mDisplaySyncFrameId; // current display syncFrameId
+    FbMsgSingleFrame *mDisplayFrame {nullptr};
+    bool mDisplaySyncFrameInitialize {false};
+    uint32_t mDisplaySyncFrameId {0}; // current display syncFrameId
 
     bool push_seamlessCombine(const mcrt::ProgressiveFrame &progressive);
-    bool push_pickupLatest(const mcrt::ProgressiveFrame &progressive);
+    bool push_pickupLatest(const mcrt::ProgressiveFrame &progressive,
+                           const std::function<bool()>& feedbackInitCallBack);
     bool push_syncidLineup(const mcrt::ProgressiveFrame &progressive);
 
     finline void shiftPtrTable();
@@ -106,6 +100,7 @@ FbMsgMultiFrames::shiftPtrTable()
 
     ptr->resetWholeHistory(mEndSyncFrameId + 1); // reset whole history about new recycled entry
     ptr->resetAllReceivedMessagesCount();
+    ptr->resetFeedback(false); // does not support feedback under SYNCID_LINEUP mode
     mPtrTable[lastId] = ptr;
 
     mStartSyncFrameId++;
@@ -136,4 +131,3 @@ FbMsgMultiFrames::getFbMsgSingleFrame(const uint32_t syncFrameId)
 }
 
 } // namespace mcrt_dataio
-

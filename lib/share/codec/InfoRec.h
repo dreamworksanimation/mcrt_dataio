@@ -1,15 +1,13 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include <json/json.h>
 
-#include <memory>               // shared_ptr
+#include <deque>
 #include <functional>           // function
 #include <list>
+#include <memory>               // shared_ptr
 
 //
 // All InfoRec related classes are used for recording arras related rendering runtime
@@ -19,7 +17,7 @@
 // InfoRec class.
 // Main purpose of recording statistical information is debug and analyzing performance.
 // Final output InfoRec data is JSON based information and pretty easy to access internal
-// data. This InfoRec information is very powerful and  useful to analyze performance of
+// data. This InfoRec information is very powerful and useful to analyze performance of
 // arras related rendering sessions.
 //
 
@@ -44,10 +42,10 @@ class InfoRecGlobal
 //
 {
 public:
-    bool isMergeSet() const;
-    void setMerge(const std::string &hostName,
-                  const int cpuTotal,
-                  const size_t memTotal);
+    bool isDispatchSet() const;
+    void setDispatch(const std::string& hostName,
+                     const int cpuTotal,
+                     const size_t memTotal);
 
     bool isMcrtSet(const int machineId) const;
     void setMcrt(const int machineId,
@@ -55,6 +53,11 @@ public:
                  const int cpuTotal,
                  const size_t memTotal);
     size_t getMcrtTotal() const;
+
+    bool isMergeSet() const;
+    void setMerge(const std::string &hostName,
+                  const int cpuTotal,
+                  const size_t memTotal);
 
     std::string encode() const;
     bool decode(const std::string &data);
@@ -98,6 +101,12 @@ public:
                   const float recvBps,       // Byte/Sec
                   const float sendBps,       // Byte/Sec
                   const float progress);     // fraction
+    void setMergeFeedbackOn(const float feedbackInterval, // sec
+                            const float evalFeedbackTime, // millisec
+                            const float sendFeedbackFps,  // fps
+                            const float sendFeedbackBps); // Byte/Sec
+    void setMergeFeedbackOff();
+    bool isMergeFeedbackActive() const;
     float getMergeProgress() const;
                   
     void setMcrt(const int machineId,
@@ -109,11 +118,18 @@ public:
                  const int renderPrepStats,  // enum int
                  const float progress,       // fraction
                  const float clockShift);    // millisec
-
+    void setMcrtFeedbackOn(const int machineId,
+                           const float feedbackInterval, // sec
+                           const float recvFeedbackFps,  // fps
+                           const float recvFeedbackBps,  // Byte/Sec
+                           const float evalFeedbackTime, // millisec
+                           const float feedbackLatency); // millisec
+    void setMcrtFeedbackOff(const int machineId);
+    bool isMcrtFeedbackActive(const int machineId) const;
+    float getMcrtSummedProgress() const; // return mcrt's summed progress fraction regarding to the all mcrt
+    
     bool isMcrtAllStop() const;
     bool isMcrtAllStart() const;
-
-    float getProgress() const; // return summed progress fraction regarding to the all mcrt
 
     std::string encode() const;
     bool decode(const std::string &data);
@@ -121,27 +137,24 @@ public:
     std::string show() const;
     std::string showTable(const std::string &key) const;
 
-    // only mcrt
-    std::vector<char> getAllMcrtValAsBool(const std::string &key) const;
-    std::vector<int> getAllMcrtValAsInt(const std::string &key) const;
-    std::vector<float> getAllMcrtValAsFloat(const std::string &key) const;
+    // access functions
+    std::deque<bool> getMcrtValAsBool(const std::string& key) const;
+    std::vector<int> getMcrtValAsInt(const std::string &key) const;
+    std::vector<float> getMcrtValAsFloat(const std::string &key) const;
 
-    float getSingleMcrtValAsFloat(const Json::Value &jvMcrt, const std::string &key) const;
     float getOpMcrtValAsFloat(const std::string &key, OpType opType) const;
     static OpType opTypeFromKey(const std::string &opKey);
 
-    float getMergeVal(const std::string &key) const;
-    float getClientVal(const std::string &key) const;
+    bool getMergeValAsBool(const std::string& key) const;
+    float getMergeValAsFloat(const std::string &key) const;
+    float getClientValAsFloat(const std::string &key) const;
 
-    // include only mcrt
-    //   vec[0 ~ totalMcrt] : mcrt value
-    std::vector<char> getAllValAsBool(const std::string &key, const size_t totalMcrt) const;
-    std::vector<int> getAllValAsInt(const std::string &key, const size_t totalMcrt) const;
-
-    // include mcrt + merge + client.
+    // mcrt + merge + client
     //   vec[0 ~ totalMcrt-1] : mcrt value
     //   vec[totalMcrt]       : merge value
     //   vec[totalMcrt+1]     : client value
+    std::deque<bool> getAllValAsBool(const std::string &key, const size_t totalMcrt) const;
+    std::vector<int> getAllValAsInt(const std::string &key, const size_t totalMcrt) const;
     std::vector<float> getAllValAsFloat(const std::string &key, const size_t totalMcrt) const;
 
 private:
@@ -150,10 +163,13 @@ private:
 
     void setTimeStamp();
     int getMaxMachineId() const;
-    std::string showArray(const std::vector<char> &vec, int oneLineMaxItem) const; // for bool vector
+    float getSingleMcrtValAsFloat(const Json::Value &jvMcrt, const std::string &key) const;
+
+    std::string showArray(const std::deque<bool> &vec, int oneLineMaxItem) const; // for bool vector
     std::string showArray(const std::vector<int> &vec, int oneLineMaxItem) const;
     std::string showArray(const std::vector<float> &vec, int oneLineMaxItem) const;
     std::string showVal(const float v) const;
+    std::string showVal(const bool v) const; // bool
     void crawlAllMcrt(std::function<void(Json::Value &jvMcrt)> func) const;
 };
 
@@ -182,7 +198,7 @@ public:
     size_t getItemTotal() const { return mData.size(); }
     InfoRecItemShPtr newRecItem();
     InfoRecItemShPtr getLastRecItem() { return mData.back(); }
-    InfoRecItemShPtr getRecItem(const size_t id);
+    InfoRecItemShPtr getRecItem(const size_t id) const;
 
     bool intervalCheck(const float intervalSec) const;
 
@@ -215,11 +231,16 @@ public:
     std::string showRenderSpanValClient(const std::string &key) const;
 
     std::vector<uint64_t> getTimeStamp() const;
-    std::vector<float> getMergeVal(const std::string &key) const;
-    std::vector<float> getClientVal(const std::string &key) const;
-    std::vector<std::vector<char>> getAllValAsBool(const std::string &key) const;
+    std::vector<float> getMergeValAsFloat(const std::string &key) const;
+    std::vector<float> getClientValAsFloat(const std::string &key) const;
+
+    std::vector<std::deque<bool>> getAllValAsBool(const std::string &key) const;
     std::vector<std::vector<int>> getAllValAsInt(const std::string &key) const;
     std::vector<std::vector<float>> getAllValAsFloat(const std::string &key) const;
+
+    std::string showMcrt(const std::string& key, const unsigned startId, const unsigned endId) const;
+    std::string showMcrtAvg(const std::string& key, const unsigned startId, const unsigned endId) const;
+    std::string showMerge(const std::string& key, const unsigned startId, const unsigned endId) const;
 
 private:
     uint64_t mLastTimeStamp;
@@ -243,11 +264,10 @@ private:
                            uint64_t &completeTimeStamp,                                
                            uint64_t &finishTimeStamp) const;
 
-
     std::string showArray2DHead(const std::vector<uint64_t> &timeStamp,
-                                const std::vector<std::vector<char>> &vec) const;
+                                const std::vector<std::deque<bool>> &vec) const;
     std::string showArray2D(const std::vector<uint64_t> &timeStamp,
-                            const std::vector<std::vector<char>> &vec) const;
+                            const std::vector<std::deque<bool>> &vec) const;
 
     std::string showArray2DHead(const std::vector<uint64_t> &timeStamp,
                                 const std::vector<std::vector<float>> &vec) const;
@@ -264,4 +284,3 @@ private:
 };
 
 } // namespace mcrt_dataio
-

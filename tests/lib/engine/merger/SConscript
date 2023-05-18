@@ -1,0 +1,13 @@
+Import('env')
+# --------------------------------------------------------------------
+name       = 'engine_merger'
+sources    = env.DWAGlob('*.cc')
+ref        = []
+components = [
+	   'common_grid_util',
+	   'engine_merger'
+              ]
+# --------------------------------------------------------------------
+env.DWAForceWarningAsError()
+
+ut = env.DWAPdevUnitTest(name, sources, ref, COMPONENTS=components, TIMEOUT=600)

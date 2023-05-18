@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 //
@@ -18,12 +15,17 @@
 //
 
 #include "FbMsgMultiChans.h"
+#include "MergeActionTracker.h"
 
 #include <mcrt_messages/ProgressiveFrame.h>
+#include <scene_rdl2/common/grid_util/Arg.h>
 #include <scene_rdl2/common/fb_util/FbTypes.h>
 #include <scene_rdl2/common/grid_util/Fb.h>
+#include <scene_rdl2/common/grid_util/Parser.h>
 #include <scene_rdl2/common/platform/Platform.h> // finline
 #include <scene_rdl2/common/rec_time/RecTime.h>  // for timing test
+#include <scene_rdl2/render/cache/CacheDequeue.h>
+#include <scene_rdl2/render/cache/CacheEnqueue.h>
 
 #include <vector>
 
@@ -38,6 +40,9 @@ class GlobalNodeInfo;
 class FbMsgSingleFrame
 {
 public:
+    using Arg = scene_rdl2::grid_util::Arg;
+    using Parser = scene_rdl2::grid_util::Parser;
+
     enum class DecodeMode : unsigned {
         ONTHEFLY = 0, // on the fly decoding without data copy (for realtime context).
         DELAY         // delay decode (for interactive lighting session).
@@ -48,20 +53,10 @@ public:
         MULTIPLEX_PIX        // multiplex pixel distribution mode
     };
 
-    FbMsgSingleFrame() :
-        mGlobalNodeInfo(nullptr),
-        mMySyncId(0),
-        mDecodeMode(DecodeMode::DELAY),
-        mTaskType(TaskType::MULTIPLEX_PIX),
-        mNumMachines(0),
-        mReceivedInfoOnlyMessagesTotal(0), mReceivedInfoOnlyMessagesAll(0),
-        mReceivedMessagesTotal(0), mReceivedMessagesAll(0),
-        mActiveMachines(0), mFirstMachineId(-1),
-        mProgressTotal(0.0f), mStatus(mcrt::BaseFrame::CANCELLED),
-        mDecodeCountTotal(0), mMergeCountTotal(0),
-        mEncodeLatencyLogCountTotal(0), mSnapshotStartTimeTotal(0),
-        mPartialMergeStartTileId(0)
-    {}
+    FbMsgSingleFrame()
+    {
+        parserConfigure();
+    }
 
     void setGlobalNodeInfo(GlobalNodeInfo *globalNodeInfo) { mGlobalNodeInfo = globalNodeInfo; }
 
@@ -77,6 +72,7 @@ public:
         mReceivedInfoOnlyMessagesAll = 0;
         mReceivedMessagesAll = 0;
     }
+    void resetFeedback(bool feedbackActive);
 
     finline bool isInitialFrameMessage(const mcrt::ProgressiveFrame& progressive,
                                        bool& forceSend) const;
@@ -86,7 +82,14 @@ public:
     void merge(const unsigned partialMergeTilesTotal, // 0:non-partial-merge-mode
                scene_rdl2::grid_util::Fb &fb,
                scene_rdl2::grid_util::LatencyLog &latencyLog); // fb is always clear internally and
-                                                   // return fresh combined result
+                                                               // return fresh combined result
+
+    bool getFeedbackActive() const { return mFeedbackActive; }
+    MergeActionTracker& getMergeActionTracker(unsigned machineId) { return mMergeActionTracker[machineId]; }
+    void encodeMergeActionTracker(scene_rdl2::cache::CacheEnqueue& enqueue); // for feedback
+    static std::string decodeMergeActionTrackerAndDump(scene_rdl2::cache::CacheDequeue& dequeue,
+                                                       unsigned targetMachineId); // for test
+
     uint32_t getSyncId() const { return mMySyncId; }
     TaskType getTaskType() const { return mTaskType; }
 
@@ -111,24 +114,32 @@ public:
 
     std::string show(const std::string &hd) const;
 
-protected:
-    GlobalNodeInfo *mGlobalNodeInfo;
+    Parser& getParser() { return mParser; }
 
-    uint32_t mMySyncId;
+    const scene_rdl2::grid_util::Fb& getFb(const unsigned machineId) const { return mFb[machineId]; } // for debug
+    const FbMsgMultiChans& getMultiChans(const unsigned machineId) const { return mMessage[machineId]; } // for debug
 
-    DecodeMode mDecodeMode;
-    TaskType mTaskType;
+private:
+    GlobalNodeInfo *mGlobalNodeInfo {nullptr};
 
-    int mNumMachines;
+    uint32_t mMySyncId {0};
+
+    DecodeMode mDecodeMode {DecodeMode::DELAY};
+    TaskType mTaskType {TaskType::MULTIPLEX_PIX};
+
+    int mNumMachines {0};
     scene_rdl2::math::Viewport mRezedViewport;
 
     // for current (=last) iteration data
     std::vector<FbMsgMultiChans> mMessage; // mMessage[machineId]
     std::vector<char> mReceived;           // mReceived[machineId]
-    size_t mReceivedInfoOnlyMessagesTotal; // total recv info messages from last message sent
-    size_t mReceivedInfoOnlyMessagesAll;   // all info messages total on this mySyncId 
-    size_t mReceivedMessagesTotal;         // total recv msgs from last image sent on this mySyncId
-    size_t mReceivedMessagesAll;           // all received messages count on this mySyncId
+    //    bool mFeedback {false}; // runtime feedback control condition
+    bool mFeedbackActive {false}; // runtime feedback control condition
+    std::vector<MergeActionTracker> mMergeActionTracker; // mMergeActionTracker[machineId]
+    size_t mReceivedInfoOnlyMessagesTotal {0}; // total recv info messages from last message sent
+    size_t mReceivedInfoOnlyMessagesAll {0};   // all info messages total on this mySyncId 
+    size_t mReceivedMessagesTotal {0};         // total recv msgs from last image sent on this mySyncId
+    size_t mReceivedMessagesAll {0};           // all received messages count on this mySyncId
     
     // regarding to entire (= from start of current frame rendering) iteration
     std::vector<char> mReceivedAll;                     // [machineId]
@@ -139,25 +150,27 @@ protected:
     std::vector<char> mCoarsePassAll;                   // [machineId]
     std::vector<float> mProgressAll;                    // [machineId]
     std::vector<mcrt::BaseFrame::Status> mStatusAll;    // [machineId]
-    int mActiveMachines;                                // active machine total
-    int mFirstMachineId;                                // first data received machine id
+    int mActiveMachines {0};                            // active machine total
+    int mFirstMachineId {-1};                           // first data received machine id
     std::string mDenoiserAlbedoInputName;
     std::string mDenoiserNormalInputName;
-    float mProgressTotal;                               // current progress sum
-    mcrt::BaseFrame::Status mStatus;                    // current frame's status
+    float mProgressTotal {0.0f};                                  // current progress sum
+    mcrt::BaseFrame::Status mStatus {mcrt::BaseFrame::CANCELLED}; // current frame's status
 
     // combined result for each machine from start of rendering
     std::vector<scene_rdl2::grid_util::Fb> mFb; // mFb[machineId] : auto resize by received ProgressiveFrame
 
-    uint32_t mDecodeCountTotal;
-    uint32_t mMergeCountTotal;
-    uint32_t mEncodeLatencyLogCountTotal;
-    uint32_t mSnapshotStartTimeTotal;
-    uint32_t mPartialMergeStartTileId; // Start tileId for next asynchronous partial merge operation
+    uint32_t mDecodeCountTotal {0};
+    uint32_t mMergeCountTotal {0};
+    uint32_t mEncodeLatencyLogCountTotal {0};
+    uint32_t mSnapshotStartTimeTotal {0};
+    uint32_t mPartialMergeStartTileId {0}; // Start tileId for next asynchronous partial merge operation
 
     scene_rdl2::rec_time::RecTimeLog mDebugTimeLogPush;   // for timing test
     scene_rdl2::rec_time::RecTimeLog mDebugTimeLogDecode; // for timing test
     scene_rdl2::rec_time::RecTimeLog mDebugTimeLogMerge;  // for timing test
+
+    Parser mParser;
 
     //------------------------------
 
@@ -174,6 +187,9 @@ protected:
                     scene_rdl2::grid_util::Fb &fb, scene_rdl2::grid_util::LatencyLog &latencyLog);
     void mergeSingleFb(const std::vector<char> *partialMergeTilesTbl, const int machineId,
                        scene_rdl2::grid_util::Fb &fb);
+    bool verifyMergedResultNumSample(const scene_rdl2::grid_util::Fb& mergedFb) const;
+    bool verifyMergedResultNumSampleSingleHost(int machineId,
+                                               const scene_rdl2::grid_util::Fb& mergedFb) const;
 
     void partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
                                  std::vector<char> &partialMergeTilesTbl);
@@ -183,6 +199,10 @@ protected:
 
     std::string showMessageAndReceived(const std::string &hd) const;
     std::string showAllReceivedAndProgress(const std::string &hd) const;
+
+    void parserConfigure();
+    bool parserCommandMultiChan(Arg& arg);
+    bool parserCommandFb(Arg& arg);
 }; // FbMsgSingleFrame
 
 finline bool
@@ -196,6 +216,7 @@ FbMsgSingleFrame::init(const int numMachines)
     try {
         mMessage.resize(numMachines);
         mReceived.resize(numMachines);
+        mMergeActionTracker.resize(numMachines);
 
         mReceivedAll.resize(numMachines);
         mReceivedMessagesTotalAll.resize(numMachines);
@@ -210,6 +231,7 @@ FbMsgSingleFrame::init(const int numMachines)
         // We need to update fb size here
         for (size_t machineId = 0; machineId < (size_t)numMachines; ++machineId) {
             mMessage[machineId].setGlobalNodeInfo(mGlobalNodeInfo);
+            mMergeActionTracker[machineId].setMachineId(static_cast<unsigned>(machineId));
             mFb[machineId].init(mRezedViewport);
         }
     }
@@ -361,4 +383,3 @@ FbMsgSingleFrame::getSnapshotStartTime()
 }
 
 } // namespace mcrt_dataio
-

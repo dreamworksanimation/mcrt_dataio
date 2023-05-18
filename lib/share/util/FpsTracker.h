@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include <queue>
@@ -36,16 +33,18 @@ public:
         mKeepIntervalSec(keepIntervalSec)
     {}
 
+    void setKeepIntervalSec(float sec) { mKeepIntervalSec = sec; }
+
     void set();
-    float getFps(); // frame/sec
+    float getFps() const; // frame/sec
 
     std::string show() const;
 
 private:
-    float deltaSecWhole() { return deltaSec(mEventQueue.back(), mEventQueue.front()); }
-    static float deltaSec(const uint64_t currTime, const uint64_t oldTime) // both microSec
+    double getDeltaSecWhole() const { return getDeltaSec(mEventQueue.back(), mEventQueue.front()); }
+    static double getDeltaSec(const uint64_t currTime, const uint64_t oldTime) // both microSec
     {
-        return (float)(currTime - oldTime) * 1.0e-6f; // return sec
+        return static_cast<double>(currTime - oldTime) * 0.000001; // return sec
     }
 
     //------------------------------
@@ -55,4 +54,3 @@ private:
 };
 
 } // namespace mcrt_dataio
-

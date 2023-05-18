@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include "MsgSendHandler.h"
@@ -67,6 +64,12 @@ public:
     void setMergeSendBps(const float bps); // MTsafe Byte/Sec
     void setMergeProgress(const float fraction); // MTsafe
 
+    void setMergeFeedbackActive(const bool flag); // MTsafe
+    void setMergeFeedbackInterval(const float sec); // MTsafe sec
+    void setMergeEvalFeedbackTime(const float ms); // MTsafe millisec
+    void setMergeSendFeedbackFps(const float fps); // MTsafe fps
+    void setMergeSendFeedbackBps(const float bps); // MTsafe Byte/Sec
+
     const std::string &getMergeHostName() const { return mMergeHostName; }
     int getMergeClockDeltaSvrPort() const { return mMergeClockDeltaSvrPort; }
     const std::string &getMergeClockDeltaSvrPath() const { return mMergeClockDeltaSvrPath; }
@@ -77,6 +80,12 @@ public:
     float getMergeRecvBps() const { return mMergeRecvBps; }
     float getMergeSendBps() const { return mMergeSendBps; }
     float getMergeProgress() const { return mMergeProgress; }
+
+    bool getMergeFeedbackActive() const { return mMergeFeedbackActive; }
+    float getMergeFeedbackInterval() const { return mMergeFeedbackInterval; } // sec
+    float getMergeEvalFeedbackTime() const { return mMergeEvalFeedbackTime; } // millisec
+    float getMergeSendFeedbackFps() const { return mMergeSendFeedbackFps; } // fps
+    float getMergeSendFeedbackBps() const { return mMergeSendFeedbackBps; } // Byte/Sec
 
     //------------------------------
 
@@ -147,6 +156,12 @@ private:
     float mMergeSendBps;                 // merge outgoing message bandwidth Byte/Sec
     float mMergeProgress;                // progress 0.0~1.0 range might be more than 1.0
 
+    bool mMergeFeedbackActive;    // merge computation feedback condition : bool
+    float mMergeFeedbackInterval; // merge computation feedback interval : sec
+    float mMergeEvalFeedbackTime; // merge computation feedback evaluation cost : millisec
+    float mMergeSendFeedbackFps;  // merge computation outgoing feedback message send fps
+    float mMergeSendFeedbackBps;  // merge computation outgoing feedback message bandwidth : Byte/Sec
+
     std::mutex mMergeGenericCommentMutex;
     std::string mMergeGenericComment; // merge computation's generic comment data for any purpose
 
@@ -169,7 +184,17 @@ private:
     void sendClockOffsetToMcrt(McrtNodeInfoShPtr nodeInfo);
 
     void parserConfigure();
+
+    static std::string msShow(float ms);
+    static std::string pctShow(float fraction);
+    static std::string bpsShow(float bps);
+
+    std::string showClientInfo() const;
+    std::string showDispatchInfo() const;
+    std::string showMergeInfo() const;
+    std::string showMergeFeedbackInfo() const;
+    std::string showAllNodeInfo() const;
+    std::string showFeedbackAvg() const;
 };
 
 } // namespace mcrt_dataio
-

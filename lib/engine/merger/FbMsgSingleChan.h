@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 //
@@ -55,6 +52,7 @@ public:
     std::string showLatencyLog(const std::string &hd) const;
 
     std::string show(const std::string &hd) const;
+    std::string show() const;
 
 protected:
     //
@@ -88,4 +86,3 @@ FbMsgSingleChan::push(DataPtr dataPtr, const size_t dataLength)
 }
 
 } // namespace mcrt_dataio
-

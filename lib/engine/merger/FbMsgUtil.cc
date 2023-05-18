@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "FbMsgUtil.h"
 
 #include <iomanip>
@@ -101,4 +98,3 @@ FbMsgUtil::hexDump(const std::string &hd,
 }
 
 } // namespace mcrt_dataio
-

@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "McrtNodeInfo.h"
 
 #include <mcrt_dataio/share/util/MiscUtil.h>
@@ -15,32 +12,7 @@
 namespace mcrt_dataio {
 
 McrtNodeInfo::McrtNodeInfo(bool decodeOnly)
-    : mMachineId(0)
-    , mCpuTotal(0)
-    , mCpuUsage(0.0f)            // fractio 0.0~1.0
-    , mMemTotal(0)               // byte
-    , mMemUsage(0.0f)            // fraction 0.0~1.0
-    , mSnapshotToSend(0.0f)      // millisec
-    , mSendBps(0.0f)             // byte/sec
-    , mClockTimeShift(0.0f)      // millisec
-    , mRoundTripTime(0.0f)       // millisec
-    , mLastRunClockOffsetTime(0) // microsec from Epoch
-    , mSyncId(0)
-    , mRenderActive(false)
-    , mRenderPrepCancel(false)
-    , mRenderPrepStatsLoadGeometriesRequestFlush(false)
-    , mRenderPrepStatsTessellationRequestFlush(false)
-    , mGlobalBaseFromEpoch(0)
-    , mTotalMsg(0)
-    , mOldestMessageRecvTiming(0.0f)
-    , mNewestMessageRecvTiming(0.0f)
-    , mRenderPrepStartTiming(0.0f)
-    , mRenderPrepEndTiming(0.0f)
-    , m1stSnapshotStartTiming(0.0f)
-    , m1stSnapshotEndTiming(0.0f)
-    , m1stSendTiming(0.0f)
-    , mProgress(0.0f)            // progress 0.0~1.0
-    , mInfoCodec("mcrtNodeInfo", decodeOnly)
+    : mInfoCodec("mcrtNodeInfo", decodeOnly)
 {
     parserConfigure();
 }
@@ -91,6 +63,42 @@ void
 McrtNodeInfo::setSendBps(const float bps) // byte/sec
 {
     mInfoCodec.setFloat("sendBps", bps, &mSendBps);
+}
+
+void
+McrtNodeInfo::setFeedbackActive(const bool flag)
+{
+    mInfoCodec.setBool("feedbackActive", flag, &mFeedbackActive);
+}
+
+void
+McrtNodeInfo::setFeedbackInterval(const float sec) // sec
+{
+    mInfoCodec.setFloat("feedbackInterval", sec, &mFeedbackInterval);
+}
+
+void
+McrtNodeInfo::setRecvFeedbackFps(const float fps) // fps
+{
+    mInfoCodec.setFloat("recvFeedbackFps", fps, &mRecvFeedbackFps);
+}
+
+void
+McrtNodeInfo::setRecvFeedbackBps(const float bps) // byte/sec
+{
+    mInfoCodec.setFloat("recvFeedbackBps", bps, &mRecvFeedbackBps);
+}
+
+void
+McrtNodeInfo::setEvalFeedbackTime(const float ms) // millisec
+{
+    mInfoCodec.setFloat("evalFeedbackTime", ms, &mEvalFeedbackTime);
+}
+
+void
+McrtNodeInfo::setFeedbackLatency(const float ms) // millisec
+{
+    mInfoCodec.setFloat("feedbackLatency", ms, &mFeedbackLatency);
 }
 
 void
@@ -479,6 +487,18 @@ McrtNodeInfo::decode(const std::string &inputData)
                 setSnapshotToSend(f);
             } else if (mInfoCodec.getFloat("sendBps", f)) {
                 setSendBps(f);
+            } else if (mInfoCodec.getBool("feedbackActive", b)) {
+                setFeedbackActive(b);
+            } else if (mInfoCodec.getFloat("feedbackInterval", f)) {
+                setFeedbackInterval(f);
+            } else if (mInfoCodec.getFloat("recvFeedbackFps", f)) {
+                setRecvFeedbackFps(f);
+            } else if (mInfoCodec.getFloat("recvFeedbackBps", f)) {
+                setRecvFeedbackBps(f);
+            } else if (mInfoCodec.getFloat("evalFeedbackTime", f)) {
+                setEvalFeedbackTime(f);
+            } else if (mInfoCodec.getFloat("feedbackLatency", f)) {
+                setFeedbackLatency(f);
             } else if (mInfoCodec.getFloat("clockTimeShift", f)) {
                 setClockTimeShift(f);
             } else if (mInfoCodec.getFloat("roundTripTime", f)) {
@@ -577,17 +597,6 @@ McrtNodeInfo::show() const
         ostr << std::setw(6) << std::fixed << std::setprecision(2) << fraction * 100.0f << " %";
         return ostr.str();
     };
-    auto msShow = [&](float ms) -> std::string {
-        std::ostringstream ostr;
-        ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
-        return ostr.str();
-    };
-    auto bpsShow = [&](float bps) -> std::string {
-        std::ostringstream ostr;
-        ostr << byteStr(static_cast<size_t>(bps)) << "/sec";
-        return ostr.str();
-    };
-    auto boolShow = [&](bool b) -> std::string { return (b)? "true": "false"; };
 
     size_t memUsed = static_cast<size_t>(static_cast<float>(mMemTotal) * mMemUsage);
 
@@ -600,14 +609,22 @@ McrtNodeInfo::show() const
          << "  mMemTotal:" << byteStr(mMemTotal) << '\n'
          << "  mMemUsage:" << pctShow(mMemUsage) << " (" << byteStr(memUsed) << ")\n"
          << "  mSnapshotToSend:" << msShow(mSnapshotToSend) << '\n'
-         << "  mSendBps:" << bpsShow(mSendBps) << '\n'
-         << "  mClockTimeShift:" << msShow(mClockTimeShift) << '\n'
+         << "  mSendBps:" << bpsShow(mSendBps) << '\n';
+    ostr << "  mFeedbackActive:" << boolStr(mFeedbackActive) << '\n';
+    if (mFeedbackActive) {
+        ostr << "  mFeedbackInterval:" << mFeedbackInterval << '\n'
+             << "  mRecvFeedbackFps:" << mRecvFeedbackFps << '\n'
+             << "  mRecvFeedbackBps:" << bpsShow(mRecvFeedbackBps) << '\n'
+             << "  mEvalFeedbackTime:" << msShow(mEvalFeedbackTime) << '\n'
+             << "  mFeedbackLatency:" << msShow(mFeedbackLatency) << '\n';
+    }
+    ostr << "  mClockTimeShift:" << msShow(mClockTimeShift) << '\n'
          << "  mRoundTripTime:" << msShow(mRoundTripTime) << '\n'
          << "  mLastRunClockOffsetTime:" << mLastRunClockOffsetTime << " us ("
          << MiscUtil::timeFromEpochStr(mLastRunClockOffsetTime) << ")\n"
          << "  mSyncId:" << mSyncId << '\n'
-         << "  mRenderActive:" << boolShow(mRenderActive) << '\n'
-         << "  mRenderPrepCancel:" << boolShow(mRenderPrepCancel) << '\n'
+         << "  mRenderActive:" << boolStr(mRenderActive) << '\n'
+         << "  mRenderPrepCancel:" << boolStr(mRenderPrepCancel) << '\n'
          << scene_rdl2::str_util::addIndent(mRenderPrepStats.show()) << '\n'
          << "  mRenderPrepStatsLoadGeometriesRequestFlush:"
          << boolStr(mRenderPrepStatsLoadGeometriesRequestFlush) << '\n'
@@ -651,6 +668,8 @@ McrtNodeInfo::parserConfigure()
                 });
     mParser.opt("timeLog", "", "show timeLog info",
                 [&](Arg& arg) -> bool { return arg.msg(showTimeLog() + '\n'); });
+    mParser.opt("feedback", "", "show feedback related status",
+                [&](Arg& arg) -> bool { return arg.msg(showFeedback() + '\n'); });
 }
 
 std::string
@@ -671,6 +690,44 @@ McrtNodeInfo::showTimeLog() const
          << "  m1stSnapshotEndTiming:" << secStr(m1stSnapshotEndTiming) << '\n'
          << "  m1stSendTiming:" << secStr(m1stSendTiming) << '\n'
          << "}";
+    return ostr.str();
+}
+
+std::string
+McrtNodeInfo::showFeedback() const
+{
+    using scene_rdl2::str_util::boolStr;
+
+    std::ostringstream ostr;
+    ostr << "feedback status {\n"
+         << "  mSendBps:" << bpsShow(mSendBps) << '\n'
+         << "  mFeedbackActive:" << boolStr(mFeedbackActive) << '\n';
+    if (mFeedbackActive) {
+        ostr << "  mFeedbackInterval:" << mFeedbackInterval << '\n'
+             << "  mRecvFeedbackFps:" << mRecvFeedbackFps << " fps\n"
+             << "  mRecvFeedbackBps:" << bpsShow(mRecvFeedbackBps) << '\n'
+             << "  mEvalFeedbackTime:" << msShow(mEvalFeedbackTime) << '\n'
+             << "  mFeedbackLatency:" << msShow(mFeedbackLatency) << '\n';
+    }
+    ostr << "}";
+    return ostr.str();
+}
+
+// static function
+std::string
+McrtNodeInfo::msShow(float ms)
+{
+    std::ostringstream ostr;
+    ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
+    return ostr.str();
+}
+
+// static function
+std::string
+McrtNodeInfo::bpsShow(float bps)
+{
+    std::ostringstream ostr;
+    ostr << scene_rdl2::str_util::byteStr(static_cast<size_t>(bps)) << "/sec";
     return ostr.str();
 }
 

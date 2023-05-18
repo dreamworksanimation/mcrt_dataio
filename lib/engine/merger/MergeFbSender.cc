@@ -1,12 +1,10 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "MergeFbSender.h"
 
 #include <scene_rdl2/common/grid_util/FbReferenceType.h>
 #include <scene_rdl2/common/grid_util/PackTiles.h>
+#include <scene_rdl2/common/grid_util/ProgressiveFrameBufferName.h>
 
 //#define DEBUG_MSG
 
@@ -26,9 +24,20 @@ MergeFbSender::init(const scene_rdl2::math::Viewport &rezedViewport)
 }
 
 void
-MergeFbSender::setHeaderInfoAndFbReset(FbMsgSingleFrame *currFbMsgSingleFrame)
+MergeFbSender::setHeaderInfoAndFbReset(FbMsgSingleFrame* currFbMsgSingleFrame,
+                                       const mcrt::BaseFrame::Status* overwriteFrameStatusPtr)
 {
-    mFrameStatus = currFbMsgSingleFrame->getStatus();
+    // This MergeFbSender is used for 2 purposes.
+    //   a) send progressiveFrame message to the client at merge computation
+    //   b) send progressiveFeedback message to MCRT computation at merge computation.
+    // In case of a, we simply use frame status by providing currFbMsgSingleFrame.
+    // But the case of b, we need to overwrite the status by specifying the status by argument.
+    if (overwriteFrameStatusPtr) {
+        mFrameStatus = *overwriteFrameStatusPtr;
+    } else {
+        mFrameStatus = currFbMsgSingleFrame->getStatus();
+    }
+
     mProgressFraction = currFbMsgSingleFrame->getProgressFraction();
     mSnapshotStartTime = currFbMsgSingleFrame->getSnapshotStartTime();
     mCoarsePassStatus = (currFbMsgSingleFrame->isCoarsePassDone())? false: true;
@@ -101,10 +110,48 @@ MergeFbSender::addBeautyBuff(mcrt::BaseFrame::Ptr message)
               << std::endl;
     */
 
-    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), mLastBeautyBufferSize, "beauty",
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastBeautyBufferSize,
+                       scene_rdl2::grid_util::ProgressiveFrameBufferName::Beauty,
                        mcrt::BaseFrame::ENCODING_UNKNOWN);
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_BEAUTY);
     mLatencyLog.addDataSize(mLastBeautyBufferSize);
+}
+
+void
+MergeFbSender::MergeFbSender::addBeautyBuffWithNumSample(mcrt::BaseFrame::Ptr message)
+{
+    static const bool sha1HashSw = false;
+
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_START_BEAUTY_NUMSAMPLE);
+    {
+        PackTilePrecision packTilePrecision =
+            calcPackTilePrecision(mFb.getRenderBufferCoarsePassPrecision(),
+                                  mFb.getRenderBufferFinePassPrecision(),
+                                  [&]() -> PackTilePrecision { // runtimeDecisionFunc for coarse pass
+                                      return getBeautyHDRITestResult();
+                                  });
+        mWork.clear();
+        mLastBeautyBufferNumSampleSize =
+            scene_rdl2::grid_util::PackTiles::
+            encode(false, // renderBufferOdd
+                   mFbActivePixels.getActivePixels(),
+                   mFb.getRenderBufferTiled(),
+                   mFb.getNumSampleBufferTiled(),
+                   mWork,
+                   packTilePrecision,
+                   mFb.getRenderBufferCoarsePassPrecision(),
+                   mFb.getRenderBufferFinePassPrecision(),
+                   sha1HashSw); // RGBA + numSample : float * 4 + u_int
+    }
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_BEAUTY_NUMSAMPLE);
+
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastBeautyBufferNumSampleSize,
+                       scene_rdl2::grid_util::ProgressiveFrameBufferName::Beauty,
+                       mcrt::BaseFrame::ENCODING_UNKNOWN);
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_BEAUTY_NUMSAMPLE);
+    mLatencyLog.addDataSize(mLastBeautyBufferNumSampleSize);
 }
 
 void
@@ -130,7 +177,9 @@ MergeFbSender::addPixelInfo(mcrt::BaseFrame::Ptr message)
     }
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_PIXELINFO);
 
-    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), mLastPixelInfoSize, "depth",
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastPixelInfoSize,
+                       mFb.getPixelInfoName().c_str(),
                        mcrt::BaseFrame::ENCODING_UNKNOWN);
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_PIXELINFO);
     mLatencyLog.addDataSize(mLastPixelInfoSize);
@@ -153,11 +202,39 @@ MergeFbSender::addHeatMap(mcrt::BaseFrame::Ptr message)
     }
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_HEATMAP);
 
-    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), mLastHeatMapSize,
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastHeatMapSize,
                        mFb.getHeatMapName().c_str(),
                        mcrt::BaseFrame::ENCODING_UNKNOWN);
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_HEATMAP);
     mLatencyLog.addDataSize(mLastHeatMapSize);
+}
+
+void
+MergeFbSender::addHeatMapWithNumSample(mcrt::BaseFrame::Ptr message)
+{
+    static const bool sha1HashSw = false;
+
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_START_HEATMAP_NUMSAMPLE);
+    {
+        mWork.clear();
+        mLastHeatMapNumSampleSize =
+            scene_rdl2::grid_util::PackTiles::
+            encodeHeatMap(mFbActivePixels.getActivePixelsHeatMap(),
+                          mFb.getHeatMapSecBufferTiled(),
+                          mFb.getWeightBufferTiled(),
+                          mWork,
+                          false, // noNumSampleMode
+                          sha1HashSw);
+    }
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_HEATMAP_NUMSAMPLE);
+
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastHeatMapNumSampleSize,
+                       mFb.getHeatMapName().c_str(),
+                       mcrt::BaseFrame::ENCODING_UNKNOWN);
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_HEATMAP_NUMSAMPLE);
+    mLatencyLog.addDataSize(mLastHeatMapNumSampleSize);
 }
 
 void
@@ -183,7 +260,8 @@ MergeFbSender::addWeightBuffer(mcrt::BaseFrame::Ptr message)
     }
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_WEIGHTBUFFER);
 
-    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), mLastWeightBufferSize,
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastWeightBufferSize,
                        mFb.getWeightBufferName().c_str(),
                        mcrt::BaseFrame::ENCODING_UNKNOWN);
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_WEIGHTBUFFER);
@@ -218,10 +296,50 @@ MergeFbSender::addRenderBufferOdd(mcrt::BaseFrame::Ptr message)
     }
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_RENDERBUFFERODD);
 
-    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), mLastRenderBufferOddSize, "renderBufferOdd",
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastRenderBufferOddSize,
+                       scene_rdl2::grid_util::ProgressiveFrameBufferName::RenderBufferOdd,
                        mcrt::BaseFrame::ENCODING_UNKNOWN);
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_RENDERBUFFERODD);
     mLatencyLog.addDataSize(mLastRenderBufferOddSize);
+}
+
+void
+MergeFbSender::addRenderBufferOddWithNumSample(mcrt::BaseFrame::Ptr message)
+{
+    static const bool sha1HashSw = false;
+
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_START_RENDERBUFFERODD_NUMSAMPLE);
+    {
+        PackTilePrecision packTilePrecision =
+            calcPackTilePrecision(mFb.getRenderBufferCoarsePassPrecision(),
+                                  mFb.getRenderBufferFinePassPrecision(),
+                                  [&]() -> PackTilePrecision { // runtimeDecisionFunc for coarse pass
+                                      return getBeautyHDRITestResult(); // access shared beauty HDRI test result
+                                  });
+        mWork.clear();
+        // Actually we don't have {coarse, fine}PassPrecision info for renderBufferOdd.
+        mLastRenderBufferOddNumSampleSize =
+            scene_rdl2::grid_util::PackTiles::
+            encode(true, // renderBufferOdd
+                   mFbActivePixels.getActivePixelsRenderBufferOdd(),
+                   mFb.getRenderBufferOddTiled(),
+                   mFb.getWeightBufferTiled(),
+                   mWork,
+                   packTilePrecision,
+                   mFb.getRenderBufferCoarsePassPrecision(), // dummy value
+                   mFb.getRenderBufferFinePassPrecision(), // dummy value
+                   false, // noNumSampleMode
+                   sha1HashSw); // RGBA : float * 4
+    }
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ENCODE_END_RENDERBUFFERODD_NUMSAMPLE);
+
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       mLastRenderBufferOddNumSampleSize,
+                       scene_rdl2::grid_util::ProgressiveFrameBufferName::RenderBufferOdd,
+                       mcrt::BaseFrame::ENCODING_UNKNOWN);
+    mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_ADDBUFFER_END_RENDERBUFFERODD_NUMSAMPLE);
+    mLatencyLog.addDataSize(mLastRenderBufferOddNumSampleSize);
 }
 
 void    
@@ -288,6 +406,16 @@ MergeFbSender::addRenderOutput(mcrt::BaseFrame::Ptr message)
         });
 }
 
+void    
+MergeFbSender::addRenderOutputWithNumSample(mcrt::BaseFrame::Ptr message)
+{
+    //
+    // We don't need this API at this moment but might be needed in the future when we need to send
+    // back AOV info from Merge to MCRT computation by progressiveFeedback message for some reason.
+    // This API is reserved for that purpose.
+    //
+}
+
 void
 MergeFbSender::addLatencyLog(mcrt::BaseFrame::Ptr message)
 {
@@ -295,7 +423,7 @@ MergeFbSender::addLatencyLog(mcrt::BaseFrame::Ptr message)
     mLatencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_SEND_MSG);
 
     {
-        size_t dataSize = mLastBeautyBufferSize;
+        size_t dataSize = mLastBeautyBufferSize + mLastBeautyBufferNumSampleSize;
         if (mFb.getPixelInfoStatus()) {
             dataSize += mLastPixelInfoSize;
         }
@@ -304,6 +432,9 @@ MergeFbSender::addLatencyLog(mcrt::BaseFrame::Ptr message)
         }  
         if (mFb.getWeightBufferStatus()) {
             dataSize += mLastWeightBufferSize;
+        }
+        if (mFb.getRenderBufferOddStatus()) {
+            dataSize += mLastRenderBufferOddSize + mLastRenderBufferOddNumSampleSize;
         }
         if (mFb.getRenderOutputStatus()) {
             dataSize += mLastRenderOutputSize;
@@ -346,7 +477,9 @@ MergeFbSender::addLatencyLog(mcrt::BaseFrame::Ptr message)
                       << "}" << std::endl;
         }
         */
-        message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), dataSize, "latencyLog",
+        message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                           dataSize,
+                           scene_rdl2::grid_util::ProgressiveFrameBufferName::LatencyLog,
                            mcrt::BaseFrame::ENCODING_UNKNOWN);
     }
 
@@ -357,7 +490,7 @@ MergeFbSender::addLatencyLog(mcrt::BaseFrame::Ptr message)
     if (mUpstreamLatencyLogWork.size()) {
         message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mUpstreamLatencyLogWork)),
                            mUpstreamLatencyLogWork.size(),
-                           "latencyLogUpstream",
+                           scene_rdl2::grid_util::ProgressiveFrameBufferName::LatencyLogUpstream,
                            mcrt::BaseFrame::ENCODING_UNKNOWN);
     }
 }
@@ -372,7 +505,9 @@ MergeFbSender::addAuxInfo(mcrt::BaseFrame::Ptr message,
     cEnq.enqStringVector(infoDataArray);
     size_t dataSize = cEnq.finalize();
 
-    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)), dataSize, "auxInfo",
+    message->addBuffer(mcrt::makeValPtr(duplicateWorkData(mWork)),
+                       dataSize,
+                       scene_rdl2::grid_util::ProgressiveFrameBufferName::AuxInfo,                       
                        mcrt::BaseFrame::ENCODING_UNKNOWN);
 }
 
@@ -559,4 +694,3 @@ MergeFbSender::calcPackTilePrecision(const CoarsePassPrecision coarsePassPrecisi
 }
 
 } // namespace mcrt_dataio
-

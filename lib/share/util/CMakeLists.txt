@@ -13,7 +13,7 @@ target_sources(${component}
     PRIVATE
         BandwidthTracker.cc
         ClockDelta.cc
-        FloatValueTracker.h
+        FloatValueTracker.cc
         FpsTracker.cc
         MiscUtil.cc
         SysUsage.cc
@@ -23,6 +23,7 @@ set_property(TARGET ${component}
     PROPERTY PUBLIC_HEADER
         BandwidthTracker.h
         ClockDelta.h
+	FloatValueTracker.h
         FpsTracker.h
         MiscUtil.h
         SysUsage.h

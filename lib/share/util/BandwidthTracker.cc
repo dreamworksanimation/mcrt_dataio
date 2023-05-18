@@ -1,12 +1,8 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "BandwidthTracker.h"
 
-#include <iostream>
-#include <sstream>
+#include <scene_rdl2/render/util/StrUtil.h>
 
 namespace mcrt_dataio {
     
@@ -16,7 +12,7 @@ BandwidthTracker::set(size_t dataSize)
     mEventList.emplace_front(std::make_shared<BandwidthEvent>(dataSize));
 
     while (mEventList.size() > 10) {
-        if (deltaSecWhole() > mKeepIntervalSec) {
+        if (getDeltaSecWhole() > static_cast<double>(mKeepIntervalSec)) {
             mEventList.pop_back();
         } else {
             break;
@@ -25,48 +21,85 @@ BandwidthTracker::set(size_t dataSize)
 }
 
 float
-BandwidthTracker::getBps()
+BandwidthTracker::getBps() const
 {
     if (mEventList.empty()) return 0.0f;
 
-    float wholeSec = deltaSecWhole();
-    if (wholeSec <= 0.0f) return 0.0f;
+    double wholeSec = getDeltaSecWhole();
+    if (wholeSec <= 0.0) return 0.0f;
 
-    float sum = 0.0f;
-    for (auto itr = mEventList.begin(); itr != mEventList.end(); ++itr) {
-        sum += static_cast<float>((*itr)->getDataSize());
-    }
-    return sum / wholeSec;
+    size_t sum = getDataSizeWhole();
+    if (sum == 0) return 0.0f;
+    return static_cast<float>(static_cast<double>(sum) / wholeSec);
 }
 
-float
-BandwidthTracker::deltaSecWhole()
+size_t
+BandwidthTracker::getMaxSize() const
 {
-    return deltaSec(mEventList.front()->getTimeStamp(), mEventList.back()->getTimeStamp());
+    size_t max = 0;
+    for (auto& itr : mEventList) {
+        if (itr->getDataSize() > max) max = itr->getDataSize();
+    }
+    return max;
+}
+
+size_t
+BandwidthTracker::getDataSizeWhole() const
+{
+    size_t sum = 0;
+    for (auto& itr : mEventList) {
+        sum += itr->getDataSize();
+    }
+    return sum;
+}
+
+double
+BandwidthTracker::getDeltaSecWhole() const
+{
+    return getDeltaSec(mEventList.front()->getTimeStamp(), mEventList.back()->getTimeStamp());
 }
 
 // static function
-float
-BandwidthTracker::deltaSec(const uint64_t currTime, const uint64_t oldTime) // both microSec
+double
+BandwidthTracker::getDeltaSec(const uint64_t currTime, const uint64_t oldTime) // both microSec
 {
-    return (float)(currTime - oldTime) * 0.000001f; // return sec
+    return static_cast<double>(currTime - oldTime) * 0.000001; // return sec
 }
 
 std::string
 BandwidthTracker::show() const
 {
+    auto showEventList = [&]() -> std::string {
+        using scene_rdl2::str_util::getNumberOfDigits;
+        using scene_rdl2::str_util::byteStr;
+        std::ostringstream ostr;
+        ostr << "mEventList (size:" << mEventList.size() << ") {\n";
+        unsigned i = 0;
+        int w0 = getNumberOfDigits(mEventList.size() - 1);
+        int w1 = getNumberOfDigits(getMaxSize());
+        for (auto& itr : mEventList) {
+            ostr << "  i:" << std::setw(w0) << i
+                 << " mDataSize:" << std::setw(w1) << itr->getDataSize()
+                 << " mTimeStamp:" << MiscUtil::timeFromEpochStr(itr->getTimeStamp()) << '\n';
+            i++;
+        }
+        ostr
+        << "}"
+        << " getDataSizeWhole():" << byteStr(getDataSizeWhole())
+        << " getDeltaSecWhole():" << getDeltaSecWhole() << " sec";
+        return ostr.str();
+    };
+
     std::ostringstream ostr;
     ostr << "BandwidthTracker {\n"
-         << "  mKeepIntervalSec:" << mKeepIntervalSec << " sec\n"
-         << "  mEventList (size:" << mEventList.size() << ") {\n";
-    for (auto itr = mEventList.begin(); itr != mEventList.end(); ++itr) {
-        ostr << "    mDataSize:" << (*itr)->getDataSize()
-             << " mTimeStamp:" << MiscUtil::timeFromEpochStr((*itr)->getTimeStamp()) << '\n';
+         << "  mKeepIntervalSec:" << mKeepIntervalSec << " sec : at least keep this interval data\n";
+    if (mEventList.empty()) {
+        ostr << "  mEventList is empty\n";
+    } else {
+        ostr << scene_rdl2::str_util::addIndent(showEventList()) << '\n';
     }
-    ostr << "  }\n"
-         << "}";
+    ostr << "}";
     return ostr.str();
 }
 
 } // namespace mcrt_dataio
-

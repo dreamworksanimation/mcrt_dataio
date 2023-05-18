@@ -59,6 +59,7 @@ if 'gcc' in env['CC']:
 env.DWASConscriptWalk(topdir='#cmd', ignore=[])
 env.DWASConscriptWalk(topdir='#lib', ignore=[])
 env.DWASConscriptWalk(topdir='#doc', ignore=[])
+env.DWASConscriptWalk(topdir='#tests')
 
 # Pass in the location of our stubs, so that those third party components will be resolved.
 env.DWAResolveUndefinedComponents()

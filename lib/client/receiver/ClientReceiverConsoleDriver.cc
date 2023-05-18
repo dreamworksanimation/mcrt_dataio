@@ -1,6 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "ClientReceiverConsoleDriver.h"
 
 #include <mcrt_messages/GenericMessage.h>
@@ -47,6 +46,10 @@ ClientReceiverConsoleDriver::parserConfigure(Parser &parser)
                    if (!mFbReceiver) return false;
                    return mFbReceiver->getParser().main(arg.childArg());
                });
+    parser.opt("feedback", "<on|off|show>", "enable/disable image feedback logic",
+               [&](Arg& arg) -> bool { return cmdFeedback(arg); });
+    parser.opt("feedbackInterval", "<intervalSec|show>", "set feedback interval by sec",
+               [&](Arg& arg) -> bool { return cmdFeedbackInterval(arg); });
 
     //------------------------------
 
@@ -198,6 +201,36 @@ ClientReceiverConsoleDriver::cmdPick(Arg &arg, int mode) const
             jMsg->messagePayload()[mcrt::RenderMessages::PICK_MESSAGE_PAYLOAD_MODE] = mode;
             return jMsg;
         });
+}
+
+bool
+ClientReceiverConsoleDriver::cmdFeedback(Arg& arg)
+{
+    sendCommandToAllMcrtAndMerge("feedback " + (arg++)());
+    return true;
+}
+
+bool
+ClientReceiverConsoleDriver::cmdFeedbackInterval(Arg& arg)
+{
+    sendCommandToAllMcrtAndMerge("feedbackInterval " + (arg++)());
+    return true;
+}
+
+void
+ClientReceiverConsoleDriver::sendCommandToAllMcrtAndMerge(const std::string& command)
+{
+    auto cmdGen = [&](const std::string& key) {
+        mcrt::GenericMessage::Ptr gMsg = std::make_shared<mcrt::GenericMessage>();
+        gMsg->mValue = std::string("cmd ") + key + ' ' + command;
+        return gMsg;
+    };
+
+    constexpr const char* DESTINATION_ALL_MCRT = "-1";
+    constexpr const char* DESTINATION_MERGE = "-2";
+
+    sendMessage([&]() -> const MessageContentConstPtr { return cmdGen(DESTINATION_ALL_MCRT); });
+    sendMessage([&]() -> const MessageContentConstPtr { return cmdGen(DESTINATION_MERGE); });
 }
 
 std::string

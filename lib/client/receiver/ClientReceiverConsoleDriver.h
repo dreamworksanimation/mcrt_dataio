@@ -1,6 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 #include "ClientReceiverFb.h"
@@ -56,6 +55,9 @@ private:
     bool cmdAovLs(Arg &arg);
     bool cmdAovPix(Arg &arg);
     bool cmdPick(Arg &arg, int mode) const;
+    bool cmdFeedback(Arg& arg);
+    bool cmdFeedbackInterval(Arg& arg);
+    void sendCommandToAllMcrtAndMerge(const std::string& cmd);
 
     std::string showRankInfo() const;
 

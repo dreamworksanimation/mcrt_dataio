@@ -1,8 +1,5 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include <list>
@@ -28,7 +25,7 @@ public:
 
     void set(float v);
 
-    float getAvg();
+    float getAvg() const;
 
     std::string show() const;
 
@@ -38,4 +35,3 @@ private:
 };
 
 } // namespace mcrt_dataio
-

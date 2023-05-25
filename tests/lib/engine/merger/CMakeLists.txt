@@ -27,4 +27,4 @@ McrtDataio_cxx_compile_options(${target})
 McrtDataio_link_options(${target})
 
 add_test(NAME ${target} COMMAND ${target})
-set_tests_properties(${target} PROPERTIES LABELS "McrtDataio")
+set_tests_properties(${target} PROPERTIES LABELS "unit")

@@ -4,6 +4,7 @@
 
 #include <queue>
 #include <string>
+#include <cstdint>
 
 namespace mcrt_dataio {
 

@@ -6,6 +6,7 @@
 #pragma once
 
 #include <functional>
+#include <string>
 
 namespace mcrt_dataio {
 

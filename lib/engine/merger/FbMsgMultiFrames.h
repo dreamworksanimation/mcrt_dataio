@@ -35,6 +35,8 @@ public:
         , mFeedback(feedback)
     {}
 
+    void setTunnelMachineIdInfo(int* tunnelMachineId) { mTunnelMachineId = tunnelMachineId; }
+
     bool initTotalCacheFrames(const size_t totalCacheFrames);
     bool initNumMachines(const int numMachines);
     bool initFb(const scene_rdl2::math::Viewport &rezedViewport);
@@ -70,6 +72,8 @@ protected:
     FbMsgSingleFrame *mDisplayFrame {nullptr};
     bool mDisplaySyncFrameInitialize {false};
     uint32_t mDisplaySyncFrameId {0}; // current display syncFrameId
+
+    int* mTunnelMachineId {nullptr};
 
     bool push_seamlessCombine(const mcrt::ProgressiveFrame &progressive);
     bool push_pickupLatest(const mcrt::ProgressiveFrame &progressive,

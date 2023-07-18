@@ -20,6 +20,7 @@ FbMsgMultiFrames::initTotalCacheFrames(const size_t totalCacheFrames)
         // This case, we don't use mPtrTable because mFbMsgMultiFrames is stable and only keep one item.
         mFbMsgMultiFrames.resize(1); // we don't need more than 1 in this case
         mFbMsgMultiFrames[0].setGlobalNodeInfo(mGlobalNodeInfo);
+        mFbMsgMultiFrames[0].setTunnelMachineIdStaged(mTunnelMachineId);
 
         mDisplaySyncFrameInitialize = false;
         mDisplaySyncFrameId = 0;
@@ -36,6 +37,7 @@ FbMsgMultiFrames::initTotalCacheFrames(const size_t totalCacheFrames)
         mPtrTable.resize(totalCacheFrames);
         for (size_t frameId = 0; frameId < mFbMsgMultiFrames.size(); ++frameId) {
             mFbMsgMultiFrames[frameId].setGlobalNodeInfo(mGlobalNodeInfo);
+            mFbMsgMultiFrames[frameId].setTunnelMachineIdStaged(mTunnelMachineId);
             if (!mFbMsgMultiFrames[frameId].init(mNumMachines)) return false;
             if (!mFbMsgMultiFrames[frameId].initFb(mRezedViewport)) return false;
             mPtrTable[frameId] = &mFbMsgMultiFrames[frameId];

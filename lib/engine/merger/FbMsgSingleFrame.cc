@@ -109,6 +109,12 @@ FbMsgSingleFrame::push(const mcrt::ProgressiveFrame &progressive)
             mDenoiserNormalInputName = progressive.mDenoiserNormalInputName;
         }
 
+        // update tunnelMachineIdRuntime when the new render started
+        mTunnelMachineIdRuntime = (mTunnelMachineIdStaged) ? (*mTunnelMachineIdStaged) : -1;
+        if (mTunnelMachineIdRuntime >= 0) {
+            std::cerr << "TunnelMahcineIdRuntime:" << mTunnelMachineIdRuntime << '\n';
+        }
+
     } else if (progressive.getStatus() == mcrt::BaseFrame::FINISHED) {
 #       ifdef DEBUG_MSG
         std::cerr << ">> FbMsgSingleFrame.cc push mId:" << currMachineId << " FINISHED" << std::endl;
@@ -163,7 +169,10 @@ FbMsgSingleFrame::push(const mcrt::ProgressiveFrame &progressive)
     }
 
     // update progress value table
-    mProgressAll[currMachineId] = mMessage[currMachineId].getProgress();
+    if (mTunnelMachineIdRuntime < 0 ||
+        (mTunnelMachineIdRuntime >= 0 && mTunnelMachineIdRuntime == currMachineId)) {
+        mProgressAll[currMachineId] = mMessage[currMachineId].getProgress();
+    }
     mProgressTotal = calcProgressiveTotal();
 
     // update mStatusAll for this frame
@@ -577,6 +586,15 @@ FbMsgSingleFrame::mergeSingleFb(const std::vector<char> *partialMergeTilesTbl,
 // Merge one mcrt info with partial merge tile logic
 //
 {
+    if (mTunnelMachineIdRuntime >= 0 && mTunnelMachineIdRuntime == machineId) {
+        // The tunnel operation is designed for debugging purposes and only specified single machine data
+        // is directly sent to the client without any merge operations. This means all merge operation is
+        // bypassed and the merge node simply sends incoming particular MCRT data to the client as is.
+        // This operation is useful for debugging to narrow down the reason the bug is inside the merge
+        // operation or not.
+        return; // skip merge operation
+    }
+
     if (!mReceivedAll[machineId]) return;
 
 #   ifdef SINGLE_THREAD

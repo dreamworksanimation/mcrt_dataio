@@ -59,6 +59,7 @@ public:
     }
 
     void setGlobalNodeInfo(GlobalNodeInfo *globalNodeInfo) { mGlobalNodeInfo = globalNodeInfo; }
+    void setTunnelMachineIdStaged(int* tunnelMachineId) { mTunnelMachineIdStaged = tunnelMachineId; }
 
     finline bool init(const int numMachines);
     finline bool initFb(const scene_rdl2::math::Viewport &rezedViewport); // original w, h. not needed tile aligned
@@ -141,6 +142,15 @@ private:
     size_t mReceivedMessagesTotal {0};         // total recv msgs from last image sent on this mySyncId
     size_t mReceivedMessagesAll {0};           // all received messages count on this mySyncId
     
+    // The tunnel operation is designed for debugging purposes and only specified single machine data
+    // is directly sent to the client without any merge operations. This means all merge operation is
+    // bypassed and the merge node simply sends incoming particular MCRT data to the client as is.
+    // This operation is useful for debugging to narrow down the reason the bug is inside the merge
+    // operation or not.
+    int* mTunnelMachineIdStaged {nullptr};
+    int mTunnelMachineIdRuntime {-1}; // negativeId : disable tunnel operation.
+                                      // 0 or positiveId : this machineId data is only send to client without merge
+
     // regarding to entire (= from start of current frame rendering) iteration
     std::vector<char> mReceivedAll;                     // [machineId]
     std::vector<unsigned> mReceivedMessagesTotalAll;    // [machineId] : message total count

@@ -301,13 +301,13 @@ InfoCodec::setUInt(Key &key, const unsigned int setVal, unsigned int *setTarget)
 void
 InfoCodec::setInt64(Key &key, const int64_t setVal, int64_t *setTarget) // MTsafe
 {
-    mImpl->set<long long>(key, (long long)setVal, (long long *)setTarget);
+    mImpl->set<Json::Int64>(key, (Json::Int64)setVal, (Json::Int64 *)setTarget);
 }
 
 void
 InfoCodec::setUInt64(Key &key, const uint64_t setVal, uint64_t *setTarget) // MTsafe
 {
-    mImpl->set<unsigned long long>(key, (unsigned long long)setVal, (unsigned long long *)setTarget);
+    mImpl->set<Json::UInt64>(key, (Json::UInt64)setVal, (Json::UInt64 *)setTarget);
 }
 
 void

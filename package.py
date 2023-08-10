@@ -14,7 +14,7 @@ def version():
     """
     Increment the build in the version.
     """
-    _version = '12.8'
+    _version = '12.9'
     from rezbuild import earlybind
     return earlybind.version(this, _version)
 
@@ -68,9 +68,9 @@ sconsTargets = {
 
 requires = [
     'arras4_core-4.10',
-    'mcrt_denoise-3.8',
+    'mcrt_denoise-3.9',
     'mcrt_messages-11.3',
-    'scene_rdl2-12.8'
+    'scene_rdl2-12.9'
 ]
 
 private_build_requires = [

@@ -8,6 +8,7 @@
 include(CMakeFindDependencyMacro)
 
 find_dependency(ArrasCore)
+find_dependency(Freetype)
 find_dependency(McrtDenoise)
 find_dependency(McrtMessages)
 find_dependency(SceneRdl2)

@@ -5,7 +5,7 @@
 #include "ClientReceiverConsoleDriver.h"
 #include "ClientReceiverDenoiser.h"
 #include "ClientReceiverStats.h"
-
+#include "TelemetryDisplay.h"
 #include "TimingAnalysis.h"
 #include "TimingRecorderHydra.h"
 
@@ -49,15 +49,15 @@ public:
     ~Impl() {}
 
     /// This class is Non-copyable
-    Impl &operator = (const Impl &) = delete;
-    Impl(const Impl &) = delete;
+    Impl &operator = (const Impl&) = delete;
+    Impl(const Impl&) = delete;
 
     //------------------------------
 
-    bool decodeProgressiveFrame(const mcrt::ProgressiveFrame &message,
+    bool decodeProgressiveFrame(const mcrt::ProgressiveFrame& message,
                                 const bool doParallel,
-                                const CallBackStartedCondition &callBackFuncAtStartedCondition,
-                                const CallBackGenericComment &callBackFuncForGenericComment);
+                                const CallBackStartedCondition& callBackFuncAtStartedCondition,
+                                const CallBackGenericComment& callBackFuncForGenericComment);
 
     //------------------------------
 
@@ -83,31 +83,31 @@ public:
     unsigned getWidth() const { return mRezedViewport.width(); }
     unsigned getHeight() const { return mRezedViewport.height(); }
 
-    const scene_rdl2::math::Viewport &getRezedViewport() const { return mRezedViewport; } // closed viewport
+    const scene_rdl2::math::Viewport& getRezedViewport() const { return mRezedViewport; } // closed viewport
     bool getRoiViewportStatus() const { return mRoiViewportStatus; }
-    const scene_rdl2::math::Viewport &getRoiViewport() const { return mRoiViewport; } // closed viewport
+    const scene_rdl2::math::Viewport& getRoiViewport() const { return mRoiViewport; } // closed viewport
 
     bool getPixelInfoStatus() const { return mFb.getPixelInfoStatus(); }
-    const std::string &getPixelInfoName() const { return mFb.getPixelInfoName(); }
+    const std::string& getPixelInfoName() const { return mFb.getPixelInfoName(); }
     int getPixelInfoNumChan() const { return 1; }
 
     bool getHeatMapStatus() const { return mFb.getHeatMapStatus(); }
-    const std::string &getHeatMapName() const { return mFb.getHeatMapName(); }
+    const std::string& getHeatMapName() const { return mFb.getHeatMapName(); }
     int getHeatMapNumChan() const { return 1; }
 
     bool getWeightBufferStatus() const { return mFb.getWeightBufferStatus(); }
-    const std::string &getWeightBufferName() const { return mFb.getWeightBufferName(); }
+    const std::string& getWeightBufferName() const { return mFb.getWeightBufferName(); }
     int getWeightBufferNumChan() const { return 1; }
 
     bool getRenderBufferOddStatus() const { return mFb.getRenderBufferOddStatus(); }
     int getRenderBufferOddNumChan() const { return 4; }
 
     unsigned getTotalRenderOutput() const { return mFb.getTotalRenderOutput(); }
-    const std::string &getRenderOutputName(const unsigned id) const;
+    const std::string& getRenderOutputName(const unsigned id) const;
     int getRenderOutputNumChan(const unsigned id) const;
-    int getRenderOutputNumChan(const std::string &aovName) const;
+    int getRenderOutputNumChan(const std::string& aovName) const;
     bool getRenderOutputClosestFilter(const unsigned id) const;
-    bool getRenderOutputClosestFilter(const std::string &aovName) const;
+    bool getRenderOutputClosestFilter(const std::string& aovName) const;
 
     //------------------------------
 
@@ -123,13 +123,13 @@ public:
     void getBeautyRgb888NoDenoise(std::vector<unsigned char>& rgbFrame,
                                   const bool top2bottom, const bool isSrgb);
 
-    bool getPixelInfoRgb888(std::vector<unsigned char> &rgbFrame, const bool top2bottom, const bool isSrgb);
-    bool getHeatMapRgb888(std::vector<unsigned char> &rgbFrame, const bool top2bottom, const bool isSrgb);
-    bool getWeightBufferRgb888(std::vector<unsigned char> &rgbFrame, const bool top2bottom, const bool isSrgb);
-    bool getBeautyAuxRgb888(std::vector<unsigned char> &rgbFrame, const bool top2bottom, const bool isSrgb);
+    bool getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+    bool getHeatMapRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+    bool getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+    bool getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
 
     bool getRenderOutputRgb888(const unsigned id,
-                               std::vector<unsigned char> &rgbFrame,
+                               std::vector<unsigned char>& rgbFrame,
                                const bool top2bottom,
                                const bool isSrgb,
                                const bool closestFilterDepthOutput);
@@ -138,8 +138,8 @@ public:
                                         const bool top2bottom,
                                         const bool isSrgb,
                                         const bool closestFilterDepthOutput);
-    bool getRenderOutputRgb888(const std::string &aovName,
-                               std::vector<unsigned char> &rgbFrame,
+    bool getRenderOutputRgb888(const std::string& aovName,
+                               std::vector<unsigned char>& rgbFrame,
                                const bool top2bottom,
                                const bool isSrgb,
                                const bool closestFilterDepthOutput);
@@ -154,22 +154,22 @@ public:
     bool getBeauty(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
     void getBeautyNoDenoise(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
 
-    bool getPixelInfo(std::vector<float> &data, const bool top2bottom); // 1 channel/pixel
-    bool getHeatMap(std::vector<float> &data, const bool top2bottom);   // 1 channel/pixel
-    bool getWeightBuffer(std::vector<float> &data, const bool top2bottom); // 1 channel/pixel
-    bool getBeautyOdd(std::vector<float> &rgba, const bool top2bottom); // 4 channels/pixel
+    bool getPixelInfo(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
+    bool getHeatMap(std::vector<float>& data, const bool top2bottom);   // 1 channel/pixel
+    bool getWeightBuffer(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
+    bool getBeautyOdd(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
     bool getBeautyOddNoDenoise(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
 
     int  getRenderOutput(const unsigned id,
-                         std::vector<float> &data,
+                         std::vector<float>& data,
                          const bool top2bottom,
                          const bool closestFilterDepthOutput);
     int  getRenderOutputNoDenoise(const unsigned id,
                                   std::vector<float>& data,
                                   const bool top2bottom,
                                   const bool closestFilterDepthOutput);
-    int  getRenderOutput(const std::string &aovName,
-                         std::vector<float> &data,
+    int  getRenderOutput(const std::string& aovName,
+                         std::vector<float>& data,
                          const bool top2bottom,
                          const bool closestFilterDepthOutput);
     int  getRenderOutputNoDenoise(const std::string& aovName,
@@ -196,17 +196,17 @@ public:
     scene_rdl2::math::Vec4f getPixBeautyOdd(const int sx, const int sy) const;
 
     int getPixRenderOutput(const unsigned id, const int sx, const int sy,
-                           std::vector<float> &out) const;
-    int getPixRenderOutput(const std::string &aovName, const int sx, const int sy,
-                           std::vector<float> &out) const;    
+                           std::vector<float>& out) const;
+    int getPixRenderOutput(const std::string& aovName, const int sx, const int sy,
+                           std::vector<float>& out) const;    
 
-    std::string showPix(const int sx, const int sy, const std::string &aovName) const;
+    std::string showPix(const int sx, const int sy, const std::string& aovName) const;
 
     //------------------------------
 
-    const scene_rdl2::grid_util::LatencyLog &getLatencyLog() const { return mLatencyLog; }
+    const scene_rdl2::grid_util::LatencyLog& getLatencyLog() const { return mLatencyLog; }
 
-    const scene_rdl2::grid_util::LatencyLogUpstream &getLatencyLogUpstream() const
+    const scene_rdl2::grid_util::LatencyLogUpstream& getLatencyLogUpstream() const
     {
         return mLatencyLogUpstream;
     }
@@ -215,7 +215,7 @@ public:
 
     void setInfoRecInterval(const float sec) { mInfoRecInterval = sec; }
     void setInfoRecDisplayInterval(const float sec) { mInfoRecDisplayInterval = sec; }
-    void setInfoRecFileName(const std::string &fileName) {
+    void setInfoRecFileName(const std::string& fileName) {
         mInfoRecFileName = fileName;
         std::cerr << ">> ClientReceiverFb.cc infoRec"
                   << " interval:" << mInfoRecInterval << "sec"
@@ -225,7 +225,7 @@ public:
 
     void updateStatsMsgInterval();
     void updateStatsProgressiveFrame();
-    bool getStats(const float intervalSec, std::string &outMsg);
+    bool getStats(const float intervalSec, std::string& outMsg);
 
     float getRecvImageDataFps() { return mRecvImageDataFps.getFps(); }
     
@@ -233,14 +233,21 @@ public:
 
     //------------------------------
 
-    void consoleEnable(ClientReceiverFb *fbReceiver,
+    void consoleEnable(ClientReceiverFb* fbReceiver,
                        const unsigned short port,
-                       const CallBackSendMessage &sendMessage);
-    ClientReceiverConsoleDriver &consoleDriver() { return mConsoleDriver; }
+                       const CallBackSendMessage& sendMessage);
+    ClientReceiverConsoleDriver& consoleDriver() { return mConsoleDriver; }
 
     Parser& getParser() { return mParser; }
 
     void setTimingRecorderHydra(std::shared_ptr<TimingRecorderHydra> ptr);
+
+    //------------------------------
+
+    void setTelemetryOverlayReso(unsigned width, unsigned height);
+    void setTelemetryOverlayActive(bool sw);
+    bool getTelemetryOverlayActive() const;
+    void switchTelemetryLayoutNext();
 
 private:
     // last received image data's sender machineId
@@ -253,6 +260,7 @@ private:
     float mRenderPrepProgress {0.0f};
     float mProgress {-1.0f};
     unsigned mFbActivityCounter {0};
+    unsigned mDecodeProgressiveFrameCounter {0};
 
     int mCoarsePassStatus {0}; // 0:coarsePass 1:nonCoarsePass 2:unknown
     std::string mDenoiserAlbedoInputName;
@@ -275,6 +283,10 @@ private:
 
     scene_rdl2::grid_util::LatencyLog mLatencyLog;
     scene_rdl2::grid_util::LatencyLogUpstream mLatencyLogUpstream;
+
+    unsigned mTelemetryOverlayResoWidth {640};
+    unsigned mTelemetryOverlayResoHeight {360};
+    telemetry::Display mTelemetryDisplay;
 
     //------------------------------
 
@@ -313,7 +325,10 @@ private:
 
     bool mRenderPrepDetailedProgressDump {false}; // for debug
     int mRenderPrepDetailedProgressDumpMode {0}; // 0:fraction 1:full-dump
-    unsigned mRenderPrepDetailedProgressShowLastSyncId {std::numeric_limits<unsigned>::max()}; // last syncId of renderPrepDetailedProgress dump
+
+    // last syncId of renderPrepDetailedProgress dump
+    unsigned mRenderPrepDetailedProgressShowLastSyncId {std::numeric_limits<unsigned>::max()};
+
     unsigned mRenderPrepDetailedProgressShowCompleteCount {0}; // for renderPrepDetailedProgress dump logic
     size_t mShowMcrtTotal {0}; // for debug
 
@@ -325,10 +340,10 @@ private:
     void initErrorMsg() { mErrorMsg.clear(); }
     void addErrorMsg(const std::string& msg);
 
-    bool decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBuffer &buffer);
-    void decodeAuxInfo(const mcrt::BaseFrame::DataBuffer &buffer);
-    void afterDecode(const CallBackGenericComment &callBackFuncForGenericComment);
-    void processGenericComment(const CallBackGenericComment &callBackFuncForGenericComment);
+    bool decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBuffer& buffer);
+    void decodeAuxInfo(const mcrt::BaseFrame::DataBuffer& buffer);
+    void afterDecode(const CallBackGenericComment& callBackFuncForGenericComment);
+    void processGenericComment(const CallBackGenericComment& callBackFuncForGenericComment);
 
     void infoRecUpdate();
     void infoRecUpdateDataAll();
@@ -354,10 +369,14 @@ private:
                     const std::function<void(std::vector<float>& buff)>& setInputCallBack,
                     bool& fallback);
 
+    void setupTelemetryDisplayInfo(telemetry::DisplayInfo& displayInfo);
+
     void parserConfigure();
     std::string showDenoiseInfo() const;
     std::string showRenderPrepProgress() const;
     std::string showViewportInfo() const;
+
+    void telemetryResetTest(); // for the telemetry testing purposes
 }; // ClientReceiverFb::Impl
 
 //------------------------------------------------------------------------------------------
@@ -365,9 +384,11 @@ private:
 bool
 ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &message,
                                                const bool doParallel,
-                                               const CallBackStartedCondition &callBackFuncAtStartedCondition,
-                                               const CallBackGenericComment &callBackFuncForGenericComment)
+                                               const CallBackStartedCondition& callBackFuncAtStartedCondition,
+                                               const CallBackGenericComment& callBackFuncForGenericComment)
 {
+    mDecodeProgressiveFrameCounter++; // never reset during sessions.
+
     if (message.mHeader.mProgress < 0.0f) {
         // Special case, this message only contains auxInfo data (no image information).
         for (const mcrt::BaseFrame::DataBuffer &buffer: message.mBuffers) {
@@ -406,6 +427,14 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
                 // overwritten by next renderPrep stats or new image.
                 // Situation 2 would be processed later code.
                 mProgress = 0.0f;
+            }
+        } else {
+            if (mTelemetryDisplay.getActive()) {
+                if (mStatus == mcrt::BaseFrame::FINISHED) {
+                    // We set progress as 0.0 when telemetry overlay is enable.
+                    // If so, client app try to display image data.
+                    mProgress = 0.0f;
+                }
             }
         }
         return true;
@@ -499,7 +528,7 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
         }
 
     } else {
-        std::vector<const mcrt::BaseFrame::DataBuffer *> bufferArray;
+        std::vector<const mcrt::BaseFrame::DataBuffer*> bufferArray;
         for (const auto &buffer: message.mBuffers) {
             mRecvMsgSize += buffer.mDataLength;
             bufferArray.push_back(&buffer);
@@ -574,7 +603,7 @@ ClientReceiverFb::Impl::getRenderOutputNumChan(const unsigned id) const
 }
 
 int    
-ClientReceiverFb::Impl::getRenderOutputNumChan(const std::string &aovName) const
+ClientReceiverFb::Impl::getRenderOutputNumChan(const std::string& aovName) const
 {
     scene_rdl2::grid_util::Fb::FbAovShPtr fbAov;
     if (!mFb.getAov2(aovName, fbAov)) {
@@ -594,7 +623,7 @@ ClientReceiverFb::Impl::getRenderOutputClosestFilter(const unsigned id) const
 }
 
 bool
-ClientReceiverFb::Impl::getRenderOutputClosestFilter(const std::string &aovName) const
+ClientReceiverFb::Impl::getRenderOutputClosestFilter(const std::string& aovName) const
 {
     scene_rdl2::grid_util::Fb::FbAovShPtr fbAov;
     if (!mFb.getAov2(aovName, fbAov)) {
@@ -604,10 +633,24 @@ ClientReceiverFb::Impl::getRenderOutputClosestFilter(const std::string &aovName)
 }
 
 bool
-ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                                         const bool top2bottom,
                                         const bool isSrgb)
 {
+    bool telemetryOverlayWithPrevArchive = false;
+    if (getProgress() == 0.0f) {
+        // This situation only be happened under telemetryOverlay active condition.
+        // Not received image data yet for this frame. We only update telemetryOverlay info
+        telemetryOverlayWithPrevArchive = true;
+        if (mFrameId == 0) {
+            // This is before receiving any images
+            telemetry::DisplayInfo info;
+            setupTelemetryDisplayInfo(info);
+            mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
+            return true;
+        }
+    }
+
     initErrorMsg();
 
     bool result = true;
@@ -634,6 +677,13 @@ ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char> &rgbFrame,
         if (fallback) getBeautyRgb888NoDenoise(rgbFrame, top2bottom, isSrgb);
 #       endif // end !VERIFY_FLOAT_API_BY_UC
     }
+
+    if (mTelemetryDisplay.getActive()) {
+        telemetry::DisplayInfo info;
+        setupTelemetryDisplayInfo(info);
+        mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
+    }
+    
     return result;
 }
 
@@ -666,7 +716,7 @@ ClientReceiverFb::Impl::getBeautyRgb888NoDenoise(std::vector<unsigned char>& rgb
 }
 
 bool
-ClientReceiverFb::Impl::getPixelInfoRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::Impl::getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame,
                                            const bool top2bottom,
                                            const bool isSrgb)
 {
@@ -698,7 +748,7 @@ ClientReceiverFb::Impl::getPixelInfoRgb888(std::vector<unsigned char> &rgbFrame,
 }
 
 bool
-ClientReceiverFb::Impl::getHeatMapRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::Impl::getHeatMapRgb888(std::vector<unsigned char>& rgbFrame,
                                          const bool top2bottom,
                                          const bool isSrgb)
 {
@@ -730,7 +780,7 @@ ClientReceiverFb::Impl::getHeatMapRgb888(std::vector<unsigned char> &rgbFrame,
 }
 
 bool
-ClientReceiverFb::Impl::getWeightBufferRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::Impl::getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame,
                                               const bool top2bottom,
                                               const bool isSrgb)
 {
@@ -762,7 +812,7 @@ ClientReceiverFb::Impl::getWeightBufferRgb888(std::vector<unsigned char> &rgbFra
 }
 
 bool
-ClientReceiverFb::Impl::getBeautyAuxRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::Impl::getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame,
                                            const bool top2bottom,
                                            const bool isSrgb)
 {
@@ -797,7 +847,7 @@ ClientReceiverFb::Impl::getBeautyAuxRgb888(std::vector<unsigned char> &rgbFrame,
 
 bool
 ClientReceiverFb::Impl::getRenderOutputRgb888(const unsigned id,
-                                              std::vector<unsigned char> &rgbFrame,
+                                              std::vector<unsigned char>& rgbFrame,
                                               const bool top2bottom,
                                               const bool isSrgb,
                                               const bool closestFilterDepthOutput)
@@ -879,8 +929,8 @@ ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(const unsigned id,
 }
 
 bool
-ClientReceiverFb::Impl::getRenderOutputRgb888(const std::string &aovName,
-                                              std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::Impl::getRenderOutputRgb888(const std::string& aovName,
+                                              std::vector<unsigned char>& rgbFrame,
                                               const bool top2bottom,
                                               const bool isSrgb,
                                               const bool closestFilterDepthOutput)
@@ -925,7 +975,7 @@ ClientReceiverFb::Impl::getRenderOutputRgb888(const std::string &aovName,
 }
 
 void
-ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(const std::string &aovName,
+ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(const std::string& aovName,
                                                        std::vector<unsigned char>& rgbFrame,
                                                        const bool top2bottom,
                                                        const bool isSrgb,
@@ -962,7 +1012,7 @@ ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(const std::string &aovNam
 //------------------------------------------------------------------------------
 
 bool
-ClientReceiverFb::Impl::getBeauty(std::vector<float> &rgba,
+ClientReceiverFb::Impl::getBeauty(std::vector<float>& rgba,
                                   const bool top2bottom)
 {
     initErrorMsg();
@@ -984,7 +1034,7 @@ ClientReceiverFb::Impl::getBeauty(std::vector<float> &rgba,
 }
 
 void
-ClientReceiverFb::Impl::getBeautyNoDenoise(std::vector<float> &rgba,
+ClientReceiverFb::Impl::getBeautyNoDenoise(std::vector<float>& rgba,
                                            const bool top2bottom)
 {
     if (mCoarsePassStatus != 1) {
@@ -1001,7 +1051,7 @@ ClientReceiverFb::Impl::getBeautyNoDenoise(std::vector<float> &rgba,
 }
 
 bool
-ClientReceiverFb::Impl::getPixelInfo(std::vector<float> &data,
+ClientReceiverFb::Impl::getPixelInfo(std::vector<float>& data,
                                      const bool top2bottom)
 {
     initErrorMsg();
@@ -1024,7 +1074,7 @@ ClientReceiverFb::Impl::getPixelInfo(std::vector<float> &data,
 }
 
 bool    
-ClientReceiverFb::Impl::getHeatMap(std::vector<float> &data,
+ClientReceiverFb::Impl::getHeatMap(std::vector<float>& data,
                                    const bool top2bottom)
 {
     initErrorMsg();
@@ -1047,7 +1097,7 @@ ClientReceiverFb::Impl::getHeatMap(std::vector<float> &data,
 }
 
 bool
-ClientReceiverFb::Impl::getWeightBuffer(std::vector<float> &data,
+ClientReceiverFb::Impl::getWeightBuffer(std::vector<float>& data,
                                         const bool top2bottom)
 {
     initErrorMsg();
@@ -1070,7 +1120,7 @@ ClientReceiverFb::Impl::getWeightBuffer(std::vector<float> &data,
 }
 
 bool
-ClientReceiverFb::Impl::getBeautyOdd(std::vector<float> &rgba,
+ClientReceiverFb::Impl::getBeautyOdd(std::vector<float>& rgba,
                                      const bool top2bottom)
 {
     initErrorMsg();
@@ -1094,7 +1144,7 @@ ClientReceiverFb::Impl::getBeautyOdd(std::vector<float> &rgba,
 
 int    
 ClientReceiverFb::Impl::getRenderOutput(const unsigned id,
-                                        std::vector<float> &data,
+                                        std::vector<float>& data,
                                         const bool top2bottom,
                                         const bool closestFilterDepthOutput)
 {
@@ -1152,8 +1202,8 @@ ClientReceiverFb::Impl::getRenderOutputNoDenoise(const unsigned id,
 }
 
 int    
-ClientReceiverFb::Impl::getRenderOutput(const std::string &aovName,
-                                        std::vector<float> &data,
+ClientReceiverFb::Impl::getRenderOutput(const std::string& aovName,
+                                        std::vector<float>& data,
                                         const bool top2bottom,
                                         const bool closestFilterDepthOutput)
 {
@@ -1288,7 +1338,7 @@ int
 ClientReceiverFb::Impl::getPixRenderOutput(const unsigned id,
                                            const int sx,
                                            const int sy,
-                                           std::vector<float> &out) const
+                                           std::vector<float>& out) const
 {
     scene_rdl2::grid_util::Fb::FbAovShPtr fbAov;
     if (!mFb.getAov2(id, fbAov)) {
@@ -1298,10 +1348,10 @@ ClientReceiverFb::Impl::getPixRenderOutput(const unsigned id,
 }
 
 int
-ClientReceiverFb::Impl::getPixRenderOutput(const std::string &aovName,
+ClientReceiverFb::Impl::getPixRenderOutput(const std::string& aovName,
                                            const int sx,
                                            const int sy,
-                                           std::vector<float> &out) const
+                                           std::vector<float>& out) const
 {
     scene_rdl2::grid_util::Fb::FbAovShPtr fbAov;
     if (!mFb.getAov2(aovName, fbAov)) {
@@ -1351,24 +1401,24 @@ ClientReceiverFb::Impl::getPixRenderOutput(const std::string &aovName,
 }
 
 std::string
-ClientReceiverFb::Impl::showPix(const int sx, const int sy, const std::string &aovName) const
+ClientReceiverFb::Impl::showPix(const int sx, const int sy, const std::string& aovName) const
 //
 // Return pixel value detailed information by string
 //
 {
-    auto showHead = [](const std::string &msg, const int sx, const int sy) -> std::string {
+    auto showHead = [](const std::string& msg, const int sx, const int sy) {
         std::ostringstream ostr;
         ostr << msg << " (sx:" << std::setw(4) << sx << ", sy:" << std::setw(4) << sy << ")";
         return ostr.str();
     };
-    auto showVal = [](const float v) -> std::string {
+    auto showVal = [](const float v) {
         union { float f; unsigned ui; } uni;
-        auto showAsF = [](const float v) -> std::string {
+        auto showAsF = [](const float v) {
             std::ostringstream ostr;
             ostr << "float(" << std::setw(20) << std::fixed << std::setprecision(9) << v << ")";
             return ostr.str();
         };
-        auto showAsBitImage = [&](const float v) -> std::string {
+        auto showAsBitImage = [&](const float v) {
             uni.f = v;
             std::ostringstream ostr;
             ostr << "bitImage(";
@@ -1380,7 +1430,7 @@ ClientReceiverFb::Impl::showPix(const int sx, const int sy, const std::string &a
             ostr << ")";
             return ostr.str();
         };
-        auto showAsUInt = [&](const float v) -> std::string {
+        auto showAsUInt = [&](const float v) {
             uni.f = v;
             std::ostringstream ostr;
             ostr << "unsigned(" << std::setw(10) << uni.ui << ")";
@@ -1391,8 +1441,8 @@ ClientReceiverFb::Impl::showPix(const int sx, const int sy, const std::string &a
         ostr << showAsF(v) << " : " << showAsBitImage(v) << " : " << showAsUInt(v);
         return ostr.str();
     };
-    auto showRgba = [&](const std::string &msg, const int sx, const int sy,
-                        const scene_rdl2::math::Vec4f &rgba) -> std::string {
+    auto showRgba = [&](const std::string& msg, const int sx, const int sy,
+                        const scene_rdl2::math::Vec4f& rgba) {
         std::ostringstream ostr;
         ostr
         << showHead(msg, sx, sy) << " {\n"
@@ -1403,8 +1453,8 @@ ClientReceiverFb::Impl::showPix(const int sx, const int sy, const std::string &a
         << "}";
         return ostr.str();
     };
-    auto showFVec = [&](const std::string &msg, const int sx, const int sy,
-                        const std::vector<float> v) -> std::string {
+    auto showFVec = [&](const std::string& msg, const int sx, const int sy,
+                        const std::vector<float> v) {
         std::ostringstream ostr;
         ostr << showHead(msg, sx, sy) << " {\n";
         for (size_t i = 0; i < v.size(); ++i) {
@@ -1413,8 +1463,8 @@ ClientReceiverFb::Impl::showPix(const int sx, const int sy, const std::string &a
         ostr << "}";
         return ostr.str();
     };
-    auto showF = [&](const std::string &msg, const int sx, const int sy,
-                     const float v) -> std::string {
+    auto showF = [&](const std::string& msg, const int sx, const int sy,
+                     const float v) {
          std::vector<float> vec{ v };
          return showFVec(msg, sx, sy, vec);
     };
@@ -1470,7 +1520,7 @@ ClientReceiverFb::Impl::updateStatsProgressiveFrame()
 }
 
 bool
-ClientReceiverFb::Impl::getStats(const float intervalSec, std::string &outMsg)
+ClientReceiverFb::Impl::getStats(const float intervalSec, std::string& outMsg)
 {
     uint32_t syncId = mFrameId;
     if (syncId != mLastSyncId) {
@@ -1507,9 +1557,9 @@ ClientReceiverFb::Impl::getStats(const float intervalSec, std::string &outMsg)
 }
 
 void    
-ClientReceiverFb::Impl::consoleEnable(ClientReceiverFb *fbReceiver,
+ClientReceiverFb::Impl::consoleEnable(ClientReceiverFb* fbReceiver,
                                       const unsigned short port,
-                                      const CallBackSendMessage &sendMessage)
+                                      const CallBackSendMessage& sendMessage)
 {
     mConsoleDriver.set(sendMessage, fbReceiver);
     mConsoleDriver.initialize(port);
@@ -1522,6 +1572,36 @@ ClientReceiverFb::Impl::setTimingRecorderHydra(std::shared_ptr<TimingRecorderHyd
     mTimingAnalysis.setTimingRecorderHydra(ptr);
 }
 
+void
+ClientReceiverFb::Impl::setTelemetryOverlayReso(unsigned width, unsigned height)
+{
+    /* useful debug message
+    std::cerr << ">> ClientReceiverFb.cc setTelemetryOverlayReso"
+              << " old(w:" << mTelemetryOverlayResoWidth << ", h:" << mTelemetryOverlayResoHeight << ") ->"
+              << " new(w:" << width << ", h:" << height << ")\n";
+    */
+    mTelemetryOverlayResoWidth = width;
+    mTelemetryOverlayResoHeight = height;
+}
+
+void
+ClientReceiverFb::Impl::setTelemetryOverlayActive(bool sw)
+{
+    mTelemetryDisplay.setActive(sw);
+}
+
+bool
+ClientReceiverFb::Impl::getTelemetryOverlayActive() const
+{
+    return mTelemetryDisplay.getActive();
+}
+
+void
+ClientReceiverFb::Impl::switchTelemetryLayoutNext()
+{
+    mTelemetryDisplay.switchLayoutNext();
+}
+
 //------------------------------------------------------------------------------
 
 void
@@ -1532,7 +1612,7 @@ ClientReceiverFb::Impl::addErrorMsg(const std::string& msg)
 }
 
 bool
-ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBuffer &buffer)
+ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBuffer& buffer)
 {
     if (!buffer.mDataLength) return true; // empty data somehow -> skip
 
@@ -1578,20 +1658,26 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
     scene_rdl2::fb_util::ActivePixels workActivePixels;
     scene_rdl2::grid_util::PackTiles::DataType dataType =
         scene_rdl2::grid_util::PackTiles::
-        decodeDataType(static_cast<const void *>(buffer.mData.get()), buffer.mDataLength);
+        decodeDataType(static_cast<const void*>(buffer.mData.get()), buffer.mDataLength);
+    bool activeDecodeAction {false};
 
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::BEAUTY) {
         // "beauty" buffer as RGBA mode (not include numSample)
-        scene_rdl2::grid_util::PackTiles::
+        if (!scene_rdl2::grid_util::PackTiles::
             decode(false,
-                   static_cast<const void *>(buffer.mData.get()),
+                   static_cast<const void*>(buffer.mData.get()),
                    buffer.mDataLength,
                    workActivePixels,
                    mFb.getRenderBufferTiled(), // RGBA : float * 4
                    mFb.getRenderBufferCoarsePassPrecision(),
-                   mFb.getRenderBufferFinePassPrecision());
-        if (!mFb.getActivePixels().orOp(workActivePixels)) {
+                   mFb.getRenderBufferFinePassPrecision(),
+                   activeDecodeAction)) {
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixels().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
@@ -1599,46 +1685,61 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::BEAUTY_WITH_NUMSAMPLE) {
         // "beauty" buffer as RGBA mode  with "numSample" buffer
         scene_rdl2::grid_util::Fb::NumSampleBuffer dummyBuffer;
-        scene_rdl2::grid_util::PackTiles::
+        if (!scene_rdl2::grid_util::PackTiles::
             decode(false, // renderBufferOdd condition
-                   static_cast<const void *>(buffer.mData.get()),
+                   static_cast<const void*>(buffer.mData.get()),
                    buffer.mDataLength,
                    false, // storeNumSampleData condition
                    workActivePixels,
                    mFb.getRenderBufferTiled(), // RGBA : float * 4 : normalized
                    dummyBuffer, // numSampleBufferTiled
                    mFb.getRenderBufferCoarsePassPrecision(),
-                   mFb.getRenderBufferFinePassPrecision());
-        if (!mFb.getActivePixels().orOp(workActivePixels)) {
+                   mFb.getRenderBufferFinePassPrecision(),
+                   activeDecodeAction)) {
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixels().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
 
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::PIXELINFO) {
         mFb.setupPixelInfo(nullptr, buffer.mName);
-        scene_rdl2::grid_util::PackTiles::
-            decodePixelInfo(static_cast<const void *>(buffer.mData.get()),
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodePixelInfo(static_cast<const void*>(buffer.mData.get()),
                             buffer.mDataLength,
                             workActivePixels,
                             mFb.getPixelInfoBufferTiled(), // Depth : float
                             mFb.getPixelInfoCoarsePassPrecision(),
-                            mFb.getPixelInfoFinePassPrecision());
-        if (!mFb.getActivePixelsPixelInfo().orOp(workActivePixels)) {
+                            mFb.getPixelInfoFinePassPrecision(),
+                            activeDecodeAction)) {
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixelsPixelInfo().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
 
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::HEATMAP) {
         mFb.setupHeatMap(nullptr, buffer.mName);
-        scene_rdl2::grid_util::PackTiles::
-            decodeHeatMap(static_cast<const void *>(buffer.mData.get()),
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeHeatMap(static_cast<const void*>(buffer.mData.get()),
                           buffer.mDataLength,
                           workActivePixels,
-                          mFb.getHeatMapSecBufferTiled()); // Sec : float
-        if (!mFb.getActivePixelsHeatMap().orOp(workActivePixels)) {
+                          mFb.getHeatMapSecBufferTiled(),
+                          activeDecodeAction)) { // Sec : float
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixelsHeatMap().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
@@ -1646,30 +1747,40 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::HEATMAP_WITH_NUMSAMPLE) {
         mFb.setupHeatMap(nullptr, buffer.mName);
         scene_rdl2::grid_util::Fb::NumSampleBuffer dummyBuffer;
-        scene_rdl2::grid_util::PackTiles::
-            decodeHeatMap(static_cast<const void *>(buffer.mData.get()),
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeHeatMap(static_cast<const void*>(buffer.mData.get()),
                           buffer.mDataLength,
                           false, // storeNumSampleData condition
                           workActivePixels,
                           mFb.getHeatMapSecBufferTiled(), // Sec : float
-                          dummyBuffer); // heatMapNumSampleBufTiled
-        if (!mFb.getActivePixelsHeatMap().orOp(workActivePixels)) {
+                          dummyBuffer,
+                          activeDecodeAction)) { // heatMapNumSampleBufTiled
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixelsHeatMap().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
 
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::WEIGHT) {
         mFb.setupWeightBuffer(nullptr, buffer.mName);
-        scene_rdl2::grid_util::PackTiles::
-            decodeWeightBuffer(static_cast<const void *>(buffer.mData.get()),
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeWeightBuffer(static_cast<const void*>(buffer.mData.get()),
                                buffer.mDataLength,
                                workActivePixels,
                                mFb.getWeightBufferTiled(), // Weight : float
                                mFb.getWeightBufferCoarsePassPrecision(),
-                               mFb.getWeightBufferFinePassPrecision());
-        if (!mFb.getActivePixelsWeightBuffer().orOp(workActivePixels)) {
+                               mFb.getWeightBufferFinePassPrecision(),
+                               activeDecodeAction)) {
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixelsWeightBuffer().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
@@ -1679,16 +1790,21 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
         scene_rdl2::grid_util::CoarsePassPrecision dummyCoarsePassPrecision;
         scene_rdl2::grid_util::FinePassPrecision dummyFinePassPrecision;
         mFb.setupRenderBufferOdd(nullptr);
-        scene_rdl2::grid_util::PackTiles::
+        if (!scene_rdl2::grid_util::PackTiles::
             decode(true, // renderBufferOdd condition
-                   static_cast<const void *>(buffer.mData.get()),
+                   static_cast<const void*>(buffer.mData.get()),
                    buffer.mDataLength,
                    workActivePixels,
                    mFb.getRenderBufferOddTiled(), // RGBA : float * 4
                    dummyCoarsePassPrecision,
-                   dummyFinePassPrecision);
-        if (!mFb.getActivePixelsRenderBufferOdd().orOp(workActivePixels)) {
+                   dummyFinePassPrecision,
+                   activeDecodeAction)) {
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixelsRenderBufferOdd().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
@@ -1699,18 +1815,23 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
         scene_rdl2::grid_util::FinePassPrecision dummyFinePassPrecision;
         scene_rdl2::grid_util::Fb::NumSampleBuffer dummyBuffer;
         mFb.setupRenderBufferOdd(nullptr);
-        scene_rdl2::grid_util::PackTiles::
+        if (!scene_rdl2::grid_util::PackTiles::
             decode(true, // renderBufferOdd condition
-                   static_cast<const void *>(buffer.mData.get()),
+                   static_cast<const void*>(buffer.mData.get()),
                    buffer.mDataLength,
                    false, // storeNumSampleData condition
                    workActivePixels,
                    mFb.getRenderBufferOddTiled(), // RGBA : float * 4
                    dummyBuffer, // numSampleBufferTiled
                    dummyCoarsePassPrecision,
-                   dummyFinePassPrecision);
-        if (!mFb.getActivePixelsRenderBufferOdd().orOp(workActivePixels)) {
+                   dummyFinePassPrecision,
+                   activeDecodeAction)) {
             return false;
+        }
+        if (activeDecodeAction) {
+            if (!mFb.getActivePixelsRenderBufferOdd().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
@@ -1718,25 +1839,32 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
     if (dataType == scene_rdl2::grid_util::PackTiles::DataType::REFERENCE) {
         // RenderOutput AOV reference type (Beauty, Alpha, HeatMap, Weight)
         scene_rdl2::grid_util::Fb::FbAovShPtr fbAov = mFb.getAov(buffer.mName); // MTsafe
-        scene_rdl2::grid_util::PackTiles::
-            decodeRenderOutputReference(static_cast<const void *>(buffer.mData.get()),
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeRenderOutputReference(static_cast<const void*>(buffer.mData.get()),
                                         buffer.mDataLength,
-                                        fbAov); // done fbAov memory setup if needed
+                                        fbAov)) { // done fbAov memory setup if needed
+            return false;
+        }
         return true;
     }
 
     if (dataType != scene_rdl2::grid_util::PackTiles::DataType::UNDEF) {
         // RenderOutput AOV.
         scene_rdl2::grid_util::Fb::FbAovShPtr fbAov = mFb.getAov(buffer.mName); // MTsafe
-        scene_rdl2::grid_util::PackTiles::
-            decodeRenderOutput(static_cast<const void *>(buffer.mData.get()),
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeRenderOutput(static_cast<const void*>(buffer.mData.get()),
                                buffer.mDataLength,
                                false, // storeNumSampleData
                                workActivePixels,
-                               fbAov); // done fbAov memory setup if needed
-        // update activePixels info by OR bitmask operation
-        if (!fbAov->getActivePixels().orOp(workActivePixels)) {
+                               fbAov,
+                               activeDecodeAction)) { // done fbAov memory setup if needed
             return false;
+        }
+        if (activeDecodeAction) {
+            // update activePixels info by OR bitmask operation
+            if (!fbAov->getActivePixels().orOp(workActivePixels)) {
+                return false;
+            }
         }
         return true;
     }
@@ -1745,7 +1873,7 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
 }
 
 void
-ClientReceiverFb::Impl::decodeAuxInfo(const mcrt::BaseFrame::DataBuffer &buffer)
+ClientReceiverFb::Impl::decodeAuxInfo(const mcrt::BaseFrame::DataBuffer& buffer)
 {
     scene_rdl2::rdl2::ValueContainerDeq cDeq(buffer.mData.get(), buffer.mDataLength);
     std::vector<std::string> infoDataArray = cDeq.deqStringVector();
@@ -1773,7 +1901,7 @@ ClientReceiverFb::Impl::decodeAuxInfo(const mcrt::BaseFrame::DataBuffer &buffer)
 }
 
 void
-ClientReceiverFb::Impl::afterDecode(const CallBackGenericComment &callBackFuncForGenericComment)
+ClientReceiverFb::Impl::afterDecode(const CallBackGenericComment& callBackFuncForGenericComment)
 {
     // This is relatively light weight and no serious impact to the decode performance.
     mRenderPrepProgress = mGlobalNodeInfo.getRenderPrepProgress();
@@ -1794,7 +1922,7 @@ ClientReceiverFb::Impl::afterDecode(const CallBackGenericComment &callBackFuncFo
 }
 
 void
-ClientReceiverFb::Impl::processGenericComment(const CallBackGenericComment &callBackFuncForGenericComment)
+ClientReceiverFb::Impl::processGenericComment(const CallBackGenericComment& callBackFuncForGenericComment)
 //
 // If we have genericComment recently received, pass them into callBack function.
 //    
@@ -1812,14 +1940,14 @@ ClientReceiverFb::Impl::processGenericComment(const CallBackGenericComment &call
 void
 ClientReceiverFb::Impl::infoRecUpdate()
 {
-    auto notStartAllYet = [&](GlobalNodeInfo &nodeInfo) -> bool {
+    auto notStartAllYet = [&](GlobalNodeInfo& nodeInfo) {
         if (!mInfoRecMaster.getItemTotal()) return true; // very 1st time
         if (!nodeInfo.isMcrtAllStart()) {
             return true; // we have non active mcrt engine
         }
         return false; // all mcrt is active
     };
-    auto justOnStart = [&](GlobalNodeInfo &nodeInfo) -> bool {
+    auto justOnStart = [&](GlobalNodeInfo& nodeInfo) {
         // Check about start timing of rendering
         if (!mInfoRecMaster.getItemTotal()) return true; // very 1st time
         float currProgress = nodeInfo.getMergeProgress();
@@ -1829,7 +1957,7 @@ ClientReceiverFb::Impl::infoRecUpdate()
         }
         return false;
     };
-    auto justOnComplete = [&](GlobalNodeInfo &nodeInfo) -> bool {
+    auto justOnComplete = [&](GlobalNodeInfo& nodeInfo) {
         // Check about render complete timing
         if (!mInfoRecMaster.getItemTotal()) return false;
         float currProgress = nodeInfo.getMergeProgress();
@@ -1837,7 +1965,7 @@ ClientReceiverFb::Impl::infoRecUpdate()
         if (currProgress >= 1.0f && prevProgress < 1.0f) return true;
         return false;
     };
-    auto justOnStopAll = [&](GlobalNodeInfo &nodeInfo) -> bool {
+    auto justOnStopAll = [&](GlobalNodeInfo& nodeInfo) {
         // Check about final active mcrt engine stop timing
         if (!nodeInfo.isMcrtAllStop()) {
             return false; // we have active mcrt engine
@@ -1988,7 +2116,7 @@ ClientReceiverFb::Impl::infoRecUpdateMerge(InfoRecMaster::InfoRecItemShPtr recIt
 void
 ClientReceiverFb::Impl::infoRecUpdateAllNodes(InfoRecMaster::InfoRecItemShPtr recItem)
 {
-    InfoRecGlobal &recGlobal = mInfoRecMaster.getGlobal();
+    InfoRecGlobal& recGlobal = mInfoRecMaster.getGlobal();
     mGlobalNodeInfo.crawlAllMcrtNodeInfo([&](GlobalNodeInfo::McrtNodeInfoShPtr mcrtNodeInfo) {
             int mId = mcrtNodeInfo->getMachineId();
             if (mId >= 0) {
@@ -2165,6 +2293,59 @@ ClientReceiverFb::Impl::runDenoise(const int outputNumChan,
 }
 
 void
+ClientReceiverFb::Impl::setupTelemetryDisplayInfo(telemetry::DisplayInfo& displayInfo)
+{
+    //
+    // Image resolution and telemetryOverlay resolution
+    //
+    displayInfo.mOverlayWidth = mTelemetryOverlayResoWidth;
+    displayInfo.mOverlayHeight = mTelemetryOverlayResoHeight;
+    if (mProgress < 0.0f) {
+        if (mFrameId > 0) {
+            // This is not a very first render. So we return the previous image resolution.
+            // This avoids unexpected display data buffer resize inside telemetryOverlay logic.
+            displayInfo.mImageWidth = getWidth();
+            displayInfo.mImageHeight = getHeight();
+        } else {
+            // We don't receive image resolution info yet.
+            displayInfo.mImageWidth = 0;
+            displayInfo.mImageHeight = 0;
+        }
+    } else {
+        if (mFrameId == 0 && mProgress == 0.0f) {
+            // This is a situation of the very first time rendering before receiving 1st progressiveFrame
+            // image data under telemetryOverlay activated condition. We don't know the image resolution
+            // yet but we know the telemetryOverlay resolution and it is the same as the image resolution
+            // at this version. We should use this info for the image display buffer allocation. This
+            // solution is safe under image resolution is not changed inside one session, however, we have
+            // to reconsider changing the resolution operation. Probably display buffer size might not be
+            // properly reallocated when the resolution changed. This is a future task.
+            displayInfo.mImageWidth = mTelemetryOverlayResoWidth;
+            displayInfo.mImageHeight = mTelemetryOverlayResoHeight;
+        } else {
+            displayInfo.mImageWidth = getWidth();
+            displayInfo.mImageHeight = getHeight();
+        }
+    }
+
+    //
+    // general info
+    //
+    displayInfo.mViewId = getViewId();
+    displayInfo.mFrameId = getFrameId();
+    displayInfo.mStatus = getStatus();
+    displayInfo.mRenderPrepProgress = getRenderPrepProgress();
+    displayInfo.mProgress = getProgress();
+    displayInfo.mFbActivityCounter = getFbActivityCounter();
+    displayInfo.mDecodeProgressiveFrameCounter = mDecodeProgressiveFrameCounter;
+    displayInfo.mIsCoarsePass = isCoarsePass();
+    displayInfo.mCurrentLatencySec = mCurrentLatencySec;
+    displayInfo.mReceiveImageDataFps = getRecvImageDataFps();
+
+    displayInfo.mGlobalNodeInfo = &mGlobalNodeInfo;
+}
+
+void
 ClientReceiverFb::Impl::parserConfigure()
 {
     using scene_rdl2::str_util::boolStr;
@@ -2172,25 +2353,17 @@ ClientReceiverFb::Impl::parserConfigure()
     mParser.description("ClientReceiverFb command");
 
     mParser.opt("globalNodeInfo", "...command...", "globalNodeInfo command",
-                [&](Arg& arg) -> bool { return mGlobalNodeInfo.getParser().main(arg.childArg()); });
+                [&](Arg& arg) { return mGlobalNodeInfo.getParser().main(arg.childArg()); });
     mParser.opt("renderPrepProgress", "", "show current renderPrep progress value",
-                [&](Arg& arg) -> bool {
-                    return arg.msg(showRenderPrepProgress() + '\n');
-                });
+                [&](Arg& arg) { return arg.msg(showRenderPrepProgress() + '\n'); });
     mParser.opt("renderPrepDetailedDump", "<bool>", "renderPrep stage detailed information dump",
-                [&](Arg& arg) -> bool {
-                    mRenderPrepDetailedProgressDump = (arg++).as<bool>(0);
-                    return true;
-                });
+                [&](Arg& arg) -> bool { mRenderPrepDetailedProgressDump = (arg++).as<bool>(0); return true; });
     mParser.opt("renderPrepDetailedDumpMode", "<mode>", "0:fraction 1:fullDump",
-                [&](Arg& arg) -> bool {
-                    mRenderPrepDetailedProgressDumpMode = (arg++).as<int>(0);
-                    return true;
-                });
+                [&](Arg& arg) { mRenderPrepDetailedProgressDumpMode = (arg++).as<int>(0); return true; });
     mParser.opt("denoiseInfo", "", "dump denoise information",
-                [&](Arg& arg) -> bool { return arg.msg(showDenoiseInfo() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showDenoiseInfo() + '\n'); });
     mParser.opt("denoiseEngine", "<optix|openImageDenoise|show>", "select denoise engine or show current",
-                [&](Arg& arg) -> bool {
+                [&](Arg& arg) {
                     std::string engine = (arg++)();
                     if (engine == "optix") mDenoiseEngine = DenoiseEngine::OPTIX;
                     else if (engine == "openImageDenoise") mDenoiseEngine = DenoiseEngine::OPEN_IMAGE_DENOISE;
@@ -2198,7 +2371,7 @@ ClientReceiverFb::Impl::parserConfigure()
                     return arg.msg(ClientReceiverFb::showDenoiseEngine(mDenoiseEngine) + '\n');
                 });
     mParser.opt("denoiseMode", "<0|1|2|3|4>", "0:off 1:on 2:on+albedo 3:on+normal 4:on+albedo+normal",
-                [&](Arg& arg) -> bool {
+                [&](Arg& arg) {
                     switch (arg++.as<int>(0)) {
                     case 0 : mBeautyDenoiseMode = DenoiseMode::DISABLE; break;
                     case 1 : mBeautyDenoiseMode = DenoiseMode::ENABLE; break;
@@ -2210,19 +2383,23 @@ ClientReceiverFb::Impl::parserConfigure()
                     return arg.msg(ClientReceiverFb::showDenoiseMode(mBeautyDenoiseMode) + '\n');
                 });
     mParser.opt("resetFbWithColMode", "<on|off|show>", "set or show fb reset w/ col mode",
-                [&](Arg& arg) -> bool {
+                [&](Arg& arg) {
                     if (arg() == "show") arg++;
                     else mResetFbWithColorMode = (arg++).as<bool>(0);
                     return arg.fmtMsg("resetFbWithColMode %s\n", boolStr(mResetFbWithColorMode).c_str());
                 });
     mParser.opt("backendStat", "", "show backend computation status",
-                [&](Arg& arg) -> bool {
-                    return arg.msg(ClientReceiverFb::showBackendStat(getBackendStat()) + '\n');
-                });
+                [&](Arg& arg) { return arg.msg(ClientReceiverFb::showBackendStat(getBackendStat()) + '\n'); });
     mParser.opt("timingAnalysis", "...command...", "timingAnalysis command",
-                [&](Arg& arg) -> bool { return mTimingAnalysis.getParser().main(arg.childArg()); });
+                [&](Arg& arg) { return mTimingAnalysis.getParser().main(arg.childArg()); });
     mParser.opt("viewportInfo", "", "dump viewport information",
-                [&](Arg& arg) -> bool { return arg.msg(showViewportInfo() + '\n'); }); 
+                [&](Arg& arg) { return arg.msg(showViewportInfo() + '\n'); }); 
+    mParser.opt("telemetry", "...command...", "telemetry display command",
+                [&](Arg& arg) { return mTelemetryDisplay.getParser().main(arg.childArg()); });
+    mParser.opt("fb", "...command...", "fb command",
+                [&](Arg& arg) { return mFb.getParser().main(arg.childArg()); });
+    mParser.opt("telemetryResetTest", "", "reset telemetry related info for simulation of proc start time",
+                [&](Arg& arg) { telemetryResetTest(); return arg.msg("testReset done\n"); });
 }
 
 std::string
@@ -2283,6 +2460,17 @@ ClientReceiverFb::Impl::showViewportInfo() const
     return ostr.str();
 }
 
+void
+ClientReceiverFb::Impl::telemetryResetTest()
+//
+// This function is used to reset telemetry-related parameters in order to simulate process
+// boot time conditions for telemetry overlay testing.
+//    
+{
+    mProgress = -1.0;
+    mStatus = mcrt::BaseFrame::FINISHED;
+}
+
 //==========================================================================================
 //==========================================================================================
 
@@ -2296,10 +2484,10 @@ ClientReceiverFb::~ClientReceiverFb()
 }
 
 bool
-ClientReceiverFb::decodeProgressiveFrame(const mcrt::ProgressiveFrame &message,
+ClientReceiverFb::decodeProgressiveFrame(const mcrt::ProgressiveFrame& message,
                                          const bool doParallel,
-                                         const CallBackStartedCondition &callBackFuncAtStartedCondition,
-                                         const CallBackGenericComment &callBackFuncForGenericComment)
+                                         const CallBackStartedCondition& callBackFuncAtStartedCondition,
+                                         const CallBackGenericComment& callBackFuncForGenericComment)
 {
     return mImpl->decodeProgressiveFrame(message, doParallel,
                                          callBackFuncAtStartedCondition, callBackFuncForGenericComment);
@@ -2377,7 +2565,7 @@ ClientReceiverFb::getHeight() const
     return mImpl->getHeight();
 }
 
-const scene_rdl2::math::Viewport &
+const scene_rdl2::math::Viewport&
 ClientReceiverFb::getRezedViewport() const
 {
     return mImpl->getRezedViewport(); // closed viewport
@@ -2389,7 +2577,7 @@ ClientReceiverFb::getRoiViewportStatus() const
     return mImpl->getRoiViewportStatus();
 }
 
-const scene_rdl2::math::Viewport &
+const scene_rdl2::math::Viewport&
 ClientReceiverFb::getRoiViewport() const
 {
     return mImpl->getRoiViewport(); // closed viewport
@@ -2401,7 +2589,7 @@ ClientReceiverFb::getPixelInfoStatus() const
     return mImpl->getPixelInfoStatus();
 }
 
-const std::string &
+const std::string&
 ClientReceiverFb::getPixelInfoName() const
 {
     return mImpl->getPixelInfoName();
@@ -2419,7 +2607,7 @@ ClientReceiverFb::getHeatMapStatus() const
     return mImpl->getHeatMapStatus();
 }
 
-const std::string &
+const std::string&
 ClientReceiverFb::getHeatMapName() const
 {
     return mImpl->getHeatMapName();
@@ -2437,7 +2625,7 @@ ClientReceiverFb::getWeightBufferStatus() const
     return mImpl->getWeightBufferStatus();
 }
 
-const std::string &
+const std::string&
 ClientReceiverFb::getWeightBufferName() const
 {
     return mImpl->getWeightBufferName();
@@ -2467,7 +2655,7 @@ ClientReceiverFb::getTotalRenderOutput() const
     return mImpl->getTotalRenderOutput();
 }
 
-const std::string &
+const std::string&
 ClientReceiverFb::getRenderOutputName(const unsigned id) const
 {
     return mImpl->getRenderOutputName(id);
@@ -2480,7 +2668,7 @@ ClientReceiverFb::getRenderOutputNumChan(const unsigned id) const
 }
 
 int
-ClientReceiverFb::getRenderOutputNumChan(const std::string &aovName) const
+ClientReceiverFb::getRenderOutputNumChan(const std::string& aovName) const
 {
     return mImpl->getRenderOutputNumChan(aovName);
 }
@@ -2532,7 +2720,7 @@ ClientReceiverFb::getErrorMsg() const
 //------------------------------------------------------------------------------------------
 
 bool
-ClientReceiverFb::getBeautyRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                                   const bool top2botton,
                                   const bool isSrgb)
 {
@@ -2540,7 +2728,7 @@ ClientReceiverFb::getBeautyRgb888(std::vector<unsigned char> &rgbFrame,
 }
 
 bool
-ClientReceiverFb::getPixelInfoRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame,
                                      const bool top2bottom,
                                      const bool isSrgb)
 {
@@ -2548,7 +2736,7 @@ ClientReceiverFb::getPixelInfoRgb888(std::vector<unsigned char> &rgbFrame,
 }
 
 bool
-ClientReceiverFb::getHeatMapRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::getHeatMapRgb888(std::vector<unsigned char>& rgbFrame,
                                    const bool top2bottom,
                                    const bool isSrgb)
 {
@@ -2556,7 +2744,7 @@ ClientReceiverFb::getHeatMapRgb888(std::vector<unsigned char> &rgbFrame,
 }
 
 bool
-ClientReceiverFb::getWeightBufferRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame,
                                         const bool top2bottom,
                                         const bool isSrgb)
 {
@@ -2564,7 +2752,7 @@ ClientReceiverFb::getWeightBufferRgb888(std::vector<unsigned char> &rgbFrame,
 }
 
 bool
-ClientReceiverFb::getBeautyAuxRgb888(std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame,
                                      const bool top2bottom,
                                      const bool isSrgb)
 {
@@ -2573,7 +2761,7 @@ ClientReceiverFb::getBeautyAuxRgb888(std::vector<unsigned char> &rgbFrame,
 
 bool
 ClientReceiverFb::getRenderOutputRgb888(const unsigned id,
-                                        std::vector<unsigned char> &rgbFrame,
+                                        std::vector<unsigned char>& rgbFrame,
                                         const bool top2bottom,
                                         const bool isSrgb,
                                         const bool closestFilterDepthOutput)
@@ -2582,8 +2770,8 @@ ClientReceiverFb::getRenderOutputRgb888(const unsigned id,
 }
 
 bool
-ClientReceiverFb::getRenderOutputRgb888(const std::string &aovName,
-                                        std::vector<unsigned char> &rgbFrame,
+ClientReceiverFb::getRenderOutputRgb888(const std::string& aovName,
+                                        std::vector<unsigned char>& rgbFrame,
                                         const bool top2bottom,
                                         const bool isSrgb,
                                         const bool closestFilterDepthOutput)
@@ -2600,28 +2788,28 @@ ClientReceiverFb::getBeauty(std::vector<float>& rgba,
 }
     
 bool
-ClientReceiverFb::getPixelInfo(std::vector<float> &data, const bool top2bottom)
+ClientReceiverFb::getPixelInfo(std::vector<float>& data, const bool top2bottom)
 // 1 channel per pixel
 {
     return mImpl->getPixelInfo(data, top2bottom);
 }
 
 bool
-ClientReceiverFb::getHeatMap(std::vector<float> &data, const bool top2bottom)
+ClientReceiverFb::getHeatMap(std::vector<float>& data, const bool top2bottom)
 // 1 channel per pixel
 {
     return mImpl->getHeatMap(data, top2bottom);
 }
 
 bool
-ClientReceiverFb::getWeightBuffer(std::vector<float> &data, const bool top2bottom)
+ClientReceiverFb::getWeightBuffer(std::vector<float>& data, const bool top2bottom)
 // 1 channel per pixel
 {
     return mImpl->getWeightBuffer(data, top2bottom);
 }
 
 bool
-ClientReceiverFb::getBeautyOdd(std::vector<float> &rgba, const bool top2bottom)
+ClientReceiverFb::getBeautyOdd(std::vector<float>& rgba, const bool top2bottom)
 // 4 channels per pixel
 {
     return mImpl->getBeautyOdd(rgba, top2bottom);
@@ -2629,7 +2817,7 @@ ClientReceiverFb::getBeautyOdd(std::vector<float> &rgba, const bool top2bottom)
 
 int
 ClientReceiverFb::getRenderOutput(const unsigned id,
-                                  std::vector<float> &data,
+                                  std::vector<float>& data,
                                   const bool top2bottom,
                                   const bool closestFilterDepthOutput)
 {
@@ -2637,8 +2825,8 @@ ClientReceiverFb::getRenderOutput(const unsigned id,
 }
 
 int
-ClientReceiverFb::getRenderOutput(const std::string &aovName,
-                                  std::vector<float> &data,
+ClientReceiverFb::getRenderOutput(const std::string& aovName,
+                                  std::vector<float>& data,
                                   const bool top2bottom,
                                   const bool closestFilterDepthOutput)
 {
@@ -2679,33 +2867,33 @@ int
 ClientReceiverFb::getPixRenderOutput(const unsigned id,
                                      const int sx,
                                      const int sy,
-                                     std::vector<float> &out) const
+                                     std::vector<float>& out) const
 {
     return mImpl->getPixRenderOutput(id, sx, sy, out);
 }
 
 int
-ClientReceiverFb::getPixRenderOutput(const std::string &aovName,
+ClientReceiverFb::getPixRenderOutput(const std::string& aovName,
                                      const int sx,
                                      const int sy,
-                                     std::vector<float> &out) const
+                                     std::vector<float>& out) const
 {
     return mImpl->getPixRenderOutput(aovName, sx, sy, out);
 }
 
 std::string
-ClientReceiverFb::showPix(const int sx, const int sy, const std::string &aovName) const
+ClientReceiverFb::showPix(const int sx, const int sy, const std::string& aovName) const
 {
     return mImpl->showPix(sx, sy, aovName);
 }
 
-const scene_rdl2::grid_util::LatencyLog &
+const scene_rdl2::grid_util::LatencyLog&
 ClientReceiverFb::getLatencyLog() const
 {
     return mImpl->getLatencyLog();
 }
 
-const scene_rdl2::grid_util::LatencyLogUpstream &
+const scene_rdl2::grid_util::LatencyLogUpstream&
 ClientReceiverFb::getLatencyLogUpstream() const
 {
     return mImpl->getLatencyLogUpstream();
@@ -2724,7 +2912,7 @@ ClientReceiverFb::setInfoRecDisplayInterval(const float sec)
 }
 
 void
-ClientReceiverFb::setInfoRecFileName(const std::string &fileName)
+ClientReceiverFb::setInfoRecFileName(const std::string& fileName)
 {
     mImpl->setInfoRecFileName(fileName);
 }
@@ -2742,7 +2930,7 @@ ClientReceiverFb::updateStatsProgressiveFrame()
 }
 
 bool
-ClientReceiverFb::getStats(const float intervalSec, std::string &outMsg)
+ClientReceiverFb::getStats(const float intervalSec, std::string& outMsg)
 {
     return mImpl->getStats(intervalSec, outMsg);
 }
@@ -2760,9 +2948,9 @@ ClientReceiverFb::getFbActivityCounter()
 }
 
 void
-ClientReceiverFb::consoleAutoSetup(const CallBackSendMessage &sendMessage)
+ClientReceiverFb::consoleAutoSetup(const CallBackSendMessage& sendMessage)
 {
-    const char *env = std::getenv("CLIENTRECEIVER_CONSOLE");
+    const char* env = std::getenv("CLIENTRECEIVER_CONSOLE");
     if (!env) return;
 
     unsigned short port = static_cast<unsigned short>(std::stoi(env));
@@ -2773,18 +2961,18 @@ ClientReceiverFb::consoleAutoSetup(const CallBackSendMessage &sendMessage)
     
 void
 ClientReceiverFb::consoleEnable(const unsigned short port,
-                                const CallBackSendMessage &sendMessage)
+                                const CallBackSendMessage& sendMessage)
 {
     mImpl->consoleEnable(this, port, sendMessage);
 }
 
-ClientReceiverConsoleDriver &
+ClientReceiverConsoleDriver&
 ClientReceiverFb::consoleDriver()
 {
     return mImpl->consoleDriver();
 }
 
-ClientReceiverFb::Parser &
+ClientReceiverFb::Parser&
 ClientReceiverFb::getParser()
 {
     return mImpl->getParser();
@@ -2857,6 +3045,30 @@ ClientReceiverFb::showSenderMachineId(int machineId)
     } else {
         return std::string("machineId:") + std::to_string(machineId);
     }
+}
+
+void
+ClientReceiverFb::setTelemetryOverlayReso(unsigned width, unsigned height)
+{
+    mImpl->setTelemetryOverlayReso(width, height);
+}
+
+void
+ClientReceiverFb::setTelemetryOverlayActive(bool sw)
+{
+    mImpl->setTelemetryOverlayActive(sw);
+}
+
+bool
+ClientReceiverFb::getTelemetryOverlayActive() const
+{
+    return mImpl->getTelemetryOverlayActive();
+}
+
+void
+ClientReceiverFb::switchTelemetryLayoutNext()
+{
+    mImpl->switchTelemetryLayoutNext();
 }
 
 } // namespace mcrt_dataio

@@ -32,23 +32,31 @@ public:
     using RenderPrepStats = scene_rdl2::grid_util::RenderPrepStats;
 
     enum class NodeStat : int { IDLE, RENDER_PREP_RUN, RENDER_PREP_CANCEL, MCRT };
+    enum class ExecMode : int { SCALAR, VECTOR, XPU, AUTO, UNKNOWN };
 
     McrtNodeInfo(bool decodeOnly);
 
-    InfoCodec &getInfoCodec() { return mInfoCodec; }
+    InfoCodec& getInfoCodec() { return mInfoCodec; }
 
-    void setHostName(const std::string &hostName); // MTsafe
+    void reset();
+
+    void setHostName(const std::string& hostName); // MTsafe
     void setMachineId(const int id); // MTsafe
     void setCpuTotal(const int total); // MTsafe
+    void setAssignedCpuTotal(const int total); // MTsafe
     void setCpuUsage(const float fraction); // MTsafe
+    void setCoreUsage(const std::vector<float>& fractions); // MTsafe
     void setMemTotal(const size_t size); // MTsafe : byte
     void setMemUsage(const float fraction); // MTsafe
+    void setExecMode(const ExecMode& mode); // MTsafe
     void setSnapshotToSend(const float ms); // MTsafe : millisec
-    void setSendBps(const float bps); // MTsafe : Byte/Sec
+    void setNetRecvBps(const float bytesPerSec); // MTsafe : Byte/Sec (entire host)
+    void setNetSendBps(const float bytesPerSec); // MTsafe : Byte/Sec (entire host)
+    void setSendBps(const float bytesPerSec); // MTsafe : Byte/Sec (only from mcrt_computation)
     void setFeedbackActive(const bool flag); // MTsafe
     void setFeedbackInterval(const float sec); // MTsafe : sec
     void setRecvFeedbackFps(const float fps); // MTsafe : fps
-    void setRecvFeedbackBps(const float bps); // MTsafe : Byte/Sec
+    void setRecvFeedbackBps(const float bytesPerSec); // MTsafe : Byte/Sec
     void setEvalFeedbackTime(const float ms); // MTsafe : millisec
     void setFeedbackLatency(const float ms); // MTsafe : millisec
     void setClockTimeShift(const float ms); // MTsafe : millisec
@@ -58,8 +66,8 @@ public:
     void setRenderActive(const bool flag); // MTsafe
     void setRenderPrepCancel(const bool flag); // MTsafe
     void setRenderPrepStatsInit(); // MTsafe
-    void setRenderPrepStats(const RenderPrepStats &rPrepStats); // MTsafe : for mcrt_computation
-    void setRenderPrepStatsStage(const RenderPrepStats::Stage &stage); // MTsafe
+    void setRenderPrepStats(const RenderPrepStats& rPrepStats); // MTsafe : for mcrt_computation
+    void setRenderPrepStatsStage(const RenderPrepStats::Stage& stage); // MTsafe
     void setRenderPrepStatsLoadGeometriesTotal(const int stageId, const int total); // MTsafe
     void setRenderPrepStatsLoadGeometriesProcessed(const int stageId, const int processed); // MTsafe
     void setRenderPrepStatsTessellationTotal(const int stageId, const int total); // MTsafe
@@ -74,17 +82,23 @@ public:
     void set1stSnapshotEndTiming(const float sec); // MTsafe
     void set1stSendTiming(const float sec); // MTsafe
     void setProgress(const float fraction); // MTsafe
+    void setGlobalProgress(const float fraction); // MTsafe
 
-    void enqGenericComment(const std::string &comment); // MTsafe
+    void enqGenericComment(const std::string& comment); // MTsafe
 
-    const std::string &getHostName() const { return mHostName; }
+    const std::string& getHostName() const { return mHostName; }
     int getMachineId() const { return mMachineId; }
     int getCpuTotal() const { return mCpuTotal; }
-    float getCpuUsage() const { return mCpuUsage; }
+    int getAssignedCpuTotal() const { return mAssignedCpuTotal; }
+    float getCpuUsage() const { return mCpuUsage; } // fraction
+    std::vector<float> getCoreUsage() const { return mCoreUsage; } // fraction
     size_t getMemTotal() const { return mMemTotal; }
     float getMemUsage() const { return mMemUsage; }
-    float getSnapshotToSend() const { return mSnapshotToSend; }
-    float getSendBps() const { return mSendBps; }
+    ExecMode getExecMode() const { return static_cast<ExecMode>(mExecMode); }
+    float getSnapshotToSend() const { return mSnapshotToSend; } // millisec
+    float getNetRecvBps() const { return mNetRecvBps; } // byte/sec
+    float getNetSendBps() const { return mNetSendBps; } // byte/sec
+    float getSendBps() const { return mSendBps; } // byte/sec
     bool getFeedbackActive() const { return mFeedbackActive; }
     float getFeedbackInterval() const { return mFeedbackInterval; } // sec
     float getRecvFeedbackFps() const { return mRecvFeedbackFps; }
@@ -96,8 +110,8 @@ public:
     unsigned getSyncId() const { return mSyncId; }
     bool getRenderActive() const { return mRenderActive; }
     bool getRenderPrepCancel() const { return mRenderPrepCancel; }
-    const RenderPrepStats &getRenderPrepStats() const { return mRenderPrepStats; }
-    RenderPrepStats &getRenderPrepStats() { return mRenderPrepStats; }
+    const RenderPrepStats& getRenderPrepStats() const { return mRenderPrepStats; }
+    RenderPrepStats& getRenderPrepStats() { return mRenderPrepStats; }
     uint64_t getGlobalBaseFromEpoch() const { return mGlobalBaseFromEpoch; }
     unsigned getTotalMsg() const { return mTotalMsg; }
     float getOldestMessageRecvTiming() const { return mOldestMessageRecvTiming; }
@@ -108,13 +122,14 @@ public:
     float get1stSnapshotEndTiming() const { return m1stSnapshotEndTiming; }
     float get1stSendTiming() const { return m1stSendTiming; }
     float getProgress() const { return mProgress; }
+    float getGlobalProgress() const { return mGlobalProgress; }
 
     std::string deqGenericComment(); // MTsafe
 
     void flushEncodeData(); // MTsafe
-    bool decode(const std::string &inputData);
+    bool decode(const std::string& inputData);
 
-    bool setClockDeltaTimeShift(const std::string &hostName,
+    bool setClockDeltaTimeShift(const std::string& hostName,
                                 float clockDeltaTimeShift, // millisec
                                 float roundTripTime); // millisec
 
@@ -122,29 +137,42 @@ public:
 
     std::string show() const;
     static std::string nodeStatStr(const NodeStat& stat);
+    static std::string execModeStr(const ExecMode& mode);
 
     Parser& getParser() { return mParser; }
 
 private:
     void parserConfigure();
 
+    void resetCoreUsage();
+
     std::string showTimeLog() const;
     std::string showFeedback() const;
+    std::string showCpuUsage() const;
+    std::string showCoreUsage() const;
+    std::string showDataIO() const;
+    std::string showProgress() const;
 
+    static std::string pctShow(float fraction);
     static std::string msShow(float ms);
-    static std::string bpsShow(float bps);
+    static std::string bytesPerSecShow(float bytesPerSec);
 
     //------------------------------
 
     std::string mHostName;
     int mMachineId {0};
 
-    int mCpuTotal {0};            // CPU core total
-    float mCpuUsage {0.0f};       // fraction 0.0~1.0
-    size_t mMemTotal {0};         // memory total byte
-    float mMemUsage {0.0f};       // fraction 0.0~1.0
-    float mSnapshotToSend {0.0f}; // millisec
-    float mSendBps {0.0f};        // outgoing message bandwidth Byte/Sec
+    int mCpuTotal {0};             // CPU core total
+    int mAssignedCpuTotal {0};     // assigned CPU core total
+    float mCpuUsage {0.0f};        // fraction 0.0~1.0
+    std::vector<float> mCoreUsage; // fraction 0.0~1.0
+    size_t mMemTotal {0};          // memory total byte
+    float mMemUsage {0.0f};        // fraction 0.0~1.0
+    int mExecMode {static_cast<int>(ExecMode::SCALAR)};
+    float mSnapshotToSend {0.0f};  // millisec
+    float mNetRecvBps {0.0f};      // recv network bandwidth byte/sec (regarding entire host)
+    float mNetSendBps {0.0f};      // send network bandwidth byte/sec (regarding entire host)
+    float mSendBps {0.0f};         // outgoing message bandwidth Byte/Sec (only from mcrt_computation)
 
     bool mFeedbackActive {false};   // feedback condition
     float mFeedbackInterval {0.0f}; // feedback interval : sec
@@ -181,6 +209,7 @@ private:
     float m1stSendTiming {0.0f};           // sec from process start
 
     float mProgress {0.0f}; // render progress 0.0~1.0
+    float mGlobalProgress {0.0f}; // global render progress 0.0~1.0
 
     // For the genericComment, we use different logic from another regular member for infoCodec operation.
     // The biggest difference between genericComment and other items in this object is that genericComment

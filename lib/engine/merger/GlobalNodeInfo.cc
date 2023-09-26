@@ -22,28 +22,36 @@
 namespace mcrt_dataio {
 
 GlobalNodeInfo::GlobalNodeInfo(bool decodeOnly, MsgSendHandlerShPtr msgSendHandler) :
-    mClientClockTimeShift(0.0f),
-    mClientRoundTripTime(0.0f),
-    mDispatchClockTimeShift(0.0f),
-    mDispatchRoundTripTime(0.0f),
-    mMergeClockDeltaSvrPort(0),
-    mMergeCpuTotal(0),
-    mMergeCpuUsage(0.0f),
-    mMergeMemTotal(0),
-    mMergeMemUsage(0.0f),
-    mMergeRecvBps(0.0f),
-    mMergeSendBps(0.0f),
-    mMergeProgress(0.0f),
     mInfoCodec("globalNodeInfo", decodeOnly),
     mMsgSendHandler(msgSendHandler)
 {
     parserConfigure();
 }
 
+void
+GlobalNodeInfo::reset()
+{
+    std::vector<float> coreFractions(mMergeCpuTotal, 0.0f);
+
+    setMergeCpuUsage(0.0f);
+    setMergeCoreUsage(coreFractions);
+    setMergeMemUsage(0.0f);
+    setMergeNetRecvBps(0.0f);
+    setMergeNetSendBps(0.0f);
+    setMergeRecvBps(0.0f);
+    setMergeSendBps(0.0f);
+    setMergeProgress(0.0f);
+
+    crawlAllMcrtNodeInfo([&](McrtNodeInfoShPtr nodeInfo) {
+            nodeInfo->reset();
+            return true;
+        });
+}
+
 //------------------------------------------------------------------------------------------
 
 void
-GlobalNodeInfo::setClientHostName(const std::string &hostName)
+GlobalNodeInfo::setClientHostName(const std::string& hostName)
 {
     mInfoCodec.setString("clientHostName", hostName, &mClientHostName);
 }
@@ -63,7 +71,7 @@ GlobalNodeInfo::setClientRoundTripTime(const float ms)
 //------------------------------------------------------------------------------------------
 
 void
-GlobalNodeInfo::setDispatchHostName(const std::string &hostName)
+GlobalNodeInfo::setDispatchHostName(const std::string& hostName)
 {
     mInfoCodec.setString("dispatchHostName", hostName, &mDispatchHostName);
 }
@@ -83,7 +91,7 @@ GlobalNodeInfo::setDispatchRoundTripTime(const float ms)
 //------------------------------------------------------------------------------------------
 
 void
-GlobalNodeInfo::setMergeHostName(const std::string &hostName)
+GlobalNodeInfo::setMergeHostName(const std::string& hostName)
 {
     mInfoCodec.setString("mergeHostName", hostName, &mMergeHostName);
 }
@@ -95,7 +103,7 @@ GlobalNodeInfo::setMergeClockDeltaSvrPort(const int port)
 }
 
 void
-GlobalNodeInfo::setMergeClockDeltaSvrPath(const std::string &path)
+GlobalNodeInfo::setMergeClockDeltaSvrPath(const std::string& path)
 {
     mInfoCodec.setString("mergeClockDeltaSvrPath", path, &mMergeClockDeltaSvrPath);
 }
@@ -113,6 +121,12 @@ GlobalNodeInfo::setMergeCpuUsage(const float fraction)
 }
 
 void
+GlobalNodeInfo::setMergeCoreUsage(const std::vector<float>& fractions)
+{
+    mInfoCodec.setVecFloat("mergeCoreUsage", fractions, &mMergeCoreUsage);
+}
+
+void
 GlobalNodeInfo::setMergeMemTotal(const size_t size)
 {
     mInfoCodec.setSizeT("mergeMemTotal", size, &mMergeMemTotal);
@@ -125,15 +139,27 @@ GlobalNodeInfo::setMergeMemUsage(const float fraction)
 }
 
 void
-GlobalNodeInfo::setMergeRecvBps(const float bps)
+GlobalNodeInfo::setMergeNetRecvBps(const float bytesPerSec)
 {
-    mInfoCodec.setFloat("mergeRecvBps", bps, &mMergeRecvBps);
+    mInfoCodec.setFloat("mergeNetRecv", bytesPerSec, &mMergeNetRecvBps);
 }
 
 void
-GlobalNodeInfo::setMergeSendBps(const float bps)
+GlobalNodeInfo::setMergeNetSendBps(const float bytesPerSec)
 {
-    mInfoCodec.setFloat("mergeSendBps", bps, &mMergeSendBps);
+    mInfoCodec.setFloat("mergeNetSend", bytesPerSec, &mMergeNetSendBps);
+}
+
+void
+GlobalNodeInfo::setMergeRecvBps(const float bytesPerSec)
+{
+    mInfoCodec.setFloat("mergeRecvBps", bytesPerSec, &mMergeRecvBps);
+}
+
+void
+GlobalNodeInfo::setMergeSendBps(const float bytesPerSec)
+{
+    mInfoCodec.setFloat("mergeSendBps", bytesPerSec, &mMergeSendBps);
 }
 
 void
@@ -167,12 +193,23 @@ GlobalNodeInfo::setMergeSendFeedbackFps(const float fps) // fps
 }
 
 void    
-GlobalNodeInfo::setMergeSendFeedbackBps(const float bps) // Byte/Sec
+GlobalNodeInfo::setMergeSendFeedbackBps(const float bytesPerSec) // Byte/Sec
 {
-    mInfoCodec.setFloat("mergeSendFeedbackBps", bps, &mMergeSendFeedbackBps);
+    mInfoCodec.setFloat("mergeSendFeedbackBps", bytesPerSec, &mMergeSendFeedbackBps);
 }
 
 //------------------------------------------------------------------------------------------
+
+int
+GlobalNodeInfo::getMcrtTotalCpu() const
+{
+    int totalCpu = 0;
+    crawlAllMcrtNodeInfo([&](McrtNodeInfoShPtr mcrtNodeInfo) {
+            totalCpu += mcrtNodeInfo->getCpuTotal();
+            return true;
+        });
+    return totalCpu;
+}
 
 bool
 GlobalNodeInfo::isMcrtAllStop() const
@@ -221,7 +258,7 @@ GlobalNodeInfo::accessMcrtNodeInfo(int mcrtId, std::function<bool(McrtNodeInfoSh
 //------------------------------------------------------------------------------------------
 
 void
-GlobalNodeInfo::enqMergeGenericComment(const std::string &comment) // MTsafe
+GlobalNodeInfo::enqMergeGenericComment(const std::string& comment) // MTsafe
 {
     std::lock_guard<std::mutex> lock(mMergeGenericCommentMutex);
     if (!mMergeGenericComment.empty()) {
@@ -282,7 +319,7 @@ GlobalNodeInfo::deqGenericComment() // MTsafe
 //------------------------------------------------------------------------------------------
 
 bool
-GlobalNodeInfo::encode(std::string &outputData)
+GlobalNodeInfo::encode(std::string& outputData)
 {
     for (auto& itr : mMcrtNodeInfoMap) {
         McrtNodeInfoShPtr currPtr = itr.second;
@@ -308,9 +345,9 @@ GlobalNodeInfo::encode(std::string &outputData)
 }
 
 bool
-GlobalNodeInfo::decode(const std::string &inputData)
+GlobalNodeInfo::decode(const std::string& inputData)
 {
-    auto decodeMcrtNodeInfoMap = [&](int id, std::string &itemInfoData) -> bool {
+    auto decodeMcrtNodeInfoMap = [&](int id, std::string& itemInfoData) -> bool {
         if (mMcrtNodeInfoMap.find(id) == mMcrtNodeInfoMap.end()) {
             mMcrtNodeInfoMap[id].reset(new McrtNodeInfo(mInfoCodec.getDecodeOnly()));
 #           ifdef DO_CLOCK_DELTA_MCRT
@@ -328,6 +365,7 @@ GlobalNodeInfo::decode(const std::string &inputData)
             int i;
             size_t t;
             bool b;
+            std::vector<float> vecF;
             if (mInfoCodec.getString("clientHostName", str)) {
                 setClientHostName(str);
             } else if (mInfoCodec.getFloat("clientClockTimeShift", f)) {
@@ -352,10 +390,16 @@ GlobalNodeInfo::decode(const std::string &inputData)
                 setMergeCpuTotal(i);
             } else if (mInfoCodec.getFloat("mergeCpuUsage", f)) {
                 setMergeCpuUsage(f);
+            } else if (mInfoCodec.getVecFloat("mergeCoreUsage", vecF)) {
+                setMergeCoreUsage(vecF);
             } else if (mInfoCodec.getSizeT("mergeMemTotal", t)) {
                 setMergeMemTotal(t);                
             } else if (mInfoCodec.getFloat("mergeMemUsage", f)) {
                 setMergeMemUsage(f);
+            } else if (mInfoCodec.getFloat("mergeNetRecv", f)) {
+                setMergeNetRecvBps(f);
+            } else if (mInfoCodec.getFloat("mergeNetSend", f)) {
+                setMergeNetSendBps(f);
             } else if (mInfoCodec.getFloat("mergeRecvBps", f)) {
                 setMergeRecvBps(f);
             } else if (mInfoCodec.getFloat("mergeSendBps", f)) {
@@ -388,7 +432,7 @@ GlobalNodeInfo::decode(const std::string &inputData)
 }
 
 bool
-GlobalNodeInfo::decode(const std::vector<std::string> &inputDataArray)
+GlobalNodeInfo::decode(const std::vector<std::string>& inputDataArray)
 {
     bool returnStatus = true;
     for (size_t i = 0; i < inputDataArray.size(); ++i) {
@@ -421,7 +465,7 @@ GlobalNodeInfo::clockDeltaClientMainAgainstMerge()
 
 bool
 GlobalNodeInfo::setClockDeltaTimeShift(NodeType nodeType,
-                                       const std::string &hostName,
+                                       const std::string& hostName,
                                        float clockDeltaTimeShift, // millisec
                                        float roundTripTime)       // millisec
 {
@@ -678,7 +722,7 @@ GlobalNodeInfo::parserConfigure()
     mParser.description("GlobalNodeInfo command");
 
     mParser.opt("mcrt", "<rankId> ...command...", "mcrt node info command",
-                [&](Arg &arg) -> bool {
+                [&](Arg& arg) {
                     int rankId = (arg++).as<int>(0);
                     if (mMcrtNodeInfoMap.find(rankId) == mMcrtNodeInfoMap.end()) {
                         return arg.msg("rankId:" + std::to_string(rankId) + " is out of range\n");
@@ -688,23 +732,25 @@ GlobalNodeInfo::parserConfigure()
                     }
                 });
     mParser.opt("renderPrepStat", "", "show all node's renderPrep stat",
-                [&](Arg& arg) -> bool { return arg.msg(showRenderPrepStatus() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showRenderPrepStatus() + '\n'); });
     mParser.opt("hostsName", "", "show all hostname info",
-                [&](Arg& arg) -> bool { return arg.msg(showAllHostsName() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showAllHostsName() + '\n'); });
     mParser.opt("clientInfo", "", "show client info",
-                [&](Arg& arg) -> bool { return arg.msg(showClientInfo() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showClientInfo() + '\n'); });
     mParser.opt("dispatchInfo", "", "show dispatch info",
-                [&](Arg& arg) -> bool { return arg.msg(showDispatchInfo() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showDispatchInfo() + '\n'); });
     mParser.opt("mergeInfo", "", "show merge info",
-                [&](Arg& arg) -> bool { return arg.msg(showMergeInfo() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showMergeInfo() + '\n'); });
     mParser.opt("mergeFeedbackInfo", "", "show merge feedback info",
-                [&](Arg& arg) -> bool { return arg.msg(showMergeFeedbackInfo() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showMergeFeedbackInfo() + '\n'); });
     mParser.opt("allNodeInfo", "", "show all node info",
-                [&](Arg& arg) -> bool { return arg.msg(showAllNodeInfo() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showAllNodeInfo() + '\n'); });
     mParser.opt("nodeStat", "", "show current node status",
-                [&](Arg& arg) -> bool { return arg.msg(McrtNodeInfo::nodeStatStr(getNodeStat()) + '\n'); });
+                [&](Arg& arg) { return arg.msg(McrtNodeInfo::nodeStatStr(getNodeStat()) + '\n'); });
     mParser.opt("feedbackAvg", "", "show feedback info of averaged about all mcrt computations",
-                [&](Arg& arg) -> bool { return arg.msg(showFeedbackAvg() + '\n'); });
+                [&](Arg& arg) { return arg.msg(showFeedbackAvg() + '\n'); });
+    mParser.opt("reset", "", "reset internal dynamic data",
+                [&](Arg& arg) { reset(); return arg.msg("reset\n"); });
 }
 
 // static function
@@ -727,10 +773,10 @@ GlobalNodeInfo::pctShow(float fraction)
 
 // static function
 std::string
-GlobalNodeInfo::bpsShow(float bps)
+GlobalNodeInfo::bytesPerSecShow(float bytesPerSec)
 {
     std::ostringstream ostr;
-    ostr << scene_rdl2::str_util::byteStr((size_t)bps) << "/sec";
+    ostr << scene_rdl2::str_util::byteStr((size_t)bytesPerSec) << "/sec";
     return ostr.str();
 }
 
@@ -770,16 +816,33 @@ GlobalNodeInfo::showMergeInfo() const
          << "  mMergeClockDeltaSvrPath:" << mMergeClockDeltaSvrPath << '\n'
          << "  mMergeCpuTotal:" << mMergeCpuTotal << '\n'
          << "  mMergeCpuUsage:" << pctShow(mMergeCpuUsage) << '\n'
+         << addIndent(showMergeCoreUsage()) << '\n'
          << "  mMergeMemTotal:" << scene_rdl2::str_util::byteStr(mMergeMemTotal) << '\n'
          << "  mMergeMemUsage:" << pctShow(mMergeMemUsage) << '\n'
-         << "  mMergeRecvBps:" << bpsShow(mMergeRecvBps) << '\n'
-         << "  mMergeSendBps:" << bpsShow(mMergeSendBps) << '\n'
+         << "  mMergeNetRecvBps:" << bytesPerSecShow(mMergeNetRecvBps) << '\n'
+         << "  mMergeNetSendBps:" << bytesPerSecShow(mMergeNetSendBps) << '\n'
+         << "  mMergeRecvBps:" << bytesPerSecShow(mMergeRecvBps) << '\n'
+         << "  mMergeSendBps:" << bytesPerSecShow(mMergeSendBps) << '\n'
          << "  mMergeProgress:" << pctShow(mMergeProgress) << '\n'
          << addIndent(showMergeFeedbackInfo()) << '\n'
          << "}";
     return ostr.str();
 }
     
+std::string
+GlobalNodeInfo::showMergeCoreUsage() const
+{
+    int w = scene_rdl2::str_util::getNumberOfDigits(mMergeCoreUsage.size());
+
+    std::ostringstream ostr;
+    ostr << "mergeCoreUsage (coreTotal:" << mMergeCoreUsage.size() << ") {\n";
+    for (size_t i = 0 ; i < mMergeCoreUsage.size(); ++i) {
+        ostr << "  i:" << std::setw(w) << i << ' ' << pctShow(mMergeCoreUsage[i]) << '\n';
+    }
+    ostr << "}";
+    return ostr.str();
+}
+
 std::string
 GlobalNodeInfo::showMergeFeedbackInfo() const
 {
@@ -792,7 +855,7 @@ GlobalNodeInfo::showMergeFeedbackInfo() const
         ostr << "  mMergeFeedbackInterval:" << mMergeFeedbackInterval << " sec\n"
              << "  mMergeEvalFeedbackTime:" << msShow(mMergeEvalFeedbackTime) << '\n'
              << "  mMergeSendFeedbackFps:" << mMergeSendFeedbackFps << '\n'
-             << "  mMergeSendFeedbackBps:" << bpsShow(mMergeSendFeedbackBps) << '\n';
+             << "  mMergeSendFeedbackBps:" << bytesPerSecShow(mMergeSendFeedbackBps) << '\n';
     }
     ostr << "}";
     return ostr.str();
@@ -856,18 +919,13 @@ GlobalNodeInfo::showFeedbackAvg() const
         ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
         return ostr.str();
     };
-    auto bpsShow = [](float bps) -> std::string {
-        std::ostringstream ostr;
-        ostr << scene_rdl2::str_util::byteStr(static_cast<size_t>(bps)) << "/sec";
-        return ostr.str();
-    };
 
     std::ostringstream ostr;
     ostr << "feedback status average (feedackActiveNode:" << activeNode << " totalNode:" << totalNode << ") {\n"
-         << "  sendBpsAvg:" << bpsShow(sendBpsAvg) << '\n'
+         << "  sendBpsAvg:" << bytesPerSecShow(sendBpsAvg) << '\n'
          << "  feedbackIntervalAvg:" << scene_rdl2::str_util::secStr(feedbackIntervalAvg) << " sec\n"
          << "  recvFeedbackFpsAvg:" << recvFeedbackFpsAvg << '\n'
-         << "  recvFeedbackBpsAvg:" << bpsShow(recvFeedbackBpsAvg) << '\n'
+         << "  recvFeedbackBpsAvg:" << bytesPerSecShow(recvFeedbackBpsAvg) << '\n'
          << "  evalFeedbackTimeAvg:" << msShow(evalFeedbackTimeAvg) << '\n'
          << "  feedbackLatencyAvg:" << msShow(feedbackLatencyAvg) << '\n'
          << "}";

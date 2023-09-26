@@ -1,13 +1,11 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #pragma once
 
 #include <memory>
 #include <functional>           // function
 #include <string>
+#include <vector>
 
 namespace mcrt_dataio {
 
@@ -42,10 +40,10 @@ class InfoCodec
 public:    
     using Key = const std::string;
 
-    InfoCodec(Key &infoKey, bool decodeOnly);
+    InfoCodec(Key& infoKey, bool decodeOnly);
     ~InfoCodec();
 
-    Key &getInfoKey() const;
+    Key& getInfoKey() const;
     bool getDecodeOnly() const;
 
     void clear(); // MTsafe
@@ -53,38 +51,42 @@ public:
 
     //------------------------------
 
-    void setBool(Key &key, const bool setVal, bool *setTarget=nullptr); // MTsafe
-    void setInt(Key &key, const int setVal, int *setTarget=nullptr); // MTsafe
-    void setUInt(Key &key, const unsigned int setVal, unsigned int *setTarget=nullptr); // MTsafe
-    void setInt64(Key &key, const int64_t setVal, int64_t *setTarget=nullptr); // MTsafe:LongLongInt
-    void setUInt64(Key &key, const uint64_t setVal, uint64_t *setTarget=nullptr); //MTsafe:LongLongUint
-    void setSizeT(Key &key, const size_t setVal, size_t *setTarget=nullptr); // MTsafe
-    void setFloat(Key &key, const float setVal, float *setTarget=nullptr); // MTsafe
-    void setDouble(Key &key, const double setVal, double *setTarget=nullptr); // MTsafe
-    void setString(Key &key, const std::string &setVal, std::string *setTarget=nullptr); // MTsafe
+    void setBool(Key& key, const bool setVal, bool* setTarget=nullptr); // MTsafe
+    void setInt(Key& key, const int setVal, int* setTarget=nullptr); // MTsafe
+    void setUInt(Key& key, const unsigned int setVal, unsigned int* setTarget=nullptr); // MTsafe
+    void setInt64(Key& key, const int64_t setVal, int64_t* setTarget=nullptr); // MTsafe:LongLongInt
+    void setUInt64(Key& key, const uint64_t setVal, uint64_t* setTarget=nullptr); //MTsafe:LongLongUint
+    void setSizeT(Key& key, const size_t setVal, size_t* setTarget=nullptr); // MTsafe
+    void setFloat(Key& key, const float setVal, float* setTarget=nullptr); // MTsafe
+    void setDouble(Key& key, const double setVal, double* setTarget=nullptr); // MTsafe
+    void setString(Key& key, const std::string& setVal, std::string* setTarget=nullptr); // MTsafe
 
-    bool encode(std::string &outputData); // MTsafe : true:encoded false:no-encoded-data(not error)
-    void encodeChild(Key &childKey, InfoCodec &child); // MTsafe
-    void encodeTable(Key &tableKey, Key &itemKey, InfoCodec &item); // MTsafe : associative array
+    void setVecFloat(Key& key, const std::vector<float>& setVal, std::vector<float>* setTarget=nullptr); // MTsafe
+
+    bool encode(std::string& outputData); // MTsafe : true:encoded false:no-encoded-data(not error)
+    void encodeChild(Key& childKey, InfoCodec& child); // MTsafe
+    void encodeTable(Key& tableKey, Key& itemKey, InfoCodec& item); // MTsafe : associative array
 
     //------------------------------
 
-    bool getBool(Key &key, bool &v);
-    bool getInt(Key &key, int &v);
-    bool getUInt(Key &key, unsigned int &v);
-    bool getInt64(Key &key, int64_t &v); // long long int
-    bool getUInt64(Key &key, uint64_t &v); // long long int
-    bool getSizeT(Key &key, size_t &v); 
-    bool getFloat(Key &key, float &v);
-    bool getDouble(Key &key, double &v);
-    bool getString(Key &key, std::string &v);
+    bool getBool(Key& key, bool& v);
+    bool getInt(Key& key, int& v);
+    bool getUInt(Key& key, unsigned int& v);
+    bool getInt64(Key& key, int64_t& v); // long long int
+    bool getUInt64(Key& key, uint64_t& v); // long long int
+    bool getSizeT(Key& key, size_t& v); 
+    bool getFloat(Key& key, float& v);
+    bool getDouble(Key& key, double& v);
+    bool getString(Key& key, std::string& v);
 
-    int  decode(const std::string &inputData, std::function<bool()> decodeFunc);
+    bool getVecFloat(Key& key, std::vector<float>& vec);
+
+    int  decode(const std::string& inputData, std::function<bool()> decodeFunc);
 
     // return true:decode-data false:not-decode-data(not-error)
-    bool decodeChild(Key &childKey, std::string &childInputData);
+    bool decodeChild(Key& childKey, std::string& childInputData);
     // return true:decode-data false:not-decode-data(not-error)
-    bool decodeTable(Key &tableKey, std::string &itemKey, std::string &itemInputData);
+    bool decodeTable(Key& tableKey, std::string& itemKey, std::string& itemInputData);
 
     std::string show() const;
 
@@ -94,4 +96,3 @@ private:
 };
 
 } // namespace mcrt_dataio
-

@@ -12,6 +12,8 @@
 #include <iomanip>
 #include <sstream>
 
+//#define DEBUG_DECODE_MSG // debug message for decode action
+
 namespace mcrt_dataio {
 
 bool
@@ -294,9 +296,10 @@ FbMsgMultiChans::decodeAll(scene_rdl2::grid_util::Fb& fb, MergeActionTracker* me
         if (!strcmp(name.c_str(), latencyLogName)) {
             itr++;              // decode skip latencyLog data
         } else {
-            const std::vector<std::vector<char>> &datas = (itr->second)->data();
-            for (const std::vector<char> &data : datas) {
-                decodeData(name.c_str(), data.data(), data.size(), fb);
+            const std::vector<DataPtr>& datas = (itr->second)->dataArray();
+            const std::vector<size_t>& dataSize = (itr->second)->dataSize();
+            for (size_t i = 0; i < datas.size(); ++i) {
+                decodeData(name.c_str(), datas[i].get(), dataSize[i], fb);
             }
             itr = mMsgArray.erase(itr); // remove data
         }
@@ -339,7 +342,7 @@ FbMsgMultiChans::decodeAll(scene_rdl2::grid_util::Fb& fb, MergeActionTracker* me
             itr = mMsgArray.erase(itr); // remove data
         }
     }
-#   endif // end !SINGLE_THREAD     
+#   endif // end else SINGLE_THREAD     
 
     //------------------------------
     //
@@ -357,56 +360,95 @@ FbMsgMultiChans::decodeData(const char* name,
                             const size_t dataSize,
                             scene_rdl2::grid_util::Fb& fb)
 {
+    // scene_rdl2::grid_util::PackTiles::debugMode(true); // for PackTiles debug
+
     //
     // decode data
     //
     switch (scene_rdl2::grid_util::PackTiles::decodeDataType(data, dataSize)) {
     case scene_rdl2::grid_util::PackTiles::DataType::BEAUTY_WITH_NUMSAMPLE :
         // beauty with numSample
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passA\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeBeautyWithNumSample(data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::BEAUTY :
         // beauty only (not include numSample)
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passB\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeBeauty(data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::BEAUTYODD_WITH_NUMSAMPLE :
         // beautyOdd with numSample
         // Actually we do not have {coarse,Fine}PassPrecision info for renderBufferOdd.
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passC\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeBeautyOddWithNumSample(data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::BEAUTYODD :
         // beautyOdd only (not include numSample)
         // Actually we do not have {coarse,Fine}PassPrecision info for renderBufferOdd.
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passD\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeBeautyOdd(data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::PIXELINFO :
         // pixelInfo
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passE\n";
+#       endif // end DEBUG_DECODE_MSG
         decodePixelInfo(name, data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::HEATMAP_WITH_NUMSAMPLE :
         // heatMap with numSample
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passF\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeHeatMapWithNumSample(name, data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::HEATMAP :
         // heatMap only (not include numSample)
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passG\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeHeatMap(name, data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::WEIGHT :
         // weight buffer
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passH\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeWeight(name, data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::REFERENCE :
         // renderOutput reference AOVs (Beauty, Alpha, HeatMap, Weight, BeautyAux, AlphaAux)
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passI\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeReference(name, data, dataSize, fb);
         break;
     case scene_rdl2::grid_util::PackTiles::DataType::UNDEF :
         // skip unknown data type
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passJ\n";
+#       endif // end DEBUG_DECODE_MSG
         break;
     default :
         // renderOutput AOVs
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeData() passK\n";
+#       endif // end DEBUG_DECODE_MSG
         decodeRenderOutputAOV(name, data, dataSize, fb);
         break;
     }
+    scene_rdl2::grid_util::PackTiles::debugMode(false);
+#   ifdef DEBUG_DECODE_MSG
+    std::cerr << ">> FbMsgMultiChans.cc decodeData() finish\n";
+#   endif // end DEBUG_DECODE_MSG
 }
 
 void
@@ -415,21 +457,34 @@ FbMsgMultiChans::decodeBeautyWithNumSample(const void* data,
                                            scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
-    
+    bool activeDecodeAction {false};
+
     try {
-        scene_rdl2::grid_util::PackTiles::decode(false, // renderBufferOdd
-                                                 data,
-                                                 dataSize,
-                                                 true, // storeNumSampleData
-                                                 workActivePixels,
-                                                 fb.getRenderBufferTiled(), // normalized color
-                                                 fb.getNumSampleBufferTiled(),
-                                                 fb.getRenderBufferCoarsePassPrecision(),
-                                                 fb.getRenderBufferFinePassPrecision());
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeautyWithNumSample() before PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decode(false, // renderBufferOdd = false
+                   data,
+                   dataSize,
+                   true, // storeNumSampleData = true
+                   workActivePixels,
+                   fb.getRenderBufferTiled(), // normalized color
+                   fb.getNumSampleBufferTiled(),
+                   fb.getRenderBufferCoarsePassPrecision(),
+                   fb.getRenderBufferFinePassPrecision(),
+                   activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeautyWithNumSample() after PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeBeautyWithNumSample() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixels())) {
         // resolution changed, we should pick current workActivePixels
         fb.getActivePixels().copy(workActivePixels);
@@ -446,19 +501,32 @@ FbMsgMultiChans::decodeBeauty(const void* data,
                               scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
-    
+    bool activeDecodeAction {false};
+
     try {
-        scene_rdl2::grid_util::PackTiles::decode(false,
-                                                 data,
-                                                 dataSize,
-                                                 workActivePixels,
-                                                 fb.getRenderBufferTiled(), // RGBA : float * 4
-                                                 fb.getRenderBufferCoarsePassPrecision(),
-                                                 fb.getRenderBufferFinePassPrecision());
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeauty() before PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decode(false, // renderBufferOdd = false
+                   data,
+                   dataSize,
+                   workActivePixels,
+                   fb.getRenderBufferTiled(), // RGBA : float * 4
+                   fb.getRenderBufferCoarsePassPrecision(),
+                   fb.getRenderBufferFinePassPrecision(),
+                   activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeauty() after PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeBeauty() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+    
     if (!workActivePixels.isSameSize(fb.getActivePixels())) {
         // resolution changed, we should pick current workActivePixels
         fb.getActivePixels().copy(workActivePixels);
@@ -474,24 +542,37 @@ FbMsgMultiChans::decodeBeautyOddWithNumSample(const void* data,
                                               scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
     
     scene_rdl2::grid_util::CoarsePassPrecision dummyCoarsePassPrecision;
     scene_rdl2::grid_util::FinePassPrecision dummyFinePassPrecision;
     fb.setupRenderBufferOdd(nullptr);
     try {
-        scene_rdl2::grid_util::PackTiles::decode(true, // renderBufferOdd
-                                                 data,
-                                                 dataSize,
-                                                 true, // storeNumSampleData
-                                                 workActivePixels,
-                                                 fb.getRenderBufferOddTiled(), // RGBA : float * 4 : normalized color
-                                                 fb.getRenderBufferOddNumSampleBufferTiled(),
-                                                 dummyCoarsePassPrecision,
-                                                 dummyFinePassPrecision);
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeautyOddWithNumSample() before PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decode(true, // renderBufferOdd
+                   data,
+                   dataSize,
+                   true, // storeNumSampleData
+                   workActivePixels,
+                   fb.getRenderBufferOddTiled(), // RGBA : float * 4 : normalized color
+                   fb.getRenderBufferOddNumSampleBufferTiled(),
+                   dummyCoarsePassPrecision,
+                   dummyFinePassPrecision,
+                   activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeautyOddWithNumSample() after PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeBeautyOddWithNumSample() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixelsRenderBufferOdd())) {
         // resolution changed, we should pick current workActivePixels.
         fb.getActivePixelsRenderBufferOdd().copy(workActivePixels);
@@ -508,22 +589,35 @@ FbMsgMultiChans::decodeBeautyOdd(const void* data,
                                  scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
     
     scene_rdl2::grid_util::CoarsePassPrecision dummyCoarsePassPrecision;
     scene_rdl2::grid_util::FinePassPrecision dummyFinePassPrecision;
     fb.setupRenderBufferOdd(nullptr);
     try {
-        scene_rdl2::grid_util::PackTiles::decode(true, // renderBufferOdd
-                                                 data,
-                                                 dataSize,
-                                                 workActivePixels,
-                                                 fb.getRenderBufferOddTiled(), // RGBA : float * 4 : normalized color
-                                                 dummyCoarsePassPrecision,
-                                                 dummyFinePassPrecision);
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeautyOdd() before PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decode(true, // renderBufferOdd
+                   data,
+                   dataSize,
+                   workActivePixels,
+                   fb.getRenderBufferOddTiled(), // RGBA : float * 4 : normalized color
+                   dummyCoarsePassPrecision,
+                   dummyFinePassPrecision,
+                   activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeBeautyOdd() after PackTiles::decode()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeBeautyOdd() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixelsRenderBufferOdd())) {
         // resolution changed, we should pick current workActivePixels.
         fb.getActivePixelsRenderBufferOdd().copy(workActivePixels);
@@ -541,19 +635,32 @@ FbMsgMultiChans::decodePixelInfo(const char* name,
                                  scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
     
     fb.setupPixelInfo(nullptr, name);
     try {
-        scene_rdl2::grid_util::PackTiles::decodePixelInfo(data,
-                                                          dataSize,
-                                                          workActivePixels,
-                                                          fb.getPixelInfoBufferTiled(),
-                                                          fb.getPixelInfoCoarsePassPrecision(),
-                                                          fb.getPixelInfoFinePassPrecision());
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodePixelInfo() before PackTiles::decodePixelInfo()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodePixelInfo(data,
+                            dataSize,
+                            workActivePixels,
+                            fb.getPixelInfoBufferTiled(),
+                            fb.getPixelInfoCoarsePassPrecision(),
+                            fb.getPixelInfoFinePassPrecision(),
+                            activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodePixelInfo() after PackTiles::decodePixelInfo()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodePixelInfo() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixelsPixelInfo())) {
         // resolution changed, we should pick current workActivePixels.
         fb.getActivePixelsPixelInfo().copy(workActivePixels);
@@ -571,19 +678,32 @@ FbMsgMultiChans::decodeHeatMapWithNumSample(const char* name,
                                             scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
 
     fb.setupHeatMap(nullptr, name);
     try {
-        scene_rdl2::grid_util::PackTiles::decodeHeatMap(data,
-                                                        dataSize,
-                                                        true, // storeNumSampleData
-                                                        workActivePixels,
-                                                        fb.getHeatMapSecBufferTiled(),
-                                                        fb.getHeatMapNumSampleBufferTiled());
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeHeatMapWithNumSample() before PackTiles::decodeHeatMap()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeHeatMap(data,
+                          dataSize,
+                          true, // storeNumSampleData
+                          workActivePixels,
+                          fb.getHeatMapSecBufferTiled(),
+                          fb.getHeatMapNumSampleBufferTiled(),
+                          activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeHeatMapWithNumSample() after PackTiles::decodeHeatMap()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeHeatMapWithNumSample() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixelsHeatMap())) {
         // resolution changed, we should pick current workActivePixels.
         fb.getActivePixelsHeatMap().copy(workActivePixels);
@@ -601,17 +721,30 @@ FbMsgMultiChans::decodeHeatMap(const char* name,
                                scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
 
     fb.setupHeatMap(nullptr, name);
     try {
-        scene_rdl2::grid_util::PackTiles::decodeHeatMap(data,
-                                                        dataSize,
-                                                        workActivePixels,
-                                                        fb.getHeatMapSecBufferTiled()); // Sec : float
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeHeatMap() before PackTiles::decodeHeatMap()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeHeatMap(data,
+                          dataSize,
+                          workActivePixels,
+                          fb.getHeatMapSecBufferTiled(),
+                          activeDecodeAction)) { // Sec : float
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeHeatMap() after PackTiles::decodeHeatMap()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeHeatMap() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixelsHeatMap())) {
         // resolution changed, we should pick current workActivePixels.
         fb.getActivePixelsHeatMap().copy(workActivePixels);
@@ -629,19 +762,32 @@ FbMsgMultiChans::decodeWeight(const char* name,
                               scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
 
     fb.setupWeightBuffer(nullptr, name);
     try {
-        scene_rdl2::grid_util::PackTiles::decodeWeightBuffer(data,
-                                                             dataSize,
-                                                             workActivePixels,
-                                                             fb.getWeightBufferTiled(),
-                                                             fb.getWeightBufferCoarsePassPrecision(),
-                                                             fb.getWeightBufferFinePassPrecision());
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeWeight() before PackTiles::decodeWeightBuffer()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeWeightBuffer(data,
+                               dataSize,
+                               workActivePixels,
+                               fb.getWeightBufferTiled(),
+                               fb.getWeightBufferCoarsePassPrecision(),
+                               fb.getWeightBufferFinePassPrecision(),
+                               activeDecodeAction)) {
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeWeight() after PackTiles::decodeWeightBuffer()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeWeight() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return; // no decoded data
+
     if (!workActivePixels.isSameSize(fb.getActivePixelsWeightBuffer())) {
         // resolution changed, we should pick current workActivePixels.
         fb.getActivePixelsWeightBuffer().copy(workActivePixels);
@@ -659,9 +805,15 @@ FbMsgMultiChans::decodeReference(const char* name,
 {
     FbAovShPtr fbAov = fb.getAov(name);
     try {
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeReference() before PackTiles::decodeRenderOutputReference()\n";
+#       endif // end DEBUG_DECODE_MSG
         scene_rdl2::grid_util::PackTiles::decodeRenderOutputReference(data,
                                                                       dataSize,
                                                                       fbAov); // update fbAov internal info
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeReference() after PackTiles::decodeRenderOutputReference()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeReference() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
@@ -676,19 +828,32 @@ FbMsgMultiChans::decodeRenderOutputAOV(const char* name,
                                        scene_rdl2::grid_util::Fb& fb)
 {
     scene_rdl2::fb_util::ActivePixels workActivePixels;
+    bool activeDecodeAction {false};
 
     FbAovShPtr fbAov = fb.getAov(name);
     auto oldFmt = fbAov->getFormat();
     try {
-        scene_rdl2::grid_util::PackTiles::decodeRenderOutput(data,
-                                                             dataSize,
-                                                             true, // storeNumSampleData
-                                                             workActivePixels,
-                                                             fbAov); // done fbAov memory setup if needed internally
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeRenderOutputAOV() before PackTiles::decodeRenderOutput()\n";
+#       endif // end DEBUG_DECODE_MSG
+        if (!scene_rdl2::grid_util::PackTiles::
+            decodeRenderOutput(data,
+                               dataSize,
+                               true, // storeNumSampleData
+                               workActivePixels,
+                               fbAov,
+                               activeDecodeAction)) { // done fbAov memory setup if needed internally
+            return;
+        }
+#       ifdef DEBUG_DECODE_MSG
+        std::cerr << ">> FbMsgMultiChans.cc decodeRenderOutputAOV() after PackTiles::decodeRenderOutput()\n";
+#       endif // end DEBUG_DECODE_MSG
     } catch (scene_rdl2::except::RuntimeError& e) {
         std::cerr << ">> FbMsgMultiChans.cc decodeRenderOutputAOV() PackTiles::decode() failed."
                   << " RuntimeError:" << e.what() << '\n';
     }
+    if (!activeDecodeAction) return;
+    
     if (oldFmt != fbAov->getFormat() || !workActivePixels.isSameSize(fbAov->getActivePixels())) {
         // resolution/format changed, we should pick current workActivePixels
         fbAov->getActivePixels().copy(workActivePixels);

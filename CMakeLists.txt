@@ -40,6 +40,7 @@ if("${PROJECT_NAME}" STREQUAL "${CMAKE_PROJECT_NAME}")
     find_package(ArrasCore REQUIRED)
     find_package(McrtDenoise REQUIRED)
     find_package(SceneRdl2 REQUIRED)
+    find_package(FreeType REQUIRED)
 endif()
 
 # ================================================

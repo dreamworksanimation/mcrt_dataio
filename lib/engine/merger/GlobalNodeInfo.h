@@ -37,46 +37,55 @@ public:
 
     GlobalNodeInfo(bool decodeOnly, MsgSendHandlerShPtr msgSendHandler);
 
+    void reset();
+
     //------------------------------
     
-    void setClientHostName(const std::string &hostName); // MTsafe
+    void setClientHostName(const std::string& hostName); // MTsafe
     void setClientClockTimeShift(const float ms); // MTsafe : millisec
     void setClientRoundTripTime(const float ms); // MTsafe : millisec
     float getClientClockTimeShift() const { return mClientClockTimeShift; } // millisec
     
     //------------------------------
     
-    void setDispatchHostName(const std::string &hostName); // MTsafe
+    void setDispatchHostName(const std::string& hostName); // MTsafe
     void setDispatchClockTimeShift(const float ms); // MTsafe : millisec
     void setDispatchRoundTripTime(const float ms); // MTsafe : millisec
-    const std::string &getDispatchHostName() const { return mDispatchHostName; }
+    const std::string& getDispatchHostName() const { return mDispatchHostName; }
+    float getDispatchClockTimeShift() const { return mDispatchClockTimeShift; } // millisec
 
     //------------------------------
     
-    void setMergeHostName(const std::string &hostName); // MTsafe
+    void setMergeHostName(const std::string& hostName); // MTsafe
     void setMergeClockDeltaSvrPort(const int port); // MTsafe
-    void setMergeClockDeltaSvrPath(const std::string &path); // MTsafe : unix-domain ipc path
+    void setMergeClockDeltaSvrPath(const std::string& path); // MTsafe : unix-domain ipc path
     void setMergeCpuTotal(const int total); // MTsafe
     void setMergeCpuUsage(const float fraction); // MTsafe fraction 0.0~1.0
+    void setMergeCoreUsage(const std::vector<float>& fractions); // MTsafe fraction 0.0~1.0
     void setMergeMemTotal(const size_t size); // MTsafe byte
     void setMergeMemUsage(const float fraction); // MTsafe fraction 0.0~1.0
-    void setMergeRecvBps(const float bps); // MTsafe Byte/Sec
-    void setMergeSendBps(const float bps); // MTsafe Byte/Sec
+    void setMergeNetRecvBps(const float bytesPerSec); // MTsafe Byte/Sec
+    void setMergeNetSendBps(const float bytesPerSec); // MTsafe Byte/Sec
+    void setMergeRecvBps(const float bytesPerSec); // MTsafe Byte/Sec
+    void setMergeSendBps(const float bytesPerSec); // MTsafe Byte/Sec
     void setMergeProgress(const float fraction); // MTsafe
 
     void setMergeFeedbackActive(const bool flag); // MTsafe
     void setMergeFeedbackInterval(const float sec); // MTsafe sec
     void setMergeEvalFeedbackTime(const float ms); // MTsafe millisec
     void setMergeSendFeedbackFps(const float fps); // MTsafe fps
-    void setMergeSendFeedbackBps(const float bps); // MTsafe Byte/Sec
+    void setMergeSendFeedbackBps(const float bytesPerSec); // MTsafe Byte/Sec
 
-    const std::string &getMergeHostName() const { return mMergeHostName; }
+    const std::string& getMergeHostName() const { return mMergeHostName; }
     int getMergeClockDeltaSvrPort() const { return mMergeClockDeltaSvrPort; }
-    const std::string &getMergeClockDeltaSvrPath() const { return mMergeClockDeltaSvrPath; }
+    const std::string& getMergeClockDeltaSvrPath() const { return mMergeClockDeltaSvrPath; }
     int getMergeCpuTotal() const { return mMergeCpuTotal; }
-    float getMergeCpuUsage() const { return mMergeCpuUsage; }
+    float getMergeCpuUsage() const { return mMergeCpuUsage; } // fraction
+    std::vector<float> getMergeCoreUsage() const { return mMergeCoreUsage; } // fraction    
     size_t getMergeMemTotal() const { return mMergeMemTotal; }
     float getMergeMemUsage() const { return mMergeMemUsage; }
+    float getMergeNetRecvBps() const { return mMergeNetRecvBps; } // byte/sec
+    float getMergeNetSendBps() const { return mMergeNetSendBps; } // byte/sec
     float getMergeRecvBps() const { return mMergeRecvBps; }
     float getMergeSendBps() const { return mMergeSendBps; }
     float getMergeProgress() const { return mMergeProgress; }
@@ -90,6 +99,7 @@ public:
     //------------------------------
 
     size_t getMcrtTotal() const { return mMcrtNodeInfoMap.size(); }
+    int getMcrtTotalCpu() const;
     bool isMcrtAllStop() const;
     bool isMcrtAllStart() const;
     bool isMcrtAllRenderPrepCompletedOrCanceled() const;
@@ -98,16 +108,16 @@ public:
 
     //------------------------------
 
-    void enqMergeGenericComment(const std::string &comment); // MTsafe
+    void enqMergeGenericComment(const std::string& comment); // MTsafe
     std::string deqGenericComment(); // MTsafe
 
-    bool encode(std::string &outputData); // MTsafe
-    bool decode(const std::string &inputData);
-    bool decode(const std::vector<std::string> &inputDataArray);
+    bool encode(std::string& outputData); // MTsafe
+    bool decode(const std::string& inputData);
+    bool decode(const std::vector<std::string>& inputDataArray);
 
     bool clockDeltaClientMainAgainstMerge();
     bool setClockDeltaTimeShift(NodeType nodeType,
-                                const std::string &hostName,
+                                const std::string& hostName,
                                 float clockDeltaTimeShift, // millisec
                                 float roundTripTime); // millisec
 
@@ -130,37 +140,40 @@ private:
     // client information
     //
     std::string mClientHostName;
-    float mClientClockTimeShift; // millisec
-    float mClientRoundTripTime;  // millisec
+    float mClientClockTimeShift {0.0f}; // millisec
+    float mClientRoundTripTime {0.0f};  // millisec
 
     //------------------------------
     //
     // dispatcher information
     //
     std::string mDispatchHostName;
-    float mDispatchClockTimeShift; // millisec
-    float mDispatchRoundTripTime;  // millisec
+    float mDispatchClockTimeShift {0.0f}; // millisec
+    float mDispatchRoundTripTime {0.0f};  // millisec
 
     //------------------------------
     //
     // merge information
     //
     std::string mMergeHostName;
-    int mMergeClockDeltaSvrPort;
+    int mMergeClockDeltaSvrPort {0};
     std::string mMergeClockDeltaSvrPath; // unix-domain ipc path
-    int mMergeCpuTotal;                  // CPU core total
-    float mMergeCpuUsage;                // fraction 0.0~1.0
-    size_t mMergeMemTotal;               // memory total byte
-    float mMergeMemUsage;                // fraction 0.0~1.0
-    float mMergeRecvBps;                 // merge incoming message bandwidth Byte/Sec
-    float mMergeSendBps;                 // merge outgoing message bandwidth Byte/Sec
-    float mMergeProgress;                // progress 0.0~1.0 range might be more than 1.0
+    int mMergeCpuTotal {0};              // CPU core total
+    float mMergeCpuUsage {0.0f};         // fraction 0.0~1.0
+    std::vector<float> mMergeCoreUsage;  // fraction 0.0~1.0    
+    size_t mMergeMemTotal {0};           // memory total byte
+    float mMergeMemUsage {0.0f};         // fraction 0.0~1.0
+    float mMergeNetRecvBps {0.0f};       // recv network bandwidth byte/sec (regarding entire host)
+    float mMergeNetSendBps {0.0f};       // send network bandwidth byte/sec (regarding entire host)
+    float mMergeRecvBps {0.0f};          // merge incoming message bandwidth Byte/Sec
+    float mMergeSendBps {0.0f};          // merge outgoing message bandwidth Byte/Sec
+    float mMergeProgress {0.0f};         // progress 0.0~1.0 range might be more than 1.0
 
-    bool mMergeFeedbackActive;    // merge computation feedback condition : bool
-    float mMergeFeedbackInterval; // merge computation feedback interval : sec
-    float mMergeEvalFeedbackTime; // merge computation feedback evaluation cost : millisec
-    float mMergeSendFeedbackFps;  // merge computation outgoing feedback message send fps
-    float mMergeSendFeedbackBps;  // merge computation outgoing feedback message bandwidth : Byte/Sec
+    bool mMergeFeedbackActive {false};   // merge computation feedback condition : bool
+    float mMergeFeedbackInterval {0.0f}; // merge computation feedback interval : sec
+    float mMergeEvalFeedbackTime {0.0f}; // merge computation feedback evaluation cost : millisec
+    float mMergeSendFeedbackFps {0.0f};  // merge computation outgoing feedback message send fps
+    float mMergeSendFeedbackBps {0.0f};  // merge computation outgoing feedback message bandwidth : Byte/Sec
 
     std::mutex mMergeGenericCommentMutex;
     std::string mMergeGenericComment; // merge computation's generic comment data for any purpose
@@ -187,11 +200,12 @@ private:
 
     static std::string msShow(float ms);
     static std::string pctShow(float fraction);
-    static std::string bpsShow(float bps);
+    static std::string bytesPerSecShow(float bytesPerSec);
 
     std::string showClientInfo() const;
     std::string showDispatchInfo() const;
     std::string showMergeInfo() const;
+    std::string showMergeCoreUsage() const;
     std::string showMergeFeedbackInfo() const;
     std::string showAllNodeInfo() const;
     std::string showFeedbackAvg() const;

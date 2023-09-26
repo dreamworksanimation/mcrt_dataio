@@ -65,8 +65,8 @@ public:
     ~ClientReceiverFb();
 
     /// This class is Non-copyable
-    ClientReceiverFb &operator = (const ClientReceiverFb &) = delete;
-    ClientReceiverFb(const ClientReceiverFb &) = delete;
+    ClientReceiverFb& operator = (const ClientReceiverFb&) = delete;
+    ClientReceiverFb(const ClientReceiverFb&) = delete;
 
     //------------------------------
 
@@ -85,10 +85,10 @@ public:
     /// If you get this situation somehow, only solution to solve and back to normal condision is
     /// "re-rendering from scratch".
     ///
-    bool decodeProgressiveFrame(const mcrt::ProgressiveFrame &message,
+    bool decodeProgressiveFrame(const mcrt::ProgressiveFrame& message,
                                 const bool doParallel,
-                                const CallBackStartedCondition &callBackFuncAtStartedCondition,
-                                const CallBackGenericComment &callBackForGenericComment = nullptr);
+                                const CallBackStartedCondition& callBackFuncAtStartedCondition,
+                                const CallBackGenericComment& callBackForGenericComment = nullptr);
 
     //------------------------------
 
@@ -220,7 +220,7 @@ public:
 
     /// @brief Get rezed viewport
     /// @return Rezed viewport as closed viewport
-    const scene_rdl2::math::Viewport &getRezedViewport() const; // closed viewport
+    const scene_rdl2::math::Viewport& getRezedViewport() const; // closed viewport
 
     /// @brief Get ROI viewport condition.
     /// @return Ture when ROI viewport is set otherwise false
@@ -228,7 +228,7 @@ public:
 
     /// @brief Get ROI viewport if it's set. If there is no ROI viewport, return useless info.
     /// @return ROI viewport as closed viewport if ROI viewport is setup.
-    const scene_rdl2::math::Viewport &getRoiViewport() const; // closed viewport
+    const scene_rdl2::math::Viewport& getRoiViewport() const; // closed viewport
 
     /// @brief Get PixelInfo data condition
     /// @return If image includes PixelInfo data, return true. Otherwise false.
@@ -237,7 +237,7 @@ public:
     /// @brief Get PixelInfo data AOV buffer name if image has PixelInfo data.
     /// @return PixelInfo data's AOV buffer name if image has PixelInfo data.
     ///         If image does not have PixelInfo data, just return useless info.
-    const std::string &getPixelInfoName() const;
+    const std::string& getPixelInfoName() const;
 
     /// @brief Get PixelInfo data's total channel number
     /// @return PixelInfo data's total channel number.
@@ -250,7 +250,7 @@ public:
     /// @brief Get HeatMap data AOV buffer name if image has HeatMap data.
     /// @return HeatMap data's AOV buffer name if image has HeatMap data.
     ///         If image does not have HeatMap data, just return useless info.
-    const std::string &getHeatMapName() const;
+    const std::string& getHeatMapName() const;
 
     /// @brief Get HeatMap data's total channel number
     /// @return PixelInfo data's total channel number.
@@ -263,7 +263,7 @@ public:
     /// @brief Get Weight buffer data AOV buffer name if image has Weight buffer data.
     /// @return Weight buffer data's AOV buffer name if image has Weight buffer data.
     ///         If image does not have Weight buffer data, just return useless info.
-    const std::string &getWeightBufferName() const;
+    const std::string& getWeightBufferName() const;
 
     /// @brief Get Weight buffer data's total channel number
     /// @return Weight buffer data's total channel number.
@@ -284,7 +284,7 @@ public:
     /// @brief Get AOV buffer name
     /// @param id AOV index (< total number of RenderOutput).
     /// @return AOV buffer name
-    const std::string &getRenderOutputName(const unsigned id) const;
+    const std::string& getRenderOutputName(const unsigned id) const;
 
     /// @brief Get AOV buffer's channel total
     /// @param id AOV index (< total number of RenderOutput).
@@ -294,7 +294,7 @@ public:
     /// @brief Get AOV buffer's channel total
     /// @param aovName AOV buffer name
     /// @return AOV buffer's channel total
-    int getRenderOutputNumChan(const std::string &aovName) const;
+    int getRenderOutputNumChan(const std::string& aovName) const;
 
     /// @brief Get AOV buffer's closestFilter use status
     /// @param id AOV index (< total number of RenderOutput).
@@ -304,7 +304,7 @@ public:
     /// @brief Get AOV buffer's closestFilter use status
     /// @param aovName AOV buffer name
     /// @return AOV buffer's closestFilter use status
-    bool getRenderOutputClosestFilter(const std::string &aovName) const;
+    bool getRenderOutputClosestFilter(const std::string& aovName) const;
 
     //------------------------------
 
@@ -380,7 +380,7 @@ public:
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
     /// If you set isSrgb = false (this is default), 8bit quantized logic is using gamma 2.2 conversion.
     /// If you set isSrgb argument as true, 8bit quantized logic changed from gamma 2.2 to sRGB mode.
-    bool getBeautyRgb888(std::vector<unsigned char> &rgbFrame,
+    bool getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                          const bool top2bottom = false,
                          const bool isSrgb = false);
 
@@ -403,7 +403,7 @@ public:
     /// rgbFrame's data format is R G B R G B ... from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
-    bool getPixelInfoRgb888(std::vector<unsigned char> &rgbFrame,
+    bool getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame,
                             const bool top2bottom = false,
                             const bool isSrgb = false);
 
@@ -426,7 +426,7 @@ public:
     /// rgbFrame's data format is R G B R G B ... from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
-    bool getHeatMapRgb888(std::vector<unsigned char> &rgbFrame,
+    bool getHeatMapRgb888(std::vector<unsigned char>& rgbFrame,
                           const bool top2bottom = false,
                           const bool isSrgb = false);
 
@@ -450,7 +450,7 @@ public:
     /// rgbFrame's data format is R G B R G B ... from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
-    bool getWeightBufferRgb888(std::vector<unsigned char> &rgbFrame,
+    bool getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame,
                                const bool top2bottom = false,
                                const bool isSrgb = false);
 
@@ -471,7 +471,7 @@ public:
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
     /// If you set isSrgb = false (this is default), 8bit quantized logic is using gamma 2.2 conversion.
     /// If you set isSrgb argument as true, 8bit quantized logic changed from gamma 2.2 to sRGB mode.
-    bool getBeautyAuxRgb888(std::vector<unsigned char> &rgbFrame,
+    bool getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame,
                             const bool top2bottom = false,
                             const bool isSrgb = false);
 
@@ -579,7 +579,7 @@ public:
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
     bool getRenderOutputRgb888(const unsigned id,
-                               std::vector<unsigned char> &rgbFrame,
+                               std::vector<unsigned char>& rgbFrame,
                                const bool top2bottom = false,
                                const bool isSrgb = false,
                                const bool closestFilterDepthOutput = false);
@@ -611,8 +611,8 @@ public:
     /// Depth value mapped from minDepth~maxDepth to 0~255.
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
-    bool getRenderOutputRgb888(const std::string &aovName,
-                               std::vector<unsigned char> &rgbFrame,
+    bool getRenderOutputRgb888(const std::string& aovName,
+                               std::vector<unsigned char>& rgbFrame,
                                const bool top2bottom = false,
                                const bool isSrgb = false,
                                const bool closestFilterDepthOutput = false);
@@ -636,7 +636,7 @@ public:
     /// rgba's data format is R G B A R G B A ... from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return rgba is flipped Y direction.
-    bool getBeauty(std::vector<float> &rgba,
+    bool getBeauty(std::vector<float>& rgba,
                    const bool top2bottom = false); // 4 channels per pixel
 
     /// @brief Get current PixelInfo buffer data as float (=32bit single float) 1 channel data.
@@ -656,7 +656,7 @@ public:
     /// data's format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getPixelInfo(std::vector<float> &data, const bool top2bottom = false); // 1 channel per pixel
+    bool getPixelInfo(std::vector<float>& data, const bool top2bottom = false); // 1 channel per pixel
 
     /// @brief Get current HeatMap buffer data as float (=32bit single float) 1 channel data.
     /// @param data returned current HeatMap buffer.
@@ -674,7 +674,7 @@ public:
     /// data's data format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getHeatMap(std::vector<float> &data, const bool top2bottom = false);   // 1 channel per pixel
+    bool getHeatMap(std::vector<float>& data, const bool top2bottom = false);   // 1 channel per pixel
 
     /// @brief Get current weight buffer data as float (=32bit single float) 1 channel data.
     /// @param data returned current weight buffer.
@@ -691,7 +691,7 @@ public:
     /// data's format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getWeightBuffer(std::vector<float> &data, const bool top2bottom = false); // 1 channel per pixel
+    bool getWeightBuffer(std::vector<float>& data, const bool top2bottom = false); // 1 channel per pixel
 
     /// @brief Get current RenderBufferOdd data as float (=32bit single float) RGBA 4 channels
     /// @param rgba returned current RenderBufferOdd data buffer.
@@ -708,7 +708,7 @@ public:
     /// data's format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getBeautyOdd(std::vector<float> &rgba, const bool top2bottom = false); // 4 channels per pixel
+    bool getBeautyOdd(std::vector<float>& rgba, const bool top2bottom = false); // 4 channels per pixel
 
     /// @brief Get current RenderOutput(=AOV) buffer data
     /// @param id specify AOV id (0 <= id < getTotalRenderOutput())
@@ -782,7 +782,8 @@ public:
     /// In this case, output data only has single float numChan.
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
-    int  getRenderOutput(const unsigned id, std::vector<float> &data,
+    int  getRenderOutput(const unsigned id,
+                         std::vector<float>& data,
                          const bool top2bottom = false,
                          const bool closestFilterDepthOutput = false);
 
@@ -813,7 +814,8 @@ public:
     /// In this case, output data only has single float numChan.
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
-    int  getRenderOutput(const std::string &aovName, std::vector<float> &data,
+    int  getRenderOutput(const std::string& aovName,
+                         std::vector<float>& data,
                          const bool top2bottom = false,
                          const bool closestFilterDepthOutput = false);
 
@@ -879,7 +881,7 @@ public:
     /// The return value is std::vector<float> and properly resized and set value by this function based on
     /// the internal definition.
     int getPixRenderOutput(const unsigned id, const int sx, const int sy,
-                           std::vector<float> &out) const; // return numChan
+                           std::vector<float>& out) const; // return numChan
 
     /// @brief Get pixel value of renderOutput (AOV) buffer
     /// @param aovName specify renderOutput AOV name
@@ -893,8 +895,8 @@ public:
     /// This API returns pixel value of internal renderOutput buffer and mainly is using for debugging purpose. 
     /// The return value is std::vector<float> and properly resized and set value by this function based on
     /// the internal definition.
-    int getPixRenderOutput(const std::string &aovName, const int sx, const int sy,
-                           std::vector<float> &out) const; // return numChan
+    int getPixRenderOutput(const std::string& aovName, const int sx, const int sy,
+                           std::vector<float>& out) const; // return numChan
 
     /// @brief Return pixel value detailed information by string
     /// @param sx pixel screen position x
@@ -929,7 +931,7 @@ public:
     ///   </tr>
     /// </table>
     /// If you specify another name of above as aovName, that aovName is used as a regular AOV buffer name.
-    std::string showPix(const int sx, const int sy, const std::string &aovName) const;
+    std::string showPix(const int sx, const int sy, const std::string& aovName) const;
 
     //------------------------------
 
@@ -974,7 +976,7 @@ public:
     /// MCRT Merger computation which contributed to create current image.<br>
     /// Typical information dump APIs for LatencyLog itself is grid_util::LatencyLogUpstream::show().<br>
     /// (See scene_rdl2/lib/common/grid_util/LatencyLog.h for more detail)<br>
-    const scene_rdl2::grid_util::LatencyLogUpstream &getLatencyLogUpstream() const;
+    const scene_rdl2::grid_util::LatencyLogUpstream& getLatencyLogUpstream() const;
 
     //------------------------------
 
@@ -1039,7 +1041,7 @@ public:
     /// is render finish timing.
     /// If your session is finished in normal condition you have multiple iRec-A files and single iRec-C
     /// and single iRec-F files in the output directory.
-    void setInfoRecFileName(const std::string &fileName);
+    void setInfoRecFileName(const std::string& fileName);
 
     /// @brief This API records message receive timing in order to get statistical information
     ///
@@ -1072,7 +1074,7 @@ public:
     /// Probably your action is too short from last display message timing. This function does
     /// not return true if this function is called less than intervalSec duration. In this case
     /// you should try again later. 
-    bool getStats(const float intervalSec, std::string &outMsg);
+    bool getStats(const float intervalSec, std::string& outMsg);
 
     /// @brief This API returns how frequently received and decoded image data (as
     /// progressiveFrame message).
@@ -1105,7 +1107,7 @@ public:
     /// "CLIENTRECEIVER_CONSOLE <port>" is set up. 
     /// <port> is used for port number in order to connect to the debug console by telnet-connection.
     /// A typical client to connect ClientReceiver's debug console is "telnet".
-    void consoleAutoSetup(const CallBackSendMessage &sendMessage);
+    void consoleAutoSetup(const CallBackSendMessage& sendMessage);
 
     /// @brief This API enables ClientReceiverFb's debug console functionality.
     /// @param port The port is used for port number in order to connect to the debug console by
@@ -1117,7 +1119,7 @@ public:
     /// information by its arguments. You should use this API if you want to set up all information
     /// by yourself instead of using environment variables by consoleAutoSetup().
     void consoleEnable(const unsigned short port,
-                       const CallBackSendMessage &sendMessage);
+                       const CallBackSendMessage& sendMessage);
 
     /// @brief Returns console driver 
     /// @return ClientReceiverConsoleDriver
@@ -1126,14 +1128,14 @@ public:
     /// Sometimes, you want to access ClientReceiverConsoleDriver directly. 
     /// You need to access ClientReceiverConsoleDriver, if your client needs to add more parsing commands
     /// into them. arras_render is a good example.
-    ClientReceiverConsoleDriver &consoleDriver();
+    ClientReceiverConsoleDriver& consoleDriver();
 
     /// @brief Returns Parser object reference
     /// @return Parser
     ///
     /// @detail
     /// Sometimes, you might want to access Parser object to execute command-line action to this object.
-    Parser &getParser();
+    Parser& getParser();
 
     /// @brief String replasentation of DenoiseMode
     /// @return String
@@ -1208,6 +1210,39 @@ public:
     /// This machineId is int or enum SenderMachineId. This API simply converts int representation of
     /// machineId to the easily understandable string message.
     static std::string showSenderMachineId(int machineId);
+
+    //------------------------------
+
+    /// @brief Set telemetry overlay information display resolution
+    /// @param width overlay information display width
+    /// @param height overlay information display height
+    ///
+    /// @detail
+    /// We need to set telemetry overlay information display resolution by this API because ClientReceiverFb
+    /// needs to produce telemetry overlay before receiving the first image. We don't know the image
+    /// resolution at the beginning yet. You can change telemetry overlay resolution anytime during sessions.
+    void setTelemetryOverlayReso(unsigned width, unsigned height);
+
+    /// @brief Set telemetry overlay enable/disable condition
+    /// @param sw display enable(=true)/disable(=false) condition
+    /// 
+    /// @detail
+    /// You can enable/disable telemetry overlay by this API anytime during sessions. Default is false.
+    void setTelemetryOverlayActive(bool sw);
+
+    /// @brief Get telemetry overlay enable/disable condition
+    /// @return return telemetry overlay condition. enable(=true) or disable(=false)
+    ///
+    /// @detail
+    /// You can get the current telemetry overlay display condition by this API.
+    bool getTelemetryOverlayActive() const;
+
+    /// @brief switch telemetry overlay layout to the next
+    ///
+    /// @detail
+    /// ClientReceiverFb has multiple different versions of the telemetry overlay layout and this API
+    /// switches the current overlay layout to the next one.
+    void switchTelemetryLayoutNext();
 
 protected:
     class Impl;

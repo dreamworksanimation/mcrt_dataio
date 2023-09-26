@@ -1,13 +1,11 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "InfoCodec.h"
 
 #include <json/json.h>
 #include <json/writer.h>
 #include <mutex>
+#include <sstream> // istringstream
 
 namespace mcrt_dataio {
 
@@ -16,13 +14,13 @@ class InfoCodec::Impl
 public:
     using Key = const std::string;
 
-    Impl(Key &infoKey, bool decodeOnly) :
+    Impl(Key& infoKey, bool decodeOnly) :
         mInfoKey(infoKey),
         mDecodeOnly(decodeOnly),
         mArray(Json::arrayValue)
     {}
 
-    Key &getInfoKey() const { return mInfoKey; }
+    Key& getInfoKey() const { return mInfoKey; }
     bool getDecodeOnly() const { return mDecodeOnly; }
 
     void clear(); // MTsafe
@@ -50,15 +48,67 @@ public:
         }
     }
 
-    bool encode(std::string &outputData); // MTsafe
-    void encodeChild(Key &childKey, InfoCodec::Impl &child); // MTsafe
-    void encodeTable(Key &tableKey, Key &itemKey, InfoCodec::Impl &item); // MTsafe
+    template <typename T>
+    void setVec(Key& key, const std::vector<T>& setVal, std::vector<T>* setTarget)
+    {
+        if (!mDecodeOnly) {
+            std::lock_guard<std::mutex> lock(mArrayMutex);
+
+            if (setTarget) *setTarget = setVal;
+        
+            Json::Value jv;
+            jv[key] = convertToStr<T>(setVal);
+            pushBack(jv);
+
+        } else {
+            if (setTarget) {
+                std::lock_guard<std::mutex> lock(mArrayMutex);
+                *setTarget = setVal;
+            }
+        }
+    }
+
+    template <typename T>
+    std::string convertToStr(const std::vector<T>& vec) const
+    {
+        std::string str;
+        str = std::to_string(vec.size()); // store size first
+        for (size_t i = 0; i < vec.size(); ++i) {
+            str += ' ';
+            str += std::to_string(vec[i]);
+        }
+        return str;
+    }
+
+    template <typename T>
+    std::vector<T> convertRealVecFromStr(const std::string& str) const
+    {
+        std::vector<T> vec;
+
+        std::istringstream istr(str);
+        std::string token;
+        int id = 0;
+        while (istr >> token) {
+            if (id == 0) {
+                size_t size = std::stoi(token);
+                vec.resize(size);
+            } else {
+                vec[id - 1] = static_cast<T>(std::stod(token));
+            }
+            id++;
+        }
+        return vec;
+    }
+
+    bool encode(std::string& outputData); // MTsafe
+    void encodeChild(Key& childKey, InfoCodec::Impl& child); // MTsafe
+    void encodeTable(Key& tableKey, Key& itemKey, InfoCodec::Impl& item); // MTsafe
 
     //------------------------------
 
     template <typename F>
     bool
-    get(Key &key, F setFunc)
+    get(Key& key, F setFunc)
     {
         Json::Value jv = mCom[key];
         if (jv.empty()) {
@@ -70,20 +120,20 @@ public:
 
     // return -1 : error (parse faile or decodeFunc failed)
     //         0 ~ positive # : parsed items count
-    int decode(const std::string &inputData, std::function<bool()> decodeFunc);
+    int decode(const std::string& inputData, std::function<bool()> decodeFunc);
 
     // return true:decode-data false:not-decode-data(not-error)
-    bool decodeChild(Key &childKey, std::string &childInputData);
+    bool decodeChild(Key& childKey, std::string& childInputData);
 
     // return true:decode-data false:not-decode-data(not-error)
-    bool decodeTable(Key &tableKey, std::string &itemKey, std::string &itemInputData);
+    bool decodeTable(Key& tableKey, std::string& itemKey, std::string& itemInputData);
 
     //------------------------------
 
     std::string show() const;
 
 private:
-    void pushBack(const Json::Value &jv);
+    void pushBack(const Json::Value& jv);
 
     //------------------------------
 
@@ -120,7 +170,7 @@ InfoCodec::Impl::isEmpty() // MTsafe
 }
 
 void
-InfoCodec::Impl::encodeChild(Key &childKey, InfoCodec::Impl &child) // MTsafe
+InfoCodec::Impl::encodeChild(Key& childKey, InfoCodec::Impl& child) // MTsafe
 {
     if (mDecodeOnly) return;
     if (!child.mArray.size()) return;
@@ -137,7 +187,7 @@ InfoCodec::Impl::encodeChild(Key &childKey, InfoCodec::Impl &child) // MTsafe
 }
 
 void
-InfoCodec::Impl::encodeTable(Key &tableKey, Key &itemKey, InfoCodec::Impl &item) // MTsafe
+InfoCodec::Impl::encodeTable(Key& tableKey, Key& itemKey, InfoCodec::Impl& item) // MTsafe
 {
     if (mDecodeOnly) return;
     if (!item.mArray.size()) return;
@@ -154,7 +204,7 @@ InfoCodec::Impl::encodeTable(Key &tableKey, Key &itemKey, InfoCodec::Impl &item)
 }
 
 bool    
-InfoCodec::Impl::encode(std::string &outputData) // MTsafe
+InfoCodec::Impl::encode(std::string& outputData) // MTsafe
 {
     if (!mDecodeOnly) {
         std::lock_guard<std::mutex> lock(mArrayMutex);
@@ -175,13 +225,13 @@ InfoCodec::Impl::encode(std::string &outputData) // MTsafe
 }
 
 void
-InfoCodec::Impl::pushBack(const Json::Value &jv)
+InfoCodec::Impl::pushBack(const Json::Value& jv)
 {
     mArray.append(jv);
 }
 
 int
-InfoCodec::Impl::decode(const std::string &inputData, std::function<bool()> decodeFunc)
+InfoCodec::Impl::decode(const std::string& inputData, std::function<bool()> decodeFunc)
 //
 // return -1 : error (parse failed or decodeFunc failed)
 //         0 ~ positive # : parsed items count
@@ -208,7 +258,7 @@ InfoCodec::Impl::decode(const std::string &inputData, std::function<bool()> deco
 }
 
 bool
-InfoCodec::Impl::decodeChild(Key &childKey, std::string &childInputData)
+InfoCodec::Impl::decodeChild(Key& childKey, std::string& childInputData)
 {
     Json::Value jv = mCom[childKey];
     if (jv.empty()) {
@@ -220,7 +270,7 @@ InfoCodec::Impl::decodeChild(Key &childKey, std::string &childInputData)
 }
 
 bool
-InfoCodec::Impl::decodeTable(Key &tableKey, std::string &itemKey, std::string &itemInputData)
+InfoCodec::Impl::decodeTable(Key& tableKey, std::string& itemKey, std::string& itemInputData)
 {
     Json::Value jv = mCom[tableKey];
     if (jv.empty()) {
@@ -247,7 +297,7 @@ InfoCodec::Impl::show() const
 
 //==========================================================================================
 
-InfoCodec::InfoCodec(Key &infoKey, bool decodeOnly)
+InfoCodec::InfoCodec(Key& infoKey, bool decodeOnly)
 {
     mImpl.reset(new Impl(infoKey, decodeOnly));
 }
@@ -256,7 +306,7 @@ InfoCodec::~InfoCodec()
 {
 }
 
-InfoCodec::Key &
+InfoCodec::Key&
 InfoCodec::getInfoKey() const
 {
     return mImpl->getInfoKey();
@@ -281,145 +331,157 @@ InfoCodec::isEmpty() // MTsafe
 }
 
 void
-InfoCodec::setBool(Key &key, const bool setVal, bool *setTarget) // MTsafe
+InfoCodec::setBool(Key& key, const bool setVal, bool* setTarget) // MTsafe
 {
     mImpl->set<bool>(key, setVal, setTarget);
 }
 
 void
-InfoCodec::setInt(Key &key, const int setVal, int *setTarget) // MTsafe
+InfoCodec::setInt(Key& key, const int setVal, int* setTarget) // MTsafe
 {
     mImpl->set<int>(key, setVal, setTarget);
 }
 
 void
-InfoCodec::setUInt(Key &key, const unsigned int setVal, unsigned int *setTarget) // MTsafe
+InfoCodec::setUInt(Key& key, const unsigned int setVal, unsigned int* setTarget) // MTsafe
 {
     mImpl->set<unsigned int>(key, setVal, setTarget);
 }
 
 void
-InfoCodec::setInt64(Key &key, const int64_t setVal, int64_t *setTarget) // MTsafe
+InfoCodec::setInt64(Key& key, const int64_t setVal, int64_t* setTarget) // MTsafe
 {
-    mImpl->set<Json::Int64>(key, (Json::Int64)setVal, (Json::Int64 *)setTarget);
+    mImpl->set<Json::Int64>(key, (Json::Int64)setVal, (Json::Int64*)setTarget);
 }
 
 void
-InfoCodec::setUInt64(Key &key, const uint64_t setVal, uint64_t *setTarget) // MTsafe
+InfoCodec::setUInt64(Key& key, const uint64_t setVal, uint64_t* setTarget) // MTsafe
 {
-    mImpl->set<Json::UInt64>(key, (Json::UInt64)setVal, (Json::UInt64 *)setTarget);
+    mImpl->set<Json::UInt64>(key, (Json::UInt64)setVal, (Json::UInt64*)setTarget);
 }
 
 void
-InfoCodec::setSizeT(Key &key, const size_t setVal, size_t *setTarget) // MTsafe
+InfoCodec::setSizeT(Key& key, const size_t setVal, size_t* setTarget) // MTsafe
 {
-    setUInt64(key, (uint64_t)setVal, (uint64_t *)setTarget);
+    setUInt64(key, (uint64_t)setVal, (uint64_t*)setTarget);
 }
 
 void
-InfoCodec::setFloat(Key &key, const float setVal, float *setTarget) // MTsafe
+InfoCodec::setFloat(Key& key, const float setVal, float* setTarget) // MTsafe
 {
     mImpl->set<float>(key, setVal, setTarget);
 }
 
 void
-InfoCodec::setDouble(Key &key, const double setVal, double *setTarget) // MTsafe
+InfoCodec::setDouble(Key& key, const double setVal, double* setTarget) // MTsafe
 {
     mImpl->set<double>(key, setVal, setTarget);
 }
 
 void 
-InfoCodec::setString(Key &key, const std::string &setVal, std::string *setTarget) // MTsafe
+InfoCodec::setString(Key& key, const std::string& setVal, std::string* setTarget) // MTsafe
 {
     mImpl->set<std::string>(key, setVal, setTarget);
 }
 
+void
+InfoCodec::setVecFloat(Key& key, const std::vector<float>& setVal, std::vector<float>* setTarget) // MTsafe
+{
+    mImpl->setVec<float>(key, setVal, setTarget);
+}
+
 bool
-InfoCodec::encode(std::string &outputData) // MTsafe
+InfoCodec::encode(std::string& outputData) // MTsafe
 {
     return mImpl->encode(outputData);
 }
 
 void
-InfoCodec::encodeChild(Key &childKey, InfoCodec &child) // MTsafe
+InfoCodec::encodeChild(Key& childKey, InfoCodec& child) // MTsafe
 {
     mImpl->encodeChild(childKey, *child.mImpl);
 }
 
 void
-InfoCodec::encodeTable(Key &tableKey, Key &itemKey, InfoCodec &item) // MTsafe
+InfoCodec::encodeTable(Key& tableKey, Key& itemKey, InfoCodec& item) // MTsafe
 {
     mImpl->encodeTable(tableKey, itemKey, *item.mImpl);
 }
 
 bool
-InfoCodec::getBool(Key &key, bool &v)
+InfoCodec::getBool(Key& key, bool& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asBool(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asBool(); });
 }
 
 bool
-InfoCodec::getInt(Key &key, int &v)
+InfoCodec::getInt(Key& key, int& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asInt(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asInt(); });
 }
 
 bool
-InfoCodec::getUInt(Key &key, unsigned int &v)
+InfoCodec::getUInt(Key& key, unsigned int& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asUInt(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asUInt(); });
 }
 
 bool
-InfoCodec::getInt64(Key &key, int64_t &v)
+InfoCodec::getInt64(Key& key, int64_t& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asInt64(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asInt64(); });
 }
 
 bool
-InfoCodec::getUInt64(Key &key, uint64_t &v)
+InfoCodec::getUInt64(Key& key, uint64_t& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asUInt64(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asUInt64(); });
 }
 
 bool
-InfoCodec::getSizeT(Key &key, size_t &v)
+InfoCodec::getSizeT(Key& key, size_t& v)
 {
-    return getUInt64(key, (uint64_t &)v);
+    return getUInt64(key, (uint64_t&)v);
 }
 
 bool
-InfoCodec::getFloat(Key &key, float &v)
+InfoCodec::getFloat(Key& key, float& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asFloat(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asFloat(); });
 }
 
 bool
-InfoCodec::getDouble(Key &key, double &v)
+InfoCodec::getDouble(Key& key, double& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asDouble(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asDouble(); });
 }
 
 bool    
-InfoCodec::getString(Key &key, std::string &v)
+InfoCodec::getString(Key& key, std::string& v)
 {
-    return mImpl->get(key, [&](Json::Value &jv) { v = jv.asString(); });
+    return mImpl->get(key, [&](Json::Value& jv) { v = jv.asString(); });
+}
+
+bool
+InfoCodec::getVecFloat(Key& key, std::vector<float>& v)
+{
+    return mImpl->get(key, [&](Json::Value& jv) { v = mImpl->convertRealVecFromStr<float>(jv.asString()); });
 }
 
 int
-InfoCodec::decode(const std::string &inputData, std::function<bool()> decodeFunc)
+InfoCodec::decode(const std::string& inputData, std::function<bool()> decodeFunc)
 {
     return mImpl->decode(inputData, decodeFunc);
 }
 
 bool
-InfoCodec::decodeChild(Key &childKey, std::string &childInputData)
+InfoCodec::decodeChild(Key& childKey, std::string& childInputData)
 {
     return mImpl->decodeChild(childKey, childInputData);
 }
 
 bool
-InfoCodec::decodeTable(Key &tableKey, std::string &itemKey, std::string &itemInputData)
+InfoCodec::decodeTable(Key& tableKey, std::string& itemKey, std::string& itemInputData)
 {
     return mImpl->decodeTable(tableKey, itemKey, itemInputData);
 }
@@ -431,4 +493,3 @@ InfoCodec::show() const
 }
 
 } // namespace mcrt_dataio
-

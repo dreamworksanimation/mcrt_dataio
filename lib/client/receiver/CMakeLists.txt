@@ -15,6 +15,12 @@ target_sources(${component}
         ClientReceiverDenoiser.cc
         ClientReceiverFb.cc
         ClientReceiverStats.cc
+	TelemetryDisplay.cc
+	TelemetryLayout.cc
+	TelemetryLayoutCorePerf.cc
+	TelemetryLayoutDevel.cc
+	TelemetryLayoutUtil.cc
+	TelemetryOverlay.cc
         TimingAnalysis.cc
         TimingRecorderHydra.cc
 )
@@ -36,8 +42,11 @@ target_include_directories(${component}
 )
 
 target_link_libraries(${component}
+    PRIVATE
+	FreeType::FreeType
     PUBLIC
         McrtDenoise::denoiser
+	${PROJECT_NAME}::engine_mcrt
         ${PROJECT_NAME}::engine_merger
         ${PROJECT_NAME}::share_codec
         ${PROJECT_NAME}::share_util

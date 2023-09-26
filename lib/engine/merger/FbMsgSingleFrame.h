@@ -265,6 +265,10 @@ FbMsgSingleFrame::initFb(const scene_rdl2::math::Viewport &rezedViewport)
     try {
         for (size_t machineId = 0; machineId < mFb.size(); ++machineId) {
             mFb[machineId].init(mRezedViewport);
+
+            std::ostringstream ostr;
+            ostr << "FbMsgSingleFrame-mId:" << machineId;
+            mFb[machineId].setDebugTag(ostr.str());
         }
     }
     catch (...) {

@@ -68,7 +68,7 @@ sconsTargets = {
 
 requires = [
     'arras4_core-4.10',
-    'freetype-2.8',
+    'freetype-2',
     'mcrt_denoise-3.15',
     'mcrt_messages-11.4',
     'scene_rdl2-12.13'

@@ -34,13 +34,13 @@ endif()
 # Find dependencies
 # ================================================
 find_package(JsonCpp REQUIRED)
+find_package(FreeType REQUIRED)
 
 if("${PROJECT_NAME}" STREQUAL "${CMAKE_PROJECT_NAME}")
     find_package(McrtMessages REQUIRED)
     find_package(ArrasCore REQUIRED)
     find_package(McrtDenoise REQUIRED)
     find_package(SceneRdl2 REQUIRED)
-    find_package(FreeType REQUIRED)
 endif()
 
 # ================================================

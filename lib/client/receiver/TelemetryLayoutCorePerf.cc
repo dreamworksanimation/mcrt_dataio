@@ -9,38 +9,22 @@ namespace telemetry {
 void
 LayoutCorePerf::drawMain(const DisplayInfo& info)
 {
-    drawGlobalInfo(info);
+    subPanelTitle(info);
+    subPanelGlobalInfo(10, mBBoxTitle.lower.y - 10 - mStepPixY, info, mBBoxGlobalInfo);
     drawGlobalProgressBar(info);
     drawMcrtComputation(info);
-}
-
-void
-LayoutCorePerf::drawGlobalInfo(const DisplayInfo& info)
-{
-    std::ostringstream ostr;
-    ostr << colReset()
-         << "FrameId:" << info.mFrameId
-         << " Status:" << strFrameStatus(info.mStatus, info.mRenderPrepProgress)
-         << " Pass:" << strPassStatus(info.mIsCoarsePass) << '\n'
-         << "FbActivity:" << info.mFbActivityCounter
-         << " Decode:" << info.mDecodeProgressiveFrameCounter
-         << " Latency:" << strSec(info.mCurrentLatencySec)
-         << " RecvImgFps:" << strFps(info.mReceiveImageDataFps);
-
-    drawUtilGlobalInfo(ostr.str(),
-                       10, // x
-                       (mMaxYLines - 1) * mStepPixY + mOffsetBottomPixY, // y
-                       mBBoxGlobalInfo);
 }
 
 void    
 LayoutCorePerf::drawGlobalProgressBar(const DisplayInfo& info)
 {
-    unsigned gapWidth = 10;
+    constexpr unsigned gapWidth = 10;
+    constexpr unsigned gapHeight = 10;
     unsigned barLeftBottomX = mBBoxGlobalInfo.upper.x + gapWidth;
-    unsigned barLeftBottomY = (mMaxYLines - 1) * mStepPixY + mOffsetBottomPixY;
+    unsigned barLeftBottomY = mBBoxTitle.lower.y - gapHeight - mStepPixY;
     unsigned barWidth = mOverlay->getWidth() - barLeftBottomX - gapWidth;
-    drawUtilGlobalProgressBar(barLeftBottomX, barLeftBottomY, barWidth, info, mBBoxGlobalProgressBar);
+
+    subPanelGlobalProgressBar(barLeftBottomX, barLeftBottomY, barWidth, info, mBBoxGlobalProgressBar);
 }
 
 void
@@ -49,12 +33,12 @@ LayoutCorePerf::drawMcrtComputation(const DisplayInfo& info)
     const GlobalNodeInfo* gNodeInfo = info.mGlobalNodeInfo;
     if (!gNodeInfo) return;
 
-    unsigned gapX = 10;
+    constexpr unsigned gapX = 10;
     unsigned leftX = gapX;
     unsigned mcrtWidth = mOverlay->getWidth() - leftX - gapX;
-    unsigned fontStepX = (mOverlay->getFontStepX() == 0) ? mFont->getFontSizePoint() : mOverlay->getFontStepX();
+    unsigned fontStepX = getFontStepX();
 
-    unsigned gapY = 10;
+    constexpr unsigned gapY = 10;
     unsigned mcrtHeight = mBBoxGlobalProgressBar.lower.y - gapY * 2;
     unsigned yStep = mStepPixY;
     unsigned yStart = mBBoxGlobalProgressBar.lower.y - gapY - yStep;
@@ -64,6 +48,7 @@ LayoutCorePerf::drawMcrtComputation(const DisplayInfo& info)
 
     mMcrtPosArray.resize(gNodeInfo->getMcrtTotal());
 
+    bool allActiveBgFlag = true;
     int titleWidthChar = 0;
     std::ostringstream ostr;
     {
@@ -88,13 +73,16 @@ LayoutCorePerf::drawMcrtComputation(const DisplayInfo& info)
         int id = 0;
         gNodeInfo->crawlAllMcrtNodeInfo([&](std::shared_ptr<McrtNodeInfo> node) {
                 McrtPos& currMcrtPos = mMcrtPosArray[id++];
-                currMcrtPos.mY = yBase;
+                currMcrtPos.mMaxY = yBase;
                 currMcrtPos.mYStep = yStep;
                 ostr << strNodeTitle(node, currMcrtPos);
                 if (id < mMcrtPosArray.size()) ostr << '\n';
 
                 if (currMcrtPos.mTitleWidthChar > titleWidthChar) titleWidthChar = currMcrtPos.mTitleWidthChar;
                 yBase -= yStep * currMcrtPos.mNumOfRows;
+
+                currMcrtPos.mActiveBgFlag = (node->getSyncId() == info.mFrameId);
+                if (!currMcrtPos.mActiveBgFlag) allActiveBgFlag = false;
                 return true;
             });
     }
@@ -115,7 +103,7 @@ LayoutCorePerf::drawMcrtComputation(const DisplayInfo& info)
             
             currMcrtPos.mCoreWinXMin = leftX + (titleWidthChar + 1) * fontStepX;
             currMcrtPos.mCoreWinXMax = leftX + mcrtWidth - gapX - 1;
-            currMcrtPos.mCoreWinYMax = currMcrtPos.mY + currMcrtPos.mYStep;
+            currMcrtPos.mCoreWinYMax = currMcrtPos.mMaxY + currMcrtPos.mYStep;
             currMcrtPos.mCoreWinYMin = currMcrtPos.mCoreWinYMax - currMcrtPos.mYStep * currMcrtPos.mNumOfRows;
             mBBoxMcrtComputation.
                 extend({scene_rdl2::math::Vec2i{currMcrtPos.mCoreWinXMin, currMcrtPos.mCoreWinYMin},
@@ -133,7 +121,25 @@ LayoutCorePerf::drawMcrtComputation(const DisplayInfo& info)
             return true;
         });
 
-    mOverlay->drawBox(mBBoxMcrtComputation, mPanelBg, mPanelBgAlpha);
+    if (allActiveBgFlag) {
+        mOverlay->drawBox(mBBoxMcrtComputation, mPanelBg, mPanelBgAlpha);
+    } else {
+        int minX = mBBoxMcrtComputation.lower.x;
+        int maxX = mBBoxMcrtComputation.upper.x;
+        int maxY = mBBoxMcrtComputation.upper.y;
+        int minY = maxY - yStep;
+        mOverlay->drawBox(setBBox(minX, minY, maxX, maxY), mPanelBg, mPanelBgAlpha);
+
+        C3 nonActiveBg {96,96,96};
+        for (size_t id = 0; id < mMcrtPosArray.size(); ++id) {
+            McrtPos& currMcrtPos = mMcrtPosArray[id];
+
+            minY = currMcrtPos.mCoreWinYMin;
+            maxY = currMcrtPos.mCoreWinYMax;
+            mOverlay->drawBox(setBBox(minX, minY, maxX, maxY),
+                              ((currMcrtPos.mActiveBgFlag) ? mPanelBg : nonActiveBg), mPanelBgAlpha);
+        }
+    }
 }
 
 bool
@@ -250,7 +256,7 @@ LayoutCorePerf::drawSingleNodeTitle(size_t mcrtTotal,
         // Special case : We only have single line space for title
         std::ostringstream ostr;
         ostr << drawId(0, "")
-             << node->getHostName()
+             << strSimpleHostName(node->getHostName())
              << " Cpu:" << node->getAssignedCpuTotal() << '/' << node->getCpuTotal()
              << ' ' << strPct(node->getCpuUsage())
              << addExtraLine(1);
@@ -262,7 +268,7 @@ LayoutCorePerf::drawSingleNodeTitle(size_t mcrtTotal,
         ostr << drawId(0, "")
              << "Cpu:" << node->getAssignedCpuTotal() << '/' << node->getCpuTotal()
              << " (" << strPct(node->getCpuUsage()) << ")\n"
-             << node->getHostName()
+             << strSimpleHostName(node->getHostName())
              << addExtraLine(2);
         return ostr.str();
     }
@@ -271,7 +277,7 @@ LayoutCorePerf::drawSingleNodeTitle(size_t mcrtTotal,
     // We have 3 or more lines space for title
     //
     std::ostringstream ostr;
-    ostr << node->getHostName() << '\n'
+    ostr << strSimpleHostName(node->getHostName()) << '\n'
          << "Cpu:" << node->getAssignedCpuTotal() << '/' << node->getCpuTotal()
          << " (" << strPct(node->getCpuUsage()) << ')';
     int titleLines = 3; // id + hostName + Cpu
@@ -325,13 +331,13 @@ LayoutCorePerf::drawCorePerfSingleNode(std::shared_ptr<McrtNodeInfo> node,
     std::vector<float> coreUsage = node->getCoreUsage();
     std::sort(coreUsage.begin(), coreUsage.end(), std::greater<float>()); // reverse sort coreUsage
 
-    int yHalfGap = 3;
+    constexpr int yHalfGap = 3;
 
     C3 c0 {255,255,0};
     C3 c1 {255,80,0};
 
     int coreId = 0;
-    int yTop = mcrtPos.mY + mcrtPos.mYStep;
+    int yTop = mcrtPos.mMaxY + mcrtPos.mYStep;
     for (int yId = 0; yId < mcrtPos.mNumOfRows; ++yId) {
         int yBase = yTop - mcrtPos.mYStep * (yId + 1);
         int yMax = yBase + mcrtPos.mYStep - yHalfGap;

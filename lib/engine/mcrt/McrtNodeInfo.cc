@@ -3,7 +3,7 @@
 #include "McrtNodeInfo.h"
 
 #include <mcrt_dataio/share/util/MiscUtil.h>
-
+#include <mcrt_dataio/share/util/ValueTimeTracker.h>
 #include <scene_rdl2/render/util/StrUtil.h>
 
 #include <iomanip>
@@ -11,10 +11,12 @@
 
 namespace mcrt_dataio {
 
-McrtNodeInfo::McrtNodeInfo(bool decodeOnly)
-    : mInfoCodec("mcrtNodeInfo", decodeOnly)
+McrtNodeInfo::McrtNodeInfo(bool decodeOnly, float valueKeepDurationSec)
+    : mValueKeepDurationSec(valueKeepDurationSec)
+    , mInfoCodec("mcrtNodeInfo", decodeOnly)
 {
     parserConfigure();
+    if (mValueKeepDurationSec > 0.0f) setupValueTimeTrackerMemory();
 }
 
 void
@@ -109,12 +111,14 @@ void
 McrtNodeInfo::setNetRecvBps(const float bytesPerSec) // byte/sec
 {
     mInfoCodec.setFloat("netRecv", bytesPerSec, &mNetRecvBps);
+    if (mNetRecvVtt) mNetRecvVtt->push(bytesPerSec);
 }
 
 void
 McrtNodeInfo::setNetSendBps(const float bytesPerSec) // byte/sec
 {
     mInfoCodec.setFloat("netSend", bytesPerSec, &mNetSendBps);
+    if (mNetSendVtt) mNetSendVtt->push(bytesPerSec);
 }
 
 void
@@ -744,6 +748,13 @@ McrtNodeInfo::execModeStr(const ExecMode& mode)
 //------------------------------------------------------------------------------------------
 
 void
+McrtNodeInfo::setupValueTimeTrackerMemory()
+{
+    mNetRecvVtt = std::make_shared<ValueTimeTracker>(mValueKeepDurationSec);
+    mNetSendVtt = std::make_shared<ValueTimeTracker>(mValueKeepDurationSec);
+}
+
+void
 McrtNodeInfo::parserConfigure()
 {
     mParser.description("McrtNodeInfo command");
@@ -768,6 +779,16 @@ McrtNodeInfo::parserConfigure()
                 [&](Arg& arg) { return arg.msg(showDataIO() + '\n'); });
     mParser.opt("progress", "", "show progress info",
                 [&](Arg& arg) { return arg.msg(showProgress() + '\n'); });
+    mParser.opt("netRecvVtt", "...command...", "netRecv valueTimeTracker command",
+                [&](Arg& arg) {
+                    if (!mNetRecvVtt) return arg.msg("mNetRecvVtt is empty\n");
+                    else return mNetRecvVtt->getParser().main(arg.childArg());
+                });
+    mParser.opt("netSendVtt", "...command...", "netSend valueTimeTracker command",
+                [&](Arg& arg) {
+                    if (!mNetSendVtt) return arg.msg("mNetSendVtt is empty\n");
+                    else return mNetSendVtt->getParser().main(arg.childArg());
+                });
 }
 
 std::string

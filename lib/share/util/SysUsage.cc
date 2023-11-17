@@ -15,7 +15,7 @@ namespace mcrt_dataio {
 
 // static function
 int
-SysUsage::cpuTotal()
+SysUsage::getCpuTotal()
 {
     return std::thread::hardware_concurrency(); // return HTcore total
 }
@@ -26,14 +26,14 @@ SysUsage::isCpuUsageReady() const
     // There is no particular meaning of this value. This should be pretty small and non zero.
     // The number of clock ticks per second can be obtained using : sysconf(_SC_CLK_TCK)
     // (= 100 for example).
-    constexpr clock_t minInterval = 32; // clock ticks
+    constexpr clock_t minInterval = 16; // clock ticks
     
     clock_t now = times(nullptr); // get current time    
     return (now - mAll.getPrevTime() > minInterval);
 }
 
 float
-SysUsage::cpu()
+SysUsage::getCpuUsage()
 // return all CPU usage fraction 0.0~1.0, negative value is error
 {
     std::ifstream ifs("/proc/stat");
@@ -79,7 +79,7 @@ SysUsage::getCoreUsage() const
 
 // static function
 size_t
-SysUsage::memTotal()
+SysUsage::getMemTotal()
 {
     struct sysinfo info;
     sysinfo(&info);
@@ -90,7 +90,7 @@ SysUsage::memTotal()
 
 // static function
 float
-SysUsage::mem()
+SysUsage::getMemUsage()
 // return memory usage fraction 0.0~1.0
 {
     struct sysinfo info;
@@ -103,7 +103,7 @@ SysUsage::mem()
 }
 
 bool
-SysUsage::netIO()
+SysUsage::updateNetIO()
 {
     size_t recv, send;
     if (!getNetIO(recv, send)) return false; // early exit

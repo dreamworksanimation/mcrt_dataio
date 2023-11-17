@@ -53,17 +53,17 @@ class SysUsage
 // How to get CPU usage
 //   1) construct SysUsage object
 //   2) If isCpuUsageReady() is false, wait some time and do 2) again
-//   3) If isCpuUsageReady() is true, call cpu(), and/or getCoreUsage()
+//   3) If isCpuUsageReady() is true, call getCpuUsage(), and/or getCoreUsage()
 //   4) wait some time and goto 2) again if you want to get CPU usage multiple times
 //
 // How to get Memory usage
-//   simply just call mem() anytime you want.
+//   simply just call getMemUsage() anytime you want.
 //
 // How to get NetIO info
 //   1) construct SysUsage object
-//   2) call netIO()
-//   3) if netIO() returns false, wait some time and do 2) again
-//   4) if netIO() returns true, call getNetRecv(), getNetSend()
+//   2) call updateNetIO()
+//   3) if updateNetIO() returns false, wait some time and do 2) again
+//   4) if updateNetIO() returns true, call getNetRecv(), getNetSend()
 //   5) wait some time and goto 2) again if you want to get NetIO info multiple times
 //
 {
@@ -79,15 +79,15 @@ public:
         mNetIoRecTime.start();
     }
 
-    static int cpuTotal(); // return HTcore total
+    static int getCpuTotal(); // return HTcore total
     bool isCpuUsageReady() const;
-    float cpu(); // return CPU usage fraction 0.0~1.0, negative value is error
+    float getCpuUsage(); // return CPU usage fraction 0.0~1.0, negative value is error
     std::vector<float> getCoreUsage() const;
 
-    static size_t memTotal(); // return total RAM as byte
-    static float mem(); // return memory usage fraction 0.0~1.0
+    static size_t getMemTotal(); // return total RAM as byte
+    static float getMemUsage(); // return memory usage fraction 0.0~1.0
 
-    bool netIO(); // update netIO information
+    bool updateNetIO(); // update netIO information
     float getNetRecv() const { return mNetRecvBps; } // Byte/Sec
     float getNetSend() const { return mNetSendBps; } // Byte/Sec
 

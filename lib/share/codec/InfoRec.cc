@@ -567,7 +567,7 @@ void
 InfoRecItem::setTimeStamp()
 {
     mTimeStamp = MiscUtil::getCurrentMicroSec();
-    mArray["time"] = (Json::Value::UInt64)(mTimeStamp);
+    mArray["time"] = static_cast<Json::Value::UInt64>(mTimeStamp);
 }
 
 int

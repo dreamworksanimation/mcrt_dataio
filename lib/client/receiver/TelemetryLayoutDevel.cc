@@ -11,6 +11,7 @@ namespace telemetry {
 void
 LayoutDevel::drawMain(const DisplayInfo& info)
 {
+    subPanelTitle(info);
     drawGlobalInfo(info);
     drawDispatchMergeComputation(info);
     drawGlobalProgressBar(info);
@@ -29,11 +30,10 @@ LayoutDevel::drawGlobalInfo(const DisplayInfo& info)
          << "      Pass:" << strPassStatus(info.mIsCoarsePass) << '\n'
          << "   Latency:" << strSec(info.mCurrentLatencySec) << '\n'
          << "RecvImgFps:" << strFps(info.mReceiveImageDataFps);
-
-    drawUtilGlobalInfo(ostr.str(),
-                       10, // x
-                       (mMaxYLines - 1) * mStepPixY + mOffsetBottomPixY, // y
-                       mBBoxGlobalInfo);
+    subPanelMessage(10, // x
+                    mBBoxTitle.lower.y - 10 - mStepPixY, // y
+                    ostr.str(),
+                    mBBoxGlobalInfo);
 }
     
 void
@@ -42,22 +42,19 @@ LayoutDevel::drawDispatchMergeComputation(const DisplayInfo& info)
     const GlobalNodeInfo* gNodeInfo = info.mGlobalNodeInfo;
     if (!gNodeInfo) return;
     if (gNodeInfo->getMcrtTotal() == 1) {
-        mBBoxDispatchMergeComputation.lower.x = 0;
-        mBBoxDispatchMergeComputation.lower.y = 0;
-        mBBoxDispatchMergeComputation.upper.x = 0;
-        mBBoxDispatchMergeComputation.upper.y = 0;
+        mBBoxDispatchMergeComputation = setBBox(0, 0, 0, 0);
         return;
     }
 
     std::ostringstream ostr;
     ostr << "Dispatch {\n"
-         << "  " << gNodeInfo->getDispatchHostName() << '\n'
+         << "  " << strSimpleHostName(gNodeInfo->getDispatchHostName()) << '\n'
          << "  ClockShift:" << strMillisec(gNodeInfo->getDispatchClockTimeShift()) << '\n'
          << "}\n\n";
 
     ostr << "Merge (Progress:" << strPct(gNodeInfo->getMergeProgress()) << ") {\n"
-         << "  " << gNodeInfo->getMergeHostName() << '\n'
-         << "   Cpu:" << gNodeInfo->getMergeCpuTotal()
+         << "  " << strSimpleHostName(gNodeInfo->getMergeHostName()) << '\n'
+         << "   Cpu:" << gNodeInfo->getMergeAssignedCpuTotal() << '/' << gNodeInfo->getMergeCpuTotal()
          << " (" << strPct(gNodeInfo->getMergeCpuUsage()) << ")\n"
          << "   Mem:" << strByte(gNodeInfo->getMergeMemTotal())
          << " (" << strPct(gNodeInfo->getMergeMemUsage()) << ")\n"
@@ -67,31 +64,23 @@ LayoutDevel::drawDispatchMergeComputation(const DisplayInfo& info)
          << "     Send:" << strBps(gNodeInfo->getMergeSendBps()) << '\n'
          << "}";
 
-    unsigned leftSpace = 10;
-    unsigned gapY = 10;
-    unsigned x = leftSpace;
-    unsigned y = mBBoxGlobalInfo.lower.y - gapY - mStepPixY;
-
-    if (!mOverlay->drawStr(*mFont, x, y, ostr.str(), {255,255,255}, mError)) {
-        std::cerr << ">> TelemetryLayoutDevel.cc drawDispatchMergeComputation drawStr failed. "
-                  << mError << '\n';
-    }
-    unsigned strItemId = mOverlay->getDrawStrItemTotal() - 1;
-
-    mBBoxDispatchMergeComputation = mOverlay->calcDrawBbox(strItemId, strItemId);
-    mOverlay->drawBox(mBBoxDispatchMergeComputation, mPanelBg, mPanelBgAlpha);
+    subPanelMessage(10, // x
+                    mBBoxGlobalInfo.lower.y - 10 - mStepPixY, // y
+                    ostr.str(),
+                    mBBoxDispatchMergeComputation);
 }
 
 void
 LayoutDevel::drawGlobalProgressBar(const DisplayInfo& info)
 {
-    unsigned gapWidth = 10;
+    constexpr unsigned gapWidth = 10;
     unsigned barLeftBottomX = ((mBBoxDispatchMergeComputation.upper.x > 0)
                                ? mBBoxDispatchMergeComputation.upper.x
                                : mBBoxGlobalInfo.upper.x) + gapWidth;
-    unsigned barLeftBottomY = (mMaxYLines - 1) * mStepPixY + mOffsetBottomPixY;
+    unsigned barLeftBottomY = mBBoxTitle.lower.y - 10 - mStepPixY;
     unsigned barWidth = mOverlay->getWidth() - barLeftBottomX - gapWidth;
-    drawUtilGlobalProgressBar(barLeftBottomX, barLeftBottomY, barWidth, info, mBBoxGlobalProgressBar);
+
+    subPanelGlobalProgressBar(barLeftBottomX, barLeftBottomY, barWidth, info, mBBoxGlobalProgressBar);
 }
 
 void
@@ -100,16 +89,16 @@ LayoutDevel::drawMcrtComputation(const DisplayInfo& info)
     const GlobalNodeInfo* gNodeInfo = info.mGlobalNodeInfo;
     if (!gNodeInfo) return;
 
-    unsigned gapX = 10;
-    unsigned gapY = 10;
+    constexpr unsigned gapX = 10;
+    constexpr unsigned gapY = 10;
     unsigned leftX = ((mBBoxDispatchMergeComputation.upper.x > 0)
                       ? mBBoxDispatchMergeComputation.upper.x
                       : mBBoxGlobalInfo.upper.x) + gapX;
     unsigned width = mOverlay->getWidth() - leftX - gapX;
 
-    unsigned fontStepX = (mOverlay->getFontStepX() == 0) ? mFont->getFontSizePoint() : mOverlay->getFontStepX();
-    unsigned barFontTotalX = width / fontStepX - 5;
-    unsigned barStartX = leftX + fontStepX * 5;
+    unsigned fontStepX = getFontStepX();
+    unsigned barFontTotalX = width / fontStepX - 2;
+    unsigned barStartX = leftX + fontStepX * 2;
     unsigned barA_fontTotal = barFontTotalX / 3;
     unsigned barB_fontTotal = barFontTotalX / 3;
     unsigned barC_fontTotal = barFontTotalX - barA_fontTotal - barB_fontTotal;
@@ -119,10 +108,14 @@ LayoutDevel::drawMcrtComputation(const DisplayInfo& info)
 
     mBarPosArray.resize(gNodeInfo->getMcrtTotal());
 
+    int hostNameW = calcMaxSimpleMcrtHostNameLen(gNodeInfo);
+
     auto strNode = [&](std::shared_ptr<McrtNodeInfo> node, BarPos& barPos) {
         const scene_rdl2::grid_util::RenderPrepStats& renderPrepStats = node->getRenderPrepStats();
         float renderPrepProgress = (static_cast<float>(renderPrepStats.getCurrSteps()) /
                                     static_cast<float>(renderPrepStats.getTotalSteps()));
+        float mcrtProgress = node->getProgress();
+        float mcrtGlobalProgress = node->getGlobalProgress();
 
         int w = scene_rdl2::str_util::getNumberOfDigits(gNodeInfo->getMcrtTotal());
         barPos.mXoffset[0] = 0.0;
@@ -132,48 +125,65 @@ LayoutDevel::drawMcrtComputation(const DisplayInfo& info)
         std::ostringstream ostr;
         ostr
         << "Id:" << std::setw(w) << std::setfill('0') << node->getMachineId() << ' ' 
-        << node->getHostName()
+        << std::setw(hostNameW) << std::setfill(' ') << std::left << strSimpleHostName(node->getHostName())
         << " Cpu:" << node->getAssignedCpuTotal() << '/' << node->getCpuTotal()
         << " Mem:" << strByte(node->getMemTotal())
         << " Act:" << strBool(node->getRenderActive())
         << " Exc:" << strExecMode(node->getExecMode())
         << " Syc:" << node->getSyncId()
         << " Clk:" << strMillisec(node->getClockTimeShift())
-        << " Prg:" << strPct(node->getProgress()) << '/' << strPct(node->getGlobalProgress())
         << " NRv:" << strBps(node->getNetRecvBps())
         << " NSd:" << strBps(node->getNetSendBps())
         << " Snd:" << strBps(node->getSendBps())        
         << " Snp:" << strMillisec(node->getSnapshotToSend())
-        << "\n"
-        << "   "
-        << strBar(barA_w,
-                  fontStepX,
-                  " RPrep:" + strPct(renderPrepProgress),
-                  renderPrepProgress,
-                  false,
-                  &barPos.mXmin[0],
-                  &barPos.mXmax[0],
-                  &barPos.mHeight[0])
-        << strBar(barB_w,
-                  fontStepX,
-                  " CPU:" + strPct(node->getCpuUsage()),
-                  node->getCpuUsage(),
-                  true,
-                  &barPos.mXmin[1],
-                  &barPos.mXmax[1],
-                  &barPos.mHeight[1])
-        << strBar(barC_w,
-                  fontStepX,
-                  " Mem:" + strPct(node->getMemUsage()),
-                  node->getMemUsage(),
-                  true,
-                  &barPos.mXmin[2],
-                  &barPos.mXmax[2],
-                  &barPos.mHeight[2]);
+        << "\n";
 
-        barPos.mFraction[0] = renderPrepProgress;
+        if (renderPrepProgress < 1.0f) {
+            ostr << strBar(barA_w,
+                           fontStepX,
+                           "RPrep:" + strPct(renderPrepProgress),
+                           renderPrepProgress,
+                           false,
+                           &barPos.mXmin[0],
+                           &barPos.mXmax[0],
+                           &barPos.mHeight[0]);
+            barPos.mFraction[0] = renderPrepProgress;
+            barPos.mExtraBarFlag = false;
+        } else {
+            ostr << strBar(barA_w,
+                           fontStepX,
+                           "MCRT:" + strPct(mcrtProgress) + '/' + strPct(mcrtGlobalProgress),
+                           mcrtProgress,
+                           false,
+                           &barPos.mXmin[0],
+                           &barPos.mXmax[0],
+                           &barPos.mHeight[0]);
+            barPos.mFraction[0] = mcrtProgress;
+            barPos.mExtraBarFlag = true;
+            barPos.mFractionExtra = mcrtGlobalProgress;
+        }
+
+        ostr << strBar(barB_w,
+                       fontStepX,
+                       " CPU:" + strPct(node->getCpuUsage()),
+                       node->getCpuUsage(),
+                       true,
+                       &barPos.mXmin[1],
+                       &barPos.mXmax[1],
+                       &barPos.mHeight[1]);
         barPos.mFraction[1] = node->getCpuUsage();
+
+        ostr << strBar(barC_w,
+                       fontStepX,
+                       " Mem:" + strPct(node->getMemUsage()),
+                       node->getMemUsage(),
+                       true,
+                       &barPos.mXmin[2],
+                       &barPos.mXmax[2],
+                       &barPos.mHeight[2]);
         barPos.mFraction[2] = node->getMemUsage();
+
+        barPos.mActiveBgFlag = (node->getSyncId() == info.mFrameId);
 
         return ostr.str();
     };
@@ -184,17 +194,20 @@ LayoutDevel::drawMcrtComputation(const DisplayInfo& info)
     std::ostringstream ostr;
     ostr << "MCRT Computation (totalMcrt:" << gNodeInfo->getMcrtTotal()
          << " totalCpu:" << gNodeInfo->getMcrtTotalCpu() << ") {\n"
-         << " isAllStop:" << strBool(gNodeInfo->isMcrtAllStop())
+         << "  isAllStop:" << strBool(gNodeInfo->isMcrtAllStop())
          << " isAllStart:" << strBool(gNodeInfo->isMcrtAllStart())
          << " isAllFinishRenderPrep:" << strBool(gNodeInfo->isMcrtAllRenderPrepCompletedOrCanceled()) << '\n';
     unsigned yBase = yStart - yStep * 3;
     int id = 0;
+    bool allActiveBgFlag = true;
     gNodeInfo->crawlAllMcrtNodeInfo([&](std::shared_ptr<McrtNodeInfo> node) {
             BarPos& currBarPos = mBarPosArray[id++];
             currBarPos.mY = yBase;
             yBase -= yStep * 2;
             
             ostr << scene_rdl2::str_util::addIndent(strNode(node, currBarPos)) << '\n';
+
+            if (!currBarPos.mActiveBgFlag) allActiveBgFlag = false;
             return true;
         });
     ostr << "}";
@@ -209,7 +222,18 @@ LayoutDevel::drawMcrtComputation(const DisplayInfo& info)
     unsigned strItemId = mOverlay->getDrawStrItemTotal() - 1;
 
     mBBoxMcrtComputation = mOverlay->calcDrawBbox(strItemId, strItemId);
-    mOverlay->drawBox(mBBoxMcrtComputation, mPanelBg, mPanelBgAlpha);
+    if (allActiveBgFlag) {
+        mOverlay->drawBox(mBBoxMcrtComputation, mPanelBg, mPanelBgAlpha);
+    } else {
+        int minX = mBBoxMcrtComputation.lower.x;
+        int maxX = mBBoxMcrtComputation.upper.x;
+        int maxY = mBBoxMcrtComputation.upper.y;
+        int minY = maxY - yStep * 2;
+        mOverlay->drawBox(setBBox(minX, minY, maxX, maxY), mPanelBg, mPanelBgAlpha);
+        minY = mBBoxMcrtComputation.lower.y;
+        maxY = minY + yStep + 1;
+        mOverlay->drawBox(setBBox(minX, minY, maxX, maxY), mPanelBg, mPanelBgAlpha);
+    }
 
     for (size_t i = 0; i < mBarPosArray.size(); ++i) {
         const BarPos& currBarPos = mBarPosArray[i];
@@ -217,39 +241,56 @@ LayoutDevel::drawMcrtComputation(const DisplayInfo& info)
         C3 c3 {255,255,0};
         C3 cRed {255,0,0};
         unsigned char alpha = 90;
-        if (currBarPos.mFraction[0] < 1.0f) {
-            drawBoxBar(barStartX + currBarPos.mXoffset[0],
-                       currBarPos.mY,
-                       currBarPos.mXmin[0],
-                       currBarPos.mXmax[0],
-                       currBarPos.mHeight[0],
-                       currBarPos.mFraction[0],
-                       c3,
+        if (!currBarPos.mExtraBarFlag) {
+            drawHBoxBar(barStartX + currBarPos.mXoffset[0],
+                        currBarPos.mY,
+                        currBarPos.mXmin[0],
+                        currBarPos.mXmax[0],
+                        currBarPos.mHeight[0],
+                        currBarPos.mFraction[0],
+                        c3,
                        alpha);
+        } else {
+            C3 cBar {170,200,220}; // light blue
+            C3 cMax {255,255,255};
+            drawHBoxBar2Sections(barStartX + currBarPos.mXoffset[0],
+                                 currBarPos.mY,
+                                 currBarPos.mXmin[0],
+                                 currBarPos.mXmax[0],
+                                 currBarPos.mHeight[0],
+                                 currBarPos.mFraction[0],
+                                 c3,
+                                 alpha,
+                                 currBarPos.mFractionExtra,
+                                 ((currBarPos.mFractionExtra < 0.9f) ? cBar : cMax),
+                                 alpha);
         }
-        drawBoxBar(barStartX + currBarPos.mXoffset[1],
-                   currBarPos.mY,
-                   currBarPos.mXmin[1],
-                   currBarPos.mXmax[1],
-                   currBarPos.mHeight[1],
-                   currBarPos.mFraction[1],
-                   ((currBarPos.mFraction[1] < 0.9) ? c3 : cRed),
-                   alpha);
-        drawBoxBar(barStartX + currBarPos.mXoffset[2],
-                   currBarPos.mY,
-                   currBarPos.mXmin[2],
-                   currBarPos.mXmax[2],
-                   currBarPos.mHeight[2],
-                   currBarPos.mFraction[2],
-                   ((currBarPos.mFraction[2] < 0.9) ? c3 : cRed),
-                   alpha);
+        drawHBoxBar(barStartX + currBarPos.mXoffset[1],
+                    currBarPos.mY,
+                    currBarPos.mXmin[1],
+                    currBarPos.mXmax[1],
+                    currBarPos.mHeight[1],
+                    currBarPos.mFraction[1],
+                    ((currBarPos.mFraction[1] < 0.9) ? c3 : cRed),
+                    alpha);
+        drawHBoxBar(barStartX + currBarPos.mXoffset[2],
+                    currBarPos.mY,
+                    currBarPos.mXmin[2],
+                    currBarPos.mXmax[2],
+                    currBarPos.mHeight[2],
+                    currBarPos.mFraction[2],
+                    ((currBarPos.mFraction[2] < 0.9) ? c3 : cRed),
+                    alpha);
+        if (!allActiveBgFlag) {
+            int minX = mBBoxMcrtComputation.lower.x;
+            int maxX = mBBoxMcrtComputation.upper.x;
+            int minY = currBarPos.mY;
+            int maxY = minY + yStep * 2;
+            C3 nonActiveBg {96,96,96};
+            mOverlay->drawBox(setBBox(minX, minY, maxX, maxY),
+                              ((currBarPos.mActiveBgFlag) ? mPanelBg : nonActiveBg), mPanelBgAlpha);
+        }
     }
-}
-
-void
-LayoutDevel::parserConfigure()
-{
-    // adding more debugConsole command here if needed.
 }
 
 } // namespace telemetry

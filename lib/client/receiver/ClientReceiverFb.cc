@@ -12,11 +12,15 @@
 #include <mcrt_dataio/engine/merger/GlobalNodeInfo.h>
 #include <mcrt_dataio/share/codec/InfoRec.h>
 #include <mcrt_dataio/share/util/FpsTracker.h>
+#include <mcrt_dataio/share/util/MiscUtil.h>
+#include <mcrt_dataio/share/util/SysUsage.h>
 
 #include <scene_rdl2/common/grid_util/PackTiles.h>
 #include <scene_rdl2/common/grid_util/PackTilesPassPrecision.h>
+#include <scene_rdl2/common/rec_time/RecTime.h>
 #include <scene_rdl2/render/util/StrUtil.h>
 
+#include <algorithm> // std::max()
 #include <cstdlib> // getenv()
 #include <iomanip>
 #include <json/json.h>
@@ -45,12 +49,15 @@ public:
     using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
 
-    Impl() { parserConfigure(); }
+    Impl(bool initialTelemetryOverlayCondition);
     ~Impl() {}
 
     /// This class is Non-copyable
     Impl &operator = (const Impl&) = delete;
     Impl(const Impl&) = delete;
+
+    void setClientMessage(const std::string& msg);
+    void clearClientMessage() { mClientMessage.clear(); }
 
     //------------------------------
 
@@ -247,9 +254,17 @@ public:
     void setTelemetryOverlayReso(unsigned width, unsigned height);
     void setTelemetryOverlayActive(bool sw);
     bool getTelemetryOverlayActive() const;
-    void switchTelemetryLayoutNext();
+    std::vector<std::string> getAllTelemetryPanelName();
+    void setTelemetryInitialPanel(const std::string& panelName);
+    void switchTelemetryPanelByName(const std::string& panelName);
+    void switchTelemetryPanelToNext();
+    void switchTelemetryPanelToPrev();
+    void switchTelemetryPanelToParent();
+    void switchTelemetryPanelToChild();
 
 private:
+    std::string mClientMessage;
+
     // last received image data's sender machineId
     int mRecvImgSenderMachineId {static_cast<int>(SenderMachineId::UNKNOWN)}; // 0orPositive:mcrt, or enum value of SenderMachineId
 
@@ -288,6 +303,8 @@ private:
     unsigned mTelemetryOverlayResoHeight {360};
     telemetry::Display mTelemetryDisplay;
 
+    SysUsage mSysUsage; // system info of client host
+
     //------------------------------
 
     scene_rdl2::rec_time::RecTime mElapsedTimeFromStart; // elapsed time information from image = STARTED
@@ -304,7 +321,9 @@ private:
 
     //------------------------------
 
-    GlobalNodeInfo mGlobalNodeInfo {true, nullptr};
+    GlobalNodeInfo mGlobalNodeInfo { /* decodeOnly = */ true,
+                                     /* valueKeepDurationSec = */ 5.0f,
+                                     /* msgSendHandler = */ nullptr};
 
     bool mClockDeltaRun {false};
 
@@ -339,6 +358,9 @@ private:
 
     void initErrorMsg() { mErrorMsg.clear(); }
     void addErrorMsg(const std::string& msg);
+
+    void updateCpuMemUsage();
+    void updateNetIO();
 
     bool decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBuffer& buffer);
     void decodeAuxInfo(const mcrt::BaseFrame::DataBuffer& buffer);
@@ -381,13 +403,45 @@ private:
 
 //------------------------------------------------------------------------------------------
 
+ClientReceiverFb::Impl::Impl(bool initialTelemetryOverlayCondition)
+{
+    parserConfigure();
+
+    if (initialTelemetryOverlayCondition) {
+        mProgress = 0.0f;
+        setTelemetryOverlayActive(true);
+    } else {
+        setTelemetryOverlayActive(false);
+    }
+
+    mGlobalNodeInfo.setClientHostName(MiscUtil::getHostName());
+    mGlobalNodeInfo.setClientCpuTotal(SysUsage::getCpuTotal());
+    mGlobalNodeInfo.setClientMemTotal(SysUsage::getMemTotal());
+    mSysUsage.updateNetIO();
+}
+
+void
+ClientReceiverFb::Impl::setClientMessage(const std::string& msg)
+{
+    mClientMessage = msg;
+    updateCpuMemUsage();
+    updateNetIO();
+}
+
 bool
 ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &message,
                                                const bool doParallel,
                                                const CallBackStartedCondition& callBackFuncAtStartedCondition,
                                                const CallBackGenericComment& callBackFuncForGenericComment)
 {
+    if (mDecodeProgressiveFrameCounter == 0) {
+        // very first progressiveFrame message decoding
+        mElapsedTimeFromStart.start();  // initialize frame start time
+    }
     mDecodeProgressiveFrameCounter++; // never reset during sessions.
+
+    updateCpuMemUsage();
+    updateNetIO();
 
     if (message.mHeader.mProgress < 0.0f) {
         // Special case, this message only contains auxInfo data (no image information).
@@ -453,6 +507,9 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
 
     mViewId = message.mHeader.mViewId;
     mFrameId = message.mHeader.mFrameId; // syncId of this image
+    if (mLastFrameId != mFrameId) {
+        mElapsedTimeFromStart.start();  // initialize frame start time
+    }
     mStatus = message.mHeader.mStatus;
 
     mCoarsePassStatus = message.mCoarsePassStatus;
@@ -496,19 +553,12 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
     mcrt::BaseFrame::Status currStatus = message.getStatus();
     if (currStatus == mcrt::BaseFrame::STARTED) {
         if (mFrameId != mLastFrameId) {
-            mElapsedTimeFromStart.start();
             if (mResetFbWithColorMode) {
                 mFb.reset();
             } else {
                 mFb.resetExceptColor();
             }
             callBackFuncAtStartedCondition();
-        }
-    } else {
-        if (mElapsedTimeFromStart.isInit()) {
-            // This is a safety logic if the very first progressiveFrame message does not
-            // have a STARTED condition somehow. We do set start time here just in case.
-            mElapsedTimeFromStart.start();
         }
     }
 
@@ -1582,6 +1632,20 @@ ClientReceiverFb::Impl::setTelemetryOverlayReso(unsigned width, unsigned height)
     */
     mTelemetryOverlayResoWidth = width;
     mTelemetryOverlayResoHeight = height;
+
+    //
+    // We need to initialize internal Fb if the internal Fb is smaller than the telemetry overlay resolution.
+    // This is required regarding client message telemetry display action.
+    //
+    unsigned telemetryMaxX = mTelemetryOverlayResoWidth - 1;
+    unsigned telemetryMaxY = mTelemetryOverlayResoHeight - 1;
+    scene_rdl2::math::Viewport currFbViewport = mFb.getRezedViewport();
+    if (currFbViewport.mMaxX < telemetryMaxX || currFbViewport.mMaxY < telemetryMaxY) {
+        unsigned maxX = std::max(static_cast<unsigned>(currFbViewport.mMaxX), telemetryMaxX);
+        unsigned maxY = std::max(static_cast<unsigned>(currFbViewport.mMaxY), telemetryMaxY);
+        scene_rdl2::math::Viewport newViewport(0, 0, maxX, maxY);
+        mFb.init(newViewport);
+    }
 }
 
 void
@@ -1596,10 +1660,46 @@ ClientReceiverFb::Impl::getTelemetryOverlayActive() const
     return mTelemetryDisplay.getActive();
 }
 
-void
-ClientReceiverFb::Impl::switchTelemetryLayoutNext()
+std::vector<std::string>
+ClientReceiverFb::Impl::getAllTelemetryPanelName()
 {
-    mTelemetryDisplay.switchLayoutNext();
+    return mTelemetryDisplay.getAllPanelName();
+}
+
+void
+ClientReceiverFb::Impl::setTelemetryInitialPanel(const std::string& panelName)
+{
+    mTelemetryDisplay.setTelemetryInitialPanel(panelName);
+}
+
+void
+ClientReceiverFb::Impl::switchTelemetryPanelByName(const std::string& panelName)
+{
+    mTelemetryDisplay.switchPanelByName(panelName);
+}
+
+void
+ClientReceiverFb::Impl::switchTelemetryPanelToNext()
+{
+    mTelemetryDisplay.switchPanelToNext();
+}
+
+void
+ClientReceiverFb::Impl::switchTelemetryPanelToPrev()
+{
+    mTelemetryDisplay.switchPanelToPrev();
+}
+
+void
+ClientReceiverFb::Impl::switchTelemetryPanelToParent()
+{
+    mTelemetryDisplay.switchPanelToParent();
+}
+
+void
+ClientReceiverFb::Impl::switchTelemetryPanelToChild()
+{
+    mTelemetryDisplay.switchPanelToChild();
 }
 
 //------------------------------------------------------------------------------
@@ -1609,6 +1709,24 @@ ClientReceiverFb::Impl::addErrorMsg(const std::string& msg)
 {
     if (!mErrorMsg.empty()) mErrorMsg += '\n';
     mErrorMsg += msg;
+}
+
+void
+ClientReceiverFb::Impl::updateCpuMemUsage()
+{
+    if (mSysUsage.isCpuUsageReady()) {
+        mGlobalNodeInfo.setClientCpuUsage(mSysUsage.getCpuUsage());
+        mGlobalNodeInfo.setClientMemUsage(mSysUsage.getMemUsage());
+    }
+}
+
+void
+ClientReceiverFb::Impl::updateNetIO()
+{
+    if (mSysUsage.updateNetIO()) {
+        mGlobalNodeInfo.setClientNetRecvBps(mSysUsage.getNetRecv());
+        mGlobalNodeInfo.setClientNetSendBps(mSysUsage.getNetSend());
+    }
 }
 
 bool
@@ -2296,6 +2414,11 @@ void
 ClientReceiverFb::Impl::setupTelemetryDisplayInfo(telemetry::DisplayInfo& displayInfo)
 {
     //
+    // client message
+    //
+    displayInfo.mClientMessage = &mClientMessage;
+
+    //
     // Image resolution and telemetryOverlay resolution
     //
     displayInfo.mOverlayWidth = mTelemetryOverlayResoWidth;
@@ -2333,6 +2456,7 @@ ClientReceiverFb::Impl::setupTelemetryDisplayInfo(telemetry::DisplayInfo& displa
     //
     displayInfo.mViewId = getViewId();
     displayInfo.mFrameId = getFrameId();
+    displayInfo.mElapsedSecFromStart = getElapsedSecFromStart(); // sec
     displayInfo.mStatus = getStatus();
     displayInfo.mRenderPrepProgress = getRenderPrepProgress();
     displayInfo.mProgress = getProgress();
@@ -2474,13 +2598,25 @@ ClientReceiverFb::Impl::telemetryResetTest()
 //==========================================================================================
 //==========================================================================================
 
-ClientReceiverFb::ClientReceiverFb()
+ClientReceiverFb::ClientReceiverFb(bool initialTelemetryOverlayCondition)
 {
-    mImpl.reset(new Impl());
+    mImpl.reset(new Impl(initialTelemetryOverlayCondition));
 }
 
 ClientReceiverFb::~ClientReceiverFb()
 {
+}
+
+void
+ClientReceiverFb::setClientMessage(const std::string& msg)
+{
+    mImpl->setClientMessage(msg);
+}
+
+void
+ClientReceiverFb::clearClientMessage()
+{
+    mImpl->clearClientMessage();
 }
 
 bool
@@ -3065,10 +3201,46 @@ ClientReceiverFb::getTelemetryOverlayActive() const
     return mImpl->getTelemetryOverlayActive();
 }
 
-void
-ClientReceiverFb::switchTelemetryLayoutNext()
+std::vector<std::string>
+ClientReceiverFb::getAllTelemetryPanelName()
 {
-    mImpl->switchTelemetryLayoutNext();
+    return mImpl->getAllTelemetryPanelName();
+}
+
+void
+ClientReceiverFb::setTelemetryInitialPanel(const std::string& panelName)
+{
+    mImpl->setTelemetryInitialPanel(panelName);
+}
+
+void
+ClientReceiverFb::switchTelemetryPanelByName(const std::string& panelName)
+{
+    mImpl->switchTelemetryPanelByName(panelName);
+}
+
+void
+ClientReceiverFb::switchTelemetryPanelToNext()
+{
+    mImpl->switchTelemetryPanelToNext();
+}
+
+void
+ClientReceiverFb::switchTelemetryPanelToPrev()
+{
+    mImpl->switchTelemetryPanelToPrev();
+}
+
+void
+ClientReceiverFb::switchTelemetryPanelToParent()
+{
+    mImpl->switchTelemetryPanelToParent();
+}
+
+void
+ClientReceiverFb::switchTelemetryPanelToChild()
+{
+    mImpl->switchTelemetryPanelToChild();
 }
 
 } // namespace mcrt_dataio

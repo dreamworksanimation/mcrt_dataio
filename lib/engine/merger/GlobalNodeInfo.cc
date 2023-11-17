@@ -4,6 +4,7 @@
 
 #include <mcrt_dataio/engine/mcrt/McrtControl.h>
 #include <mcrt_dataio/share/util/MiscUtil.h>
+#include <mcrt_dataio/share/util/ValueTimeTracker.h>
 
 #include <scene_rdl2/render/util/StrUtil.h>
 #include <scene_rdl2/render/util/TimeUtil.h>
@@ -21,17 +22,24 @@
 
 namespace mcrt_dataio {
 
-GlobalNodeInfo::GlobalNodeInfo(bool decodeOnly, MsgSendHandlerShPtr msgSendHandler) :
-    mInfoCodec("globalNodeInfo", decodeOnly),
-    mMsgSendHandler(msgSendHandler)
+GlobalNodeInfo::GlobalNodeInfo(bool decodeOnly,
+                               float valueKeepDurationSec,
+                               MsgSendHandlerShPtr msgSendHandler)
+    : mValueKeepDurationSec(valueKeepDurationSec)
+    , mInfoCodec("globalNodeInfo", decodeOnly)
+    , mMsgSendHandler(msgSendHandler)
 {
     parserConfigure();
+    if (mValueKeepDurationSec > 0.0f) setupValueTimeTrackerMemory();
 }
 
 void
 GlobalNodeInfo::reset()
 {
     std::vector<float> coreFractions(mMergeCpuTotal, 0.0f);
+
+    setClientNetRecvBps(0.0f);
+    setClientNetSendBps(0.0f);
 
     setMergeCpuUsage(0.0f);
     setMergeCoreUsage(coreFractions);
@@ -66,6 +74,44 @@ void
 GlobalNodeInfo::setClientRoundTripTime(const float ms)
 {
     mInfoCodec.setFloat("clientRoundTripTime", ms, &mClientRoundTripTime);
+}
+
+void
+GlobalNodeInfo::setClientCpuTotal(const int total)
+{
+    mInfoCodec.setInt("clientCpuTotal", total, &mClientCpuTotal);
+}
+
+void
+GlobalNodeInfo::setClientCpuUsage(const float fraction)
+{
+    mInfoCodec.setFloat("clientCpuUsage", fraction, &mClientCpuUsage);
+}
+
+void
+GlobalNodeInfo::setClientMemTotal(const size_t size)
+{
+    mInfoCodec.setSizeT("clientMemTotal", size, &mClientMemTotal);
+}
+
+void
+GlobalNodeInfo::setClientMemUsage(const float fraction)
+{
+    mInfoCodec.setFloat("clientMemUsage", fraction, &mClientMemUsage);
+}
+
+void
+GlobalNodeInfo::setClientNetRecvBps(const float bytesPerSec)
+{
+    mInfoCodec.setFloat("clientNetRecv", bytesPerSec, &mClientNetRecvBps);
+    if (mClientNetRecvVtt) mClientNetRecvVtt->push(bytesPerSec);
+}
+
+void
+GlobalNodeInfo::setClientNetSendBps(const float bytesPerSec)
+{
+    mInfoCodec.setFloat("clientNetSend", bytesPerSec, &mClientNetSendBps);
+    if (mClientNetSendVtt) mClientNetSendVtt->push(bytesPerSec);
 }
 
 //------------------------------------------------------------------------------------------
@@ -109,9 +155,21 @@ GlobalNodeInfo::setMergeClockDeltaSvrPath(const std::string& path)
 }
 
 void
+GlobalNodeInfo::setMergeMcrtTotal(const int total)
+{
+    mInfoCodec.setInt("mergeMcrtTotal", total, &mMergeMcrtTotal);
+}
+
+void
 GlobalNodeInfo::setMergeCpuTotal(const int total)
 {
     mInfoCodec.setInt("mergeCpuTotal", total, &mMergeCpuTotal);
+}
+
+void
+GlobalNodeInfo::setMergeAssignedCpuTotal(const int total)
+{
+    mInfoCodec.setInt("mergeAssignedCpuTotal", total, &mMergeAssignedCpuTotal);
 }
 
 void
@@ -142,12 +200,14 @@ void
 GlobalNodeInfo::setMergeNetRecvBps(const float bytesPerSec)
 {
     mInfoCodec.setFloat("mergeNetRecv", bytesPerSec, &mMergeNetRecvBps);
+    if (mMergeNetRecvVtt) mMergeNetRecvVtt->push(bytesPerSec);
 }
 
 void
 GlobalNodeInfo::setMergeNetSendBps(const float bytesPerSec)
 {
     mInfoCodec.setFloat("mergeNetSend", bytesPerSec, &mMergeNetSendBps);
+    if (mMergeNetSendVtt) mMergeNetSendVtt->push(bytesPerSec);
 }
 
 void
@@ -235,6 +295,18 @@ GlobalNodeInfo::isMcrtAllRenderPrepCompletedOrCanceled() const
                 mcrtNodeInfo->getRenderPrepStats();
             return renderPrepStats.isCompleted() || renderPrepStats.isCanceled();
         });
+}
+
+size_t
+GlobalNodeInfo::getMaxMcrtHostName() const
+{
+    size_t size = 0;
+    crawlAllMcrtNodeInfo([&](McrtNodeInfoShPtr mcrtNodeInfo) {
+            size_t currSize = mcrtNodeInfo->getHostName().size();
+            if (size < currSize) size = currSize;
+            return true;
+        });
+    return size;
 }
 
 bool
@@ -349,7 +421,8 @@ GlobalNodeInfo::decode(const std::string& inputData)
 {
     auto decodeMcrtNodeInfoMap = [&](int id, std::string& itemInfoData) -> bool {
         if (mMcrtNodeInfoMap.find(id) == mMcrtNodeInfoMap.end()) {
-            mMcrtNodeInfoMap[id].reset(new McrtNodeInfo(mInfoCodec.getDecodeOnly()));
+            mMcrtNodeInfoMap[id].reset(new McrtNodeInfo(mInfoCodec.getDecodeOnly(),
+                                                        mValueKeepDurationSec));
 #           ifdef DO_CLOCK_DELTA_MCRT
             sendClockDeltaClientMainToMcrt(id);
 #           endif // end DO_CLOCK_DELTA_MCRT
@@ -372,6 +445,18 @@ GlobalNodeInfo::decode(const std::string& inputData)
                 setClientClockTimeShift(f);
             } else if (mInfoCodec.getFloat("clientRoundTripTime", f)) {
                 setClientRoundTripTime(f);
+            } else if (mInfoCodec.getInt("clientCpuTotal", i)) {
+                setClientCpuTotal(i);
+            } else if (mInfoCodec.getFloat("clientCpuUsage", f)) {
+                setClientCpuUsage(f);
+            } else if (mInfoCodec.getSizeT("clientMemTotal", t)) {
+                setClientMemTotal(t);
+            } else if (mInfoCodec.getFloat("clientMemUsage", f)) {
+                setClientMemUsage(f);
+            } else if (mInfoCodec.getFloat("clientNetRecv", f)) {
+                setClientNetRecvBps(f);
+            } else if (mInfoCodec.getFloat("clientNetSend", f)) {
+                setClientNetSendBps(f);
 
             } else if (mInfoCodec.getString("dispatchHostName", str)) {
                 setDispatchHostName(str);
@@ -386,8 +471,12 @@ GlobalNodeInfo::decode(const std::string& inputData)
                 setMergeClockDeltaSvrPort(i);
             } else if (mInfoCodec.getString("mergeClockDeltaSvrPath", str)) {
                 setMergeClockDeltaSvrPath(str);
+            } else if (mInfoCodec.getInt("mergeMcrtTotal", i)) {
+                setMergeMcrtTotal(i);
             } else if (mInfoCodec.getInt("mergeCpuTotal", i)) {
                 setMergeCpuTotal(i);
+            } else if (mInfoCodec.getInt("mergeAssignedCpuTotal", i)) {
+                setMergeAssignedCpuTotal(i);
             } else if (mInfoCodec.getFloat("mergeCpuUsage", f)) {
                 setMergeCpuUsage(f);
             } else if (mInfoCodec.getVecFloat("mergeCoreUsage", vecF)) {
@@ -670,6 +759,18 @@ GlobalNodeInfo::showAllHostsName() const
     return ostr.str();
 }
 
+//------------------------------------------------------------------------------------------
+
+void
+GlobalNodeInfo::setupValueTimeTrackerMemory()
+{
+    mClientNetRecvVtt = std::make_shared<ValueTimeTracker>(mValueKeepDurationSec);
+    mClientNetSendVtt = std::make_shared<ValueTimeTracker>(mValueKeepDurationSec);
+
+    mMergeNetRecvVtt = std::make_shared<ValueTimeTracker>(mValueKeepDurationSec);
+    mMergeNetSendVtt = std::make_shared<ValueTimeTracker>(mValueKeepDurationSec);
+}
+
 void
 GlobalNodeInfo::sendClockDeltaClientMainToMcrt(const int machineId)
 //
@@ -737,10 +838,30 @@ GlobalNodeInfo::parserConfigure()
                 [&](Arg& arg) { return arg.msg(showAllHostsName() + '\n'); });
     mParser.opt("clientInfo", "", "show client info",
                 [&](Arg& arg) { return arg.msg(showClientInfo() + '\n'); });
+    mParser.opt("clientNetRecvVtt", "...command...", "clientNetRecv valueTimeTracker command",
+                [&](Arg& arg) {
+                    if (!mClientNetRecvVtt) return arg.msg("mClientNetRecvVtt is empty\n");
+                    else return mClientNetRecvVtt->getParser().main(arg.childArg());
+                });
+    mParser.opt("clientNetSendVtt", "...command...", "clientNetSend valueTimeTracker command",
+                [&](Arg& arg) {
+                    if (!mClientNetSendVtt) return arg.msg("mClientNetSendVtt is empty\n");
+                    else return mClientNetSendVtt->getParser().main(arg.childArg());
+                });
     mParser.opt("dispatchInfo", "", "show dispatch info",
                 [&](Arg& arg) { return arg.msg(showDispatchInfo() + '\n'); });
     mParser.opt("mergeInfo", "", "show merge info",
                 [&](Arg& arg) { return arg.msg(showMergeInfo() + '\n'); });
+    mParser.opt("mergeNetRecvVtt", "...command...", "mergeNetRecv valueTimeTracker command",
+                [&](Arg& arg) {
+                    if (!mMergeNetRecvVtt) return arg.msg("mMergeNetRecvVtt is empty\n");
+                    else return mMergeNetRecvVtt->getParser().main(arg.childArg());
+                });
+    mParser.opt("mergeNetSendVtt", "...command...", "mergeNetSend valueTimeTracker command",
+                [&](Arg& arg) {
+                    if (!mMergeNetSendVtt) return arg.msg("mMergeNetSendVtt is empty\n");
+                    else return mMergeNetSendVtt->getParser().main(arg.childArg());
+                });
     mParser.opt("mergeFeedbackInfo", "", "show merge feedback info",
                 [&](Arg& arg) { return arg.msg(showMergeFeedbackInfo() + '\n'); });
     mParser.opt("allNodeInfo", "", "show all node info",
@@ -788,6 +909,12 @@ GlobalNodeInfo::showClientInfo() const
          << "  mClientHostName:" << mClientHostName << '\n'
          << "  mClientClockTimeShift:" << msShow(mClientClockTimeShift) << '\n'
          << "  mClientRoundTripTime:" << msShow(mClientRoundTripTime) << '\n'
+         << "  mCLientCpuTotal:" << mClientCpuTotal << '\n'
+         << "  mClientCpuUsage:" << pctShow(mClientCpuUsage) << '\n'
+         << "  mClientMemTotal:" << scene_rdl2::str_util::byteStr(mClientMemTotal) << '\n'
+         << "  mClientMemUsage:" << pctShow(mClientMemUsage) << '\n'
+         << "  mClientNetRecvBps:" << bytesPerSecShow(mClientNetRecvBps) << '\n'
+         << "  mClientNetSendBps:" << bytesPerSecShow(mClientNetSendBps) << '\n'
          << "}";
     return ostr.str();
 }
@@ -814,7 +941,9 @@ GlobalNodeInfo::showMergeInfo() const
          << "  mMergeHostName:" << mMergeHostName << '\n'
          << "  mMergeClockDeltaSvrPort:" << mMergeClockDeltaSvrPort << '\n'
          << "  mMergeClockDeltaSvrPath:" << mMergeClockDeltaSvrPath << '\n'
+         << "  mMergeMcrtTotal:" << mMergeMcrtTotal << '\n'
          << "  mMergeCpuTotal:" << mMergeCpuTotal << '\n'
+         << "  mMergeAssignedCpuTotal:" << mMergeAssignedCpuTotal << '\n'
          << "  mMergeCpuUsage:" << pctShow(mMergeCpuUsage) << '\n'
          << addIndent(showMergeCoreUsage()) << '\n'
          << "  mMergeMemTotal:" << scene_rdl2::str_util::byteStr(mMergeMemTotal) << '\n'

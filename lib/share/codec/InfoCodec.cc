@@ -29,7 +29,7 @@ public:
     //------------------------------
 
     template <typename T>
-    void set(Key &key, const T setVal, T *setTarget)
+    void set(Key& key, const T setVal, T* setTarget)
     {
         if (!mDecodeOnly) {
             std::lock_guard<std::mutex> lock(mArrayMutex);    

@@ -67,6 +67,79 @@ Display::bakeOverlayRgb888(std::vector<unsigned char>& rgbFrame,
     }
 }
 
+std::vector<std::string>
+Display::getAllPanelName()
+{
+    setupRootPanelTable(); // just in case
+    std::vector<std::string> panelNameList;
+    mRootPanelTable->getAllPanelName(panelNameList, "");
+    return panelNameList;
+}
+
+void
+Display::setTelemetryInitialPanel(const std::string& panelName)
+{
+    mInitialPanelName = panelName;
+}
+
+bool
+Display::switchPanelByName(const std::string& panelName)
+{
+    if (panelName.empty()) return true; // early exit
+
+    if (!findPanelTest(panelName)) {
+        return false;           // Could not find panel
+    }
+
+    PanelTableShPtr currPanelTable {nullptr};
+    std::shared_ptr<const Panel> currPanel {nullptr};
+
+    std::stringstream sstr { panelName };
+    std::string currPanelName;
+    while (getline(sstr, currPanelName, '/')) {
+        if (!currPanel) {
+            currPanelTable = mRootPanelTable;
+            mPanelTableStack.init(currPanelTable);
+        } else {
+            currPanelTable = currPanel->getChildPanelTable();
+            mPanelTableStack.currentPanelToChild();
+        }
+        // currId is always a valid id because we already tested panelName is properly exist
+        int currId = currPanelTable->findPanel(currPanelName);
+
+        // found currentPanel : set currId as currentPanel
+        currPanelTable->setCurrId(currId);
+
+        currPanel = currPanelTable->getPanel(static_cast<size_t>(currId));
+    }
+
+    return true;
+}
+
+void
+Display::switchPanelToNext()
+{
+    mPanelTableStack.currentPanelToNext();
+}
+
+void
+Display::switchPanelToPrev()
+{
+    mPanelTableStack.currentPanelToPrev();
+}
+
+void
+Display::switchPanelToParent()
+{
+    mPanelTableStack.currentPanelToParent();
+}
+
+void
+Display::switchPanelToChild()
+{
+    mPanelTableStack.currentPanelToChild();
+}
+
 std::string
 Display::show() const
 {
@@ -90,18 +163,68 @@ Display::show() const
 //------------------------------------------------------------------------------------------
 
 void
-Display::setupLayout()
+Display::setupRootPanelTable()
 {
-    auto setNewLayout = [&](std::shared_ptr<LayoutBase> ptr) {
-        mLayoutMap[ptr->getName()] = ptr;
-    };
+    if (mRootPanelTable) {
+        return;
+    }
 
-    std::shared_ptr<LayoutBase> defaultLayout = std::make_shared<LayoutDevel>(mOverlay, mFont);
-    setNewLayout(defaultLayout);
-    mCurrLayout = mLayoutMap[defaultLayout->getName()];
+    //
+    // construct panel table tree
+    //
+    PanelTableShPtr currPanelTbl = std::make_shared<PanelTable>("rootPanelTable");
+    currPanelTbl->push_back_panel(genPanel("devel", "devel", ""));
+    currPanelTbl->push_back_panel(genPanel("corePerf", "corePerf", ""));
+    currPanelTbl->push_back_panel(genPanel("netIO", "netIO", ""));
+    /* This is a test example code of creating child panels
+    {
+        PanelTableShPtr childPanelTbl = std::make_shared<PanelTable>("prepChild");
+        childPanelTbl->push_back_panel(genPanel("netIO-0:3", "netIO", ""));
+        childPanelTbl->push_back_panel(genPanel("netIO-1:3", "netIO", ""));
+        childPanelTbl->push_back_panel(genPanel("netIO-2:3", "netIO", ""));
+        currPanelTbl->getLastPanel()->setChildPanelTable(childPanelTbl);
+    }
+    */
+    currPanelTbl->push_back_panel(genPanel("feedback", "feedback", ""));
 
-    // adding extra layout here
-    setNewLayout(std::make_shared<LayoutCorePerf>(mOverlay, mFont));
+    mRootPanelTable = currPanelTbl;
+    mRootPanelTable->setCurrId(0);
+
+    //
+    // setup panelTableStack initial condition 
+    //
+    mPanelTableStack.init(mRootPanelTable); // set root panel as current stack
+
+    //
+    // initial telemetry panel setup
+    //
+    if (!mInitialPanelName.empty()) {
+        switchPanelByName(mInitialPanelName);
+        std::cerr << "TelemetryDisplay.cc setupRootPanelTable() initialPanelName:" << mInitialPanelName << '\n';
+    }
+}
+
+Display::PanelShPtr
+Display::genPanel(const std::string& panelName,
+                  const std::string& layoutName,
+                  const std::string& setupOptions) const
+{
+    return std::make_shared<Panel>(panelName, genLayout(panelName, layoutName), setupOptions);
+}
+
+Display::LayoutBaseShPtr
+Display::genLayout(const std::string& panelName, const std::string& layoutName) const
+{
+    if (layoutName == "corePerf") {
+        return std::make_shared<LayoutCorePerf>(panelName, mOverlay, mFont);
+    } else if (layoutName == "devel") {
+        return std::make_shared<LayoutDevel>(panelName, mOverlay, mFont);
+    } else if (layoutName == "feedback") {
+        return std::make_shared<LayoutFeedback>(panelName, mOverlay, mFont);
+    } else if (layoutName == "netIO") {
+        return std::make_shared<LayoutNetIO>(panelName, mOverlay, mFont);
+    }
+    return nullptr;
 }
 
 bool
@@ -226,9 +349,11 @@ Display::stdBakeOverlayRgb888(const DisplayInfo& info,
     }
     {
         mOverlay->drawBoxClear();
+        mOverlay->drawVLineClear();
         mOverlay->drawStrClear();
         drawOverlay(info);
         mOverlay->drawBoxFlush(mDoParallel);
+        mOverlay->drawVLineFlush(mDoParallel);
         mOverlay->drawStrFlush(mDoParallel);
     }
     if (mTimingProfile) mDrawStrTime.set(mRecTime.end() - sectionStartTime);
@@ -244,10 +369,14 @@ Display::stdBakeOverlayRgb888(const DisplayInfo& info,
 void
 Display::drawOverlay(const DisplayInfo& info)
 {
-    if (!mCurrLayout) {
-        setupLayout();
+    if (!mRootPanelTable) {
+        setupRootPanelTable();
     }
-    if (mCurrLayout) mCurrLayout->drawMain(info);
+
+    PanelShPtr currPanel = mPanelTableStack.getCurrentPanel();
+    if (currPanel) {
+        currPanel->getLayout()->drawMain(info);
+    }
 }
 
 void
@@ -334,37 +463,29 @@ Display::clearBgArchive()
     }
 }
 
-void
-Display::switchLayoutToNextOnTheList()
+bool
+Display::findPanelTest(const std::string& panelName) const
 {
-    if (!mCurrLayout) return; // current layout is empty
-    if (mLayoutMap.empty()) return; // empty
+    std::shared_ptr<const PanelTable> currPanelTable {nullptr};
+    std::shared_ptr<const Panel> currPanel {nullptr};
 
-    auto itr = mLayoutMap.find(mCurrLayout->getName());
-    if (itr == mLayoutMap.end()) return; // can not find item
+    if (!mRootPanelTable) return false;
 
-    ++itr;
-    if (itr == mLayoutMap.end()) {
-        itr = mLayoutMap.begin();
-    }
-    mCurrLayout = itr->second;
-}
-
-void
-Display::switchLayoutByName(const std::string& name,
-                            const std::function<void(const std::string& msg)> msgOut)
-{
-    auto itr = mLayoutMap.find(name);
-    if (itr == mLayoutMap.end()) {
-        // can not find
-        if (msgOut) {
-            std::ostringstream ostr;
-            ostr << "Can not find layout. name:" << name;
-            msgOut(ostr.str());
+    std::stringstream sstr { panelName };
+    std::string currPanelName;
+    while (getline(sstr, currPanelName, '/')) {
+        if (!currPanel) {
+            currPanelTable = mRootPanelTable;
+        } else {
+            currPanelTable = currPanel->getChildPanelTable();
         }
-    } else {
-        mCurrLayout = itr->second;
+        int currId = currPanelTable->findPanel(currPanelName);
+        if (currId < 0) {
+            return false; // could not find currPanel
+        }
+        currPanel = currPanelTable->getPanel(static_cast<size_t>(currId));
     }
+    return true;
 }
 
 void
@@ -386,7 +507,7 @@ Display::parserConfigure()
         if (arg() == "show") arg++;
         else {
             std::string key = (arg++)();
-                 if (key == "small" ) { align = Align::SMALL; }
+            if (key == "small" ) { align = Align::SMALL; }
             else if (key == "middle") { align = Align::MIDDLE; }
             else if (key == "big"   ) { align = Align::BIG; }
             // else align is unchanged
@@ -411,26 +532,19 @@ Display::parserConfigure()
                     if (!mOverlay) return arg.msg("mOverlay is empty\n");
                     return mOverlay->getParser().main(arg.childArg()); 
                 });
-    mParser.opt("layout", "...command...", "current layout command",
+    mParser.opt("findPanelTest", "<panelName>", "test for findPanelTest()",
+                [&](Arg& arg) { return arg.msg(showFindPanelTest((arg++)()) + '\n'); });
+    mParser.opt("switchPanelByName", "<panelName>", "switch current panel by name",
                 [&](Arg& arg) {
-                    if (!mCurrLayout) return arg.msg("current layout is empty\n");
-                    return mCurrLayout->getParser().main(arg.childArg());
+                    if (!switchPanelByName((arg++)())) return arg.msg("error\n");
+                    else return arg.msg("OK\n");
                 });
-    mParser.opt("layoutNameList", "", "list of all available layout name",
-                [&](Arg& arg) { return arg.msg(showLayoutNameList() + '\n'); });
-    mParser.opt("layoutNext", "", "switch layout to the next",
-                [&](Arg& arg) {
-                    switchLayoutToNextOnTheList();
-                    return arg.msg(showCurrentLayoutName() + '\n');
-                });
-    mParser.opt("layoutName", "<name|show>", "set layout by name",
-                [&](Arg& arg) {
-                    if (arg() == "show") arg++;
-                    else {
-                        switchLayoutByName((arg++)(), [&](const std::string& msg) { arg.msg(msg + '\n'); });
-                    }
-                    return arg.msg(showCurrentLayoutName() + '\n');
-                });
+    mParser.opt("showCurrentPanelName", "", "show current panel name",
+                [&](Arg& arg) { return arg.msg(showCurrentPanelName() + '\n'); });
+    mParser.opt("showAllPanelName", "", "show all panel name",
+                [&](Arg& arg) { return arg.msg(showAllPanelName() + '\n'); });
+    mParser.opt("stack", "...command...", "panel table stack command",
+                [&](Arg& arg) { return mPanelTableStack.getParser().main(arg.childArg()); });
     mParser.opt("testMode", "<on|off|show>", "set testmode",
                 [&](Arg& arg) { return setFlag(arg, mTestMode, "telemetryTestMode"); });
     mParser.opt("testMsg", "<x> <y> <string> <r0255> <g0255> <b0255>", "set testmode info",
@@ -501,35 +615,6 @@ Display::showAlign(Align align) const
 }
 
 std::string
-Display::showLayoutNameList() const
-{
-    auto maxNameLen = [&]() {
-        size_t maxLen = 0;
-        for (const auto& itr : mLayoutMap) {
-            if (itr.first.size() > maxLen) maxLen = itr.first.size();
-        }
-        return maxLen;
-    };
-
-    int w = maxNameLen();
-
-    std::ostringstream ostr;
-    ostr << "layout (total:" << mLayoutMap.size() << ") {\n";
-    for (const auto& itr : mLayoutMap) {
-        ostr << "  " << std::setw(w) << itr.first
-             << ((itr.second.get() == mCurrLayout.get()) ? " <== current\n" : "\n");
-    }
-    ostr << "}";
-    return ostr.str();
-}
-
-std::string
-Display::showCurrentLayoutName() const
-{
-    return (mCurrLayout) ? mCurrLayout->getName() : "current layout is empty";
-}
-
-std::string
 Display::showTimingProfile() const
 {
     auto showPct = [](float fraction) {
@@ -560,6 +645,37 @@ Display::showTimingProfile() const
          << "  FinalizeRgb888:" << secStr(finalizeRgb888) << " (" << showPct(finalizeRgb888Fraction) << ")\n"
          << "           Total:" << secStr(all) << '\n'
          << "}";
+    return ostr.str();
+}
+
+std::string
+Display::showFindPanelTest(const std::string& panelName) const
+{
+    std::ostringstream ostr;
+    ostr << "findPanelTest(panelName:" << panelName << "):"
+         << scene_rdl2::str_util::boolStr(findPanelTest(panelName));
+    return ostr.str();
+}
+
+std::string
+Display::showCurrentPanelName() const
+{
+    std::ostringstream ostr;
+    ostr << "currentPanelName:" << mPanelTableStack.getCurrentPanelName();
+    return ostr.str();
+}
+
+std::string
+Display::showAllPanelName() const
+{
+    std::vector<std::string> panelNameList = getAllPanelName();
+
+    std::ostringstream ostr;
+    ostr << "panelName list (size:" << panelNameList.size() << ") {\n";
+    for (size_t i = 0; i < panelNameList.size(); ++i) {
+        ostr << "  " << panelNameList[i] << '\n';
+    }
+    ostr << "}";
     return ostr.str();
 }
 

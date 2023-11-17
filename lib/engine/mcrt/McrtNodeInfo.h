@@ -12,6 +12,8 @@
 
 namespace mcrt_dataio {
 
+class ValueTimeTracker;
+
 class McrtNodeInfo
 //
 // This class is used to keep backend progmcrt engine's node information.
@@ -30,11 +32,12 @@ public:
     using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
     using RenderPrepStats = scene_rdl2::grid_util::RenderPrepStats;
+    using ValueTimeTrackerShPtr = std::shared_ptr<ValueTimeTracker>;
 
     enum class NodeStat : int { IDLE, RENDER_PREP_RUN, RENDER_PREP_CANCEL, MCRT };
     enum class ExecMode : int { SCALAR, VECTOR, XPU, AUTO, UNKNOWN };
 
-    McrtNodeInfo(bool decodeOnly);
+    McrtNodeInfo(bool decodeOnly, float valueKeepDurationSec);
 
     InfoCodec& getInfoCodec() { return mInfoCodec; }
 
@@ -93,7 +96,7 @@ public:
     float getCpuUsage() const { return mCpuUsage; } // fraction
     std::vector<float> getCoreUsage() const { return mCoreUsage; } // fraction
     size_t getMemTotal() const { return mMemTotal; }
-    float getMemUsage() const { return mMemUsage; }
+    float getMemUsage() const { return mMemUsage; } // fraction
     ExecMode getExecMode() const { return static_cast<ExecMode>(mExecMode); }
     float getSnapshotToSend() const { return mSnapshotToSend; } // millisec
     float getNetRecvBps() const { return mNetRecvBps; } // byte/sec
@@ -124,6 +127,9 @@ public:
     float getProgress() const { return mProgress; }
     float getGlobalProgress() const { return mGlobalProgress; }
 
+    ValueTimeTrackerShPtr getNetRecvVtt() const { return mNetRecvVtt; }
+    ValueTimeTrackerShPtr getNetSendVtt() const { return mNetSendVtt; }
+
     std::string deqGenericComment(); // MTsafe
 
     void flushEncodeData(); // MTsafe
@@ -142,8 +148,9 @@ public:
     Parser& getParser() { return mParser; }
 
 private:
-    void parserConfigure();
+    void setupValueTimeTrackerMemory();
 
+    void parserConfigure();
     void resetCoreUsage();
 
     std::string showTimeLog() const;
@@ -159,6 +166,8 @@ private:
 
     //------------------------------
 
+    float mValueKeepDurationSec {0.0f};
+
     std::string mHostName;
     int mMachineId {0};
 
@@ -173,6 +182,9 @@ private:
     float mNetRecvBps {0.0f};      // recv network bandwidth byte/sec (regarding entire host)
     float mNetSendBps {0.0f};      // send network bandwidth byte/sec (regarding entire host)
     float mSendBps {0.0f};         // outgoing message bandwidth Byte/Sec (only from mcrt_computation)
+
+    ValueTimeTrackerShPtr mNetRecvVtt;
+    ValueTimeTrackerShPtr mNetSendVtt;
 
     bool mFeedbackActive {false};   // feedback condition
     float mFeedbackInterval {0.0f}; // feedback interval : sec

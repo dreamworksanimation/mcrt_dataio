@@ -16,11 +16,14 @@ target_sources(${component}
         ClientReceiverFb.cc
         ClientReceiverStats.cc
 	TelemetryDisplay.cc
-	TelemetryLayout.cc
+	TelemetryLayoutBase.cc
 	TelemetryLayoutCorePerf.cc
 	TelemetryLayoutDevel.cc
-	TelemetryLayoutUtil.cc
+	TelemetryLayoutFeedback.cc
+	TelemetryLayoutNetIO.cc
+	TelemetryLayoutPanel.cc
 	TelemetryOverlay.cc
+	TelemetryPanel.cc
         TimingAnalysis.cc
         TimingRecorderHydra.cc
 )

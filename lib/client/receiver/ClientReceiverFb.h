@@ -61,12 +61,27 @@ public:
         UNKNOWN = -3
     };
 
-    ClientReceiverFb();
+    ClientReceiverFb(bool initialTelemetryOverlayCondition = false);
     ~ClientReceiverFb();
 
     /// This class is Non-copyable
     ClientReceiverFb& operator = (const ClientReceiverFb&) = delete;
     ClientReceiverFb(const ClientReceiverFb&) = delete;
+
+    /// @brief Set client message for telemetry overlay
+    /// @param msg Client message itself
+    ///
+    /// @detail
+    /// You can set client messages for telemetry overlay. Some telemetry panels can show this message.
+    /// You can update client messages multiple times at any time. This message is only used for telemetry
+    /// overlay so far.
+    void setClientMessage(const std::string& msg);
+
+    /// @brief Clear client message for telemetry overlay
+    ///
+    /// @detail
+    /// Clear current client message for telemetry overlay
+    void clearClientMessage();
 
     //------------------------------
 
@@ -1237,12 +1252,58 @@ public:
     /// You can get the current telemetry overlay display condition by this API.
     bool getTelemetryOverlayActive() const;
 
-    /// @brief switch telemetry overlay layout to the next
+    /// @brief Get all telemetry panel name
+    /// @return return all telemetry panel name.
     ///
     /// @detail
-    /// ClientReceiverFb has multiple different versions of the telemetry overlay layout and this API
-    /// switches the current overlay layout to the next one.
-    void switchTelemetryLayoutNext();
+    /// You can get all telemetry panel names as string vector.
+    std::vector<std::string> getAllTelemetryPanelName();
+
+    /// @brief Set the initial telemetry panel name
+    /// @param panelName telemetry panel name
+    ///
+    /// @detail
+    /// You can set the initial telemetry panel name that is shown if the telemetry overlay is turned on
+    /// the first time. This panel is set to the current telemetry panel.
+    /// If you don't set the initial panel name, the default is "devel".
+    void setTelemetryInitialPanel(const std::string& panelName);
+
+    /// @brief Switch the current telemetry panel by name
+    /// @param panelName telemetry panelname
+    ///
+    /// @detail
+    /// ClientReceiverFb has multiple telemetry panels inside. After finishing the initial telemetry overlay,
+    /// you can change the telemetry panel by name. This panel is set to the current telemetry panel.
+    /// This API only works after the initial telemetry overlay has been displayed.
+    void switchTelemetryPanelByName(const std::string& panelName);
+
+    /// @brief Switch telemetry panel to the next
+    ///
+    /// @detail
+    /// ClientReceiverFb has multiple different versions of the telemetry panels and this API
+    /// switches the current overlay panel to the next one in the panel table.
+    void switchTelemetryPanelToNext();
+
+    /// @brief Switch telemetry panel to the previous
+    ///
+    /// @detail
+    /// ClientReceiverFb has multiple different versions of the telemetry panels and this API
+    /// switches the current overlay panel to the previous one in the panel table.
+    void switchTelemetryPanelToPrev();
+
+    /// @brief Switch the current telemetry panel to the parent if the current panel has parent
+    ///
+    /// @detail
+    /// The telemetry panel table can be constructed as tree structures. We can change the current
+    /// displayed panel to the parent if the current panel has the parent.
+    void switchTelemetryPanelToParent();
+
+    /// @brief Switch the current telemetry panel to the child if the current panel has a child
+    ///
+    /// @detail
+    /// The telemetry panel table can be constructed as tree structures. We can change the current
+    /// displayed panel to the child if the current panel has the child.
+    void switchTelemetryPanelToChild();
 
 protected:
     class Impl;

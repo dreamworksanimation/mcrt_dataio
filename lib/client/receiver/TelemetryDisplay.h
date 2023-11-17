@@ -4,6 +4,7 @@
 
 #include "TelemetryLayout.h"
 #include "TelemetryOverlay.h"
+#include "TelemetryPanel.h"
 
 #include <mcrt_dataio/engine/merger/GlobalNodeInfo.h>
 #include <mcrt_dataio/share/util/FloatValueTracker.h>
@@ -23,11 +24,14 @@ public:
     unsigned mOverlayWidth {0};
     unsigned mOverlayHeight {0};
 
+    const std::string* mClientMessage {nullptr};
+
     unsigned mImageWidth {0};
     unsigned mImageHeight {0};
 
     size_t mViewId {0};
     uint32_t mFrameId {0};
+    float mElapsedSecFromStart {0.0f}; // sec
     mcrt::BaseFrame::Status mStatus {mcrt::BaseFrame::FINISHED};
     float mRenderPrepProgress {0.0f};
     float mProgress {0.0f};
@@ -61,15 +65,32 @@ public:
                            const DisplayInfo& info,
                            bool bakeWithPrevArchive);
 
-    void switchLayoutNext() { switchLayoutToNextOnTheList(); }
+    std::vector<std::string> getAllPanelName();
+    void setTelemetryInitialPanel(const std::string& panelName);
+    bool switchPanelByName(const std::string& panelName);
+    void switchPanelToNext();
+    void switchPanelToPrev();
+    void switchPanelToParent();
+    void switchPanelToChild();
 
     Parser& getParser() { return mParser; }
 
     std::string show() const;
 
 private:
+    using FontShPtr = std::shared_ptr<Font>;
+    using LayoutBaseShPtr = std::shared_ptr<LayoutBase>;
+    using OverlayShPtr = std::shared_ptr<Overlay>;
+    using PanelShPtr = std::shared_ptr<Panel>;
+    using PanelTableShPtr = std::shared_ptr<PanelTable>;
 
-    void setupLayout();
+    void setupRootPanelTable();
+    PanelShPtr genPanel(const std::string& panelName,
+                        const std::string& layoutName,
+                        const std::string& setupOptions) const;
+    LayoutBaseShPtr genLayout(const std::string& panelName,
+                              const std::string& layoutName) const;
+
     bool setupFont();
     bool setupTestFont();
     unsigned calcFontSize() const;
@@ -94,17 +115,17 @@ private:
     void copyArchive(std::vector<unsigned char>& rgbFrame) const;
     void clearBgArchive();
 
-    void switchLayoutByName(const std::string& name,
-                            const std::function<void(const std::string& msg)>);
-    void switchLayoutToNextOnTheList();
+    bool findPanelTest(const std::string& panelName) const;
 
     void parserConfigure();
 
     std::string showTestInfo() const;
     std::string showAlign(Align align) const;
-    std::string showLayoutNameList() const;
     std::string showCurrentLayoutName() const;
     std::string showTimingProfile() const;
+    std::string showFindPanelTest(const std::string& panelName) const;
+    std::string showCurrentPanelName() const;
+    std::string showAllPanelName() const;
     void resetTimingProfile();
 
     //------------------------------
@@ -117,8 +138,8 @@ private:
     unsigned mOverwriteWidth {0}; // telemetry overlay size overwrite value
     unsigned mOverwriteHeight {0}; // telemetry overlay size overwrite value
 
-    std::shared_ptr<Overlay> mOverlay;
-    std::shared_ptr<Font> mFont;
+    OverlayShPtr mOverlay;
+    FontShPtr mFont;
 
     std::vector<unsigned char> mBgArchive; // initially empty
 
@@ -127,8 +148,9 @@ private:
     //
     // overlay data layout
     //
-    std::shared_ptr<LayoutBase> mCurrLayout;
-    std::unordered_map<std::string, std::shared_ptr<LayoutBase>> mLayoutMap;
+    std::string mInitialPanelName;
+    PanelTableShPtr mRootPanelTable {nullptr};
+    PanelTableStack mPanelTableStack;
 
     //
     // test parameters

@@ -3,6 +3,8 @@
 #include "TelemetryLayout.h"
 #include "TelemetryOverlay.h"
 
+#include <mcrt_dataio/engine/merger/GlobalNodeInfo.h>
+#include <mcrt_dataio/share/util/ValueTimeTracker.h>
 #include <scene_rdl2/common/math/Math.h>
 
 #include <algorithm> // clamp
@@ -12,8 +14,9 @@
 namespace mcrt_dataio {
 namespace telemetry {
 
-LayoutBase::LayoutBase(std::shared_ptr<Overlay> overlay, std::shared_ptr<Font> font)
-    : mOverlay(overlay)
+LayoutBase::LayoutBase(const std::string& name, OverlayShPtr overlay, FontShPtr font)
+    : mName(name)
+    , mOverlay(overlay)
     , mFont(font)
 {
     mMaxYLines = mOverlay->getMaxYLines(*mFont, mOffsetBottomPixY, mStepPixY);
@@ -107,7 +110,16 @@ LayoutBase::strMillisec(float millisec) const
 }
 
 std::string
-LayoutBase::strByte(size_t numByte) const
+LayoutBase::strByte(size_t numByte, size_t minOutStrLen) const
+//
+// minOutStrLen : minimum output string length
+//
+// This API creates a string of at least minOutStrLen size.
+// If the output string is less than minOutStrLen, space padding is added at the front of the string.
+// If the output string is more than minOutStrLen, just return the string.
+// All the functionality of auto padding logic is canceled when minOutStrLen is 0.
+// And just returns a string without any padding.
+//
 {
     C3 fgC {0,255,255};
     C3 bgC {0,0,0};
@@ -128,14 +140,28 @@ LayoutBase::strByte(size_t numByte) const
         ostr << colFg(fgC) << colBg(bgC)
              << std::setw(3) << std::fixed << std::setprecision(2) << f << colReset() << "GB";
     }
+
+    if (minOutStrLen == 0) {
+        return ostr.str();
+    }
+
+    std::string msg = ostr.str();
+    size_t msgLen = Overlay::msgDisplayLen(msg);
+    if (msgLen >= minOutStrLen) {
+        return msg; // clear minimum output string length. just return string without padding
+    }
+
+    // The output string is too short. Adding padding
+    ostr.str("");
+    ostr << std::setw(minOutStrLen - msgLen + msg.size()) << msg;
     return ostr.str();
 }
 
 std::string
-LayoutBase::strBps(float bps) const
+LayoutBase::strBps(float bps, size_t minOutStrLen) const
 {
     size_t byte = static_cast<size_t>(bps);
-    return strByte(byte) + "/s";
+    return strByte(byte, (minOutStrLen > 2) ? minOutStrLen - 2 : 0) + "/s";
 }
 
 std::string
@@ -226,6 +252,14 @@ LayoutBase::strBool(bool flag) const
 }
 
 std::string
+LayoutBase::strSimpleHostName(const std::string& hostName) const
+{
+    size_t p = hostName.find('.');
+    if (p == std::string::npos) return hostName;
+    return hostName.substr(0, p);
+}
+
+std::string
 LayoutBase::strFrameStatus(const mcrt::BaseFrame::Status& status, const float renderPrepProgress) const
 {
     std::ostringstream ostr;
@@ -279,16 +313,20 @@ LayoutBase::strExecMode(const McrtNodeInfo::ExecMode& execMode) const
 }
 
 void
-LayoutBase::drawBoxBar(unsigned barLeftBottomX,
-                       unsigned barLeftBottomY,
-                       unsigned barStartOffsetPixX,
-                       unsigned barEndOffsetPixX,
-                       unsigned barHeight,
-                       float fraction,
-                       const C3& c,
-                       unsigned char alpha)
+LayoutBase::drawHBoxBar(unsigned barLeftBottomX,
+                        unsigned barLeftBottomY,
+                        unsigned barStartOffsetPixX,
+                        unsigned barEndOffsetPixX,
+                        unsigned barHeight,
+                        float fraction,
+                        const C3& c,
+                        unsigned char alpha)
+//
+// draw horizontal box bar
+//
 {
     if (fraction <= 0.0f) return;
+    if (barEndOffsetPixX < barStartOffsetPixX) return;
 
     float currFraction = fraction;
     if (currFraction > 1.0f) currFraction = 1.0f;
@@ -305,6 +343,240 @@ LayoutBase::drawBoxBar(unsigned barLeftBottomX,
     Overlay::BBox2i bbox {scene_rdl2::math::Vec2i {xMin, yMin}, scene_rdl2::math::Vec2i {xMax, yMax}};
 
     mOverlay->drawBoxBar(bbox, c, alpha);
+}
+
+void
+LayoutBase::drawHBoxBar2Sections(unsigned barLeftBottomX,
+                                 unsigned barLeftBottomY,
+                                 unsigned barStartOffsetPixX,
+                                 unsigned barEndOffsetPixX,
+                                 unsigned barHeight,
+                                 float fractionA,
+                                 const C3& cA,
+                                 unsigned char alphaA,
+                                 float fractionB,
+                                 const C3& cB,
+                                 unsigned char alphaB)
+//
+// draw horizontal box bar that consists of 2 consecutive sections
+//
+{
+    if (fractionA <= 0.0f && fractionB <= 0.0f) return;
+
+    auto calcBBox = [&](float minFraction, float maxFraction) {
+        auto clamp01 = [](float v) { return (v > 1.0f) ? 1.0f : ((v < 0.0f) ? 0.0f : v); };
+
+        unsigned barWidth = barEndOffsetPixX - barStartOffsetPixX + 1;
+        unsigned barStartX = barLeftBottomX + barStartOffsetPixX;
+        int minOffset = barWidth * clamp01(minFraction);
+        int maxOffset = barWidth * clamp01(maxFraction);
+
+        int yOffset = barHeight * mFont->getBgYAdjustScale();
+        int ySubTarget = 3;
+        int ySub = (barHeight > ySubTarget * 2) ? ySubTarget : 0;
+
+        int xMin = barStartX + minOffset;
+        int yMin = barLeftBottomY - yOffset + ySub;
+        int xMax = barStartX + maxOffset - 1;
+        int yMax = barLeftBottomY + barHeight - ySub;
+        return Overlay::BBox2i {scene_rdl2::math::Vec2i {xMin, yMin}, scene_rdl2::math::Vec2i {xMax, yMax}};
+    };
+
+    if (fractionA > 0.0f) mOverlay->drawBoxBar(calcBBox(0.0f, fractionA), cA, alphaA);
+    if (fractionB > 0.0f && fractionA < fractionB) {
+        mOverlay->drawBoxBar(calcBBox(fractionA, fractionB), cB, alphaB);
+    }
+}
+
+void
+LayoutBase::drawHBarWithTitle(unsigned barLeftBottomX, unsigned barLeftBottomY, unsigned barWidth,
+                              const std::string& title,
+                              float fraction,
+                              bool usageMode)
+{
+    float x = barLeftBottomX;
+    float y = barLeftBottomY;
+
+    unsigned barStartOffsetPixX;
+    unsigned barEndOffsetPixX;
+    unsigned barHeight;
+    std::string barStr = strBar(barWidth,
+                                getFontStepX(),
+                                title,
+                                fraction,
+                                usageMode,
+                                &barStartOffsetPixX,
+                                &barEndOffsetPixX,
+                                &barHeight);
+    if (!mOverlay->drawStr(*mFont, x, y, barStr, {255,255,255}, mError)) {
+        std::cerr << ">> TelemetryLayout.cc drawHBarWithTitle() failed. " << mError << '\n';
+    }
+    unsigned strItemId = mOverlay->getDrawStrItemTotal() - 1;
+
+    if (usageMode || fraction < 1.0f) {
+        C3 cBar {255,255,0};
+        C3 cRed {255,0,0};
+        unsigned char cBarAlpha = 90;
+        drawHBoxBar(x, y, barStartOffsetPixX, barEndOffsetPixX, barHeight, fraction,
+                    ((fraction < 0.9f) ? cBar : cRed), cBarAlpha);
+    }
+}
+
+void
+LayoutBase::drawHBar2SectionsWithTitle(unsigned barLeftBottomX, unsigned barLeftBottomY, unsigned barWidth,
+                                       const std::string& title,
+                                       float fractionA,
+                                       float fractionB,
+                                       bool usageMode)
+{
+    float x = barLeftBottomX;
+    float y = barLeftBottomY;
+
+    unsigned barStartOffsetPixX;
+    unsigned barEndOffsetPixX;
+    unsigned barHeight;
+    std::string barStr = strBar(barWidth,
+                                getFontStepX(),
+                                title,
+                                fractionA,
+                                usageMode,
+                                &barStartOffsetPixX,
+                                &barEndOffsetPixX,
+                                &barHeight);
+    if (!mOverlay->drawStr(*mFont, x, y, barStr, {255,255,255}, mError)) {
+        std::cerr << ">> TelemetryLayout.cc drawHBar2SectionsWithTitle() failed. " << mError << '\n';
+    }
+    unsigned strItemId = mOverlay->getDrawStrItemTotal() - 1;
+
+    if (usageMode || fractionA < 1.0f) {
+        C3 cBarA {255,255,0};
+        C3 cMaxA {255,0,0};
+        C3 cBarB {170,200,220}; // light blue
+        C3 cMaxB {255,255,255};
+        unsigned char cBarAlpha = 128;
+        drawHBoxBar2Sections(x, y, barStartOffsetPixX, barEndOffsetPixX, barHeight,
+                             fractionA, ((fractionA < 0.9f) ? cBarA : cMaxA), cBarAlpha,
+                             fractionB, ((fractionB < 0.9f) ? cBarB : cMaxB), cBarAlpha);
+    }
+}
+
+void
+LayoutBase::drawVLine(unsigned x, unsigned yMin, unsigned yMax,
+                      const C3& c, unsigned char alpha)
+{
+    mOverlay->drawVLine(x, yMin, yMax, c, alpha);
+}
+
+void
+LayoutBase::drawVBarGraph(unsigned leftBottomX,
+                          unsigned leftBottomY,
+                          unsigned rightTopX,
+                          unsigned rightTopY,
+                          unsigned rulerYSize,
+                          const ValueTimeTracker& vtt,
+                          const C3& c, unsigned char alpha,
+                          float graphTopY, // auto adjust display Y range if this value 0 or negative
+                          float& maxValue,
+                          float& currValue)
+{
+    constexpr unsigned rulerYGap = 1;
+
+    unsigned width = rightTopX - leftBottomX + 1;
+    unsigned height = rightTopY - leftBottomY + 1;
+
+    //
+    // resample value
+    //
+    std::vector<float> tbl;
+    float residualSec = vtt.getResampleValue(width, tbl, &maxValue);
+    currValue = tbl.back();
+
+    //
+    // bar graph
+    //
+    float yMax = (graphTopY <= 0.0f) ? maxValue : graphTopY;
+    auto calcRatio = [&](float v) { return v / yMax; };
+    unsigned barHeight = height - rulerYSize - rulerYGap;
+    unsigned barMinY = leftBottomY;
+    for (unsigned x = leftBottomX; x <= rightTopX; ++x) {
+        size_t id = x - leftBottomX;
+        float ratio = calcRatio(tbl[id]);
+        if (ratio > 1.0f) {
+            // clip bar and change color to white
+            unsigned y = barHeight + leftBottomY;
+            drawVLine(x, barMinY, y, {200,200,200}, alpha);
+        } else {
+            unsigned y = static_cast<unsigned>(barHeight * ratio) + leftBottomY;
+            drawVLine(x, barMinY, y, c, alpha);
+        }
+    }
+
+    //
+    // ruler : 1.0 sec interval
+    //
+    unsigned rulerMinY = rightTopY - rulerYSize;
+    unsigned rulerMaxY = rightTopY;
+    C3 cSecBound {255, 255, 255};
+    unsigned char alphaSecBound = 255;
+
+    float durationSec = vtt.getValueKeepDurationSec();
+    float stepSec = durationSec / static_cast<float>(width);
+    float currPlotSec = residualSec;
+    while (currPlotSec <= durationSec) {
+        unsigned offsetX = static_cast<unsigned>(currPlotSec / stepSec);
+        drawVLine(rightTopX - offsetX, rulerMinY, rulerMaxY, cSecBound, alphaSecBound);
+        currPlotSec += 1.0f;
+    }
+}
+
+void
+LayoutBase::drawBpsVBarGraphWithTitle(unsigned leftBottomX,
+                                      unsigned leftBottomY,
+                                      unsigned rightTopX,
+                                      unsigned rightTopY,
+                                      unsigned rulerYSize,
+                                      const ValueTimeTracker& vtt,
+                                      const C3& c,
+                                      unsigned char alpha,
+                                      float graphTopY, // auto adjust Y if this value is 0 or negative
+                                      const std::string& title)
+{
+    unsigned width = rightTopX - leftBottomX + 1;
+    unsigned height = rightTopY - leftBottomY + 1;
+
+    float maxValue, currVal;
+    drawVBarGraph(leftBottomX, leftBottomY, rightTopX, rightTopY, rulerYSize,
+                  vtt,
+                  c,
+                  alpha,
+                  graphTopY,
+                  maxValue, currVal);
+
+    std::ostringstream ostr;
+    ostr << colReset()
+         << title
+         << ' ' << strBps(currVal, 10)
+         << " peak:" << strBps(maxValue, 10);
+
+    unsigned infoX = leftBottomX;
+    unsigned infoY = rightTopY - mStepPixY - rulerYSize;
+    if (!mOverlay->drawStr(*mFont, infoX, infoY, ostr.str(), mCharFg, mError)) {
+        std::cerr << ">> TelemetryLayout.cc drawBpsVBarGraphWithTitle() drawStr() failed. " << mError << '\n';
+    }
+}
+
+unsigned
+LayoutBase::calcMaxSimpleMcrtHostNameLen(const GlobalNodeInfo* gNodeInfo) const
+{
+    if (!gNodeInfo) return static_cast<unsigned>(0);
+
+    unsigned maxSimpleSize = 0;
+    gNodeInfo->crawlAllMcrtNodeInfo([&](std::shared_ptr<McrtNodeInfo> node) {
+            unsigned simpleSize = static_cast<unsigned>(strSimpleHostName(node->getHostName()).size());
+            if (maxSimpleSize < simpleSize) maxSimpleSize = simpleSize;
+            return true;
+        });
+    return maxSimpleSize;
 }
 
 std::string

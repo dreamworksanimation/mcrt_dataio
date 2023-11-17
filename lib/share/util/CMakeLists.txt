@@ -17,6 +17,7 @@ target_sources(${component}
         FpsTracker.cc
         MiscUtil.cc
         SysUsage.cc
+	ValueTimeTracker.cc
 )
 
 set_property(TARGET ${component}
@@ -27,6 +28,7 @@ set_property(TARGET ${component}
         FpsTracker.h
         MiscUtil.h
         SysUsage.h
+	ValueTimeTracker.h
 )
 
 target_include_directories(${component}

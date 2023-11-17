@@ -99,6 +99,8 @@ class Font
 //
 {
 public:
+    using FontCacheItemShPtr = std::shared_ptr<FontCacheItem>;
+
     Font(const std::string& fontTTFFileName, int fontSizePoint)
         : mFontTTFFileName(fontTTFFileName)
         , mFontSizePoint(fontSizePoint)
@@ -111,7 +113,7 @@ public:
     int getFontSizePoint() const { return mFontSizePoint; }
     const FT_Face& getFace() const { return mFace; }
 
-    std::shared_ptr<FontCacheItem> getFontCacheItem(char c);
+    FontCacheItemShPtr getFontCacheItem(char c);
 
     float getBgYAdjustScale() const { return mBgYAdjustScale; }
 
@@ -132,7 +134,7 @@ private:
 
     float mBgYAdjustScale {0.0f};
 
-    std::unordered_map<unsigned, std::shared_ptr<FontCacheItem>> mFontCacheMap;
+    std::unordered_map<unsigned, FontCacheItemShPtr> mFontCacheMap;
 };
 
 //------------------------------------------------------------------------------------------
@@ -144,9 +146,11 @@ class OverlayCharItem
 //            
 {
 public:
+    using FontCacheItemShPtr = std::shared_ptr<FontCacheItem>;
+
     OverlayCharItem() = default;
 
-    void set(std::shared_ptr<FontCacheItem> fontCacheItem,
+    void set(FontCacheItemShPtr fontCacheItem,
              const FT_Vector& fontPos,
              unsigned fontHeight,
              float bgYAdjustScale,
@@ -166,7 +170,7 @@ public:
 
     unsigned getAdvanceX() const { return mFontCacheItem->getAdvanceX(); }
 
-    std::shared_ptr<FontCacheItem> getFontCacheItem() const { return mFontCacheItem; }
+    FontCacheItemShPtr getFontCacheItem() const { return mFontCacheItem; }
 
     unsigned getBaseX() const { return Font::ftPosToi(mFontBasePos.x); }
     unsigned getBaseY() const { return Font::ftPosToi(mFontBasePos.y); }
@@ -193,7 +197,7 @@ public:
     std::string show(unsigned winHeight = 0) const;
 
 private:
-    std::shared_ptr<FontCacheItem> mFontCacheItem {nullptr};
+    FontCacheItemShPtr mFontCacheItem {nullptr};
 
     //   FreeType coordinate : Fixed point position value and Y flip
     //      -----> +X 
@@ -233,6 +237,8 @@ class OverlayStrItem
 //
 {
 public:
+    using OverlayCharItemShPtr = std::shared_ptr<OverlayCharItem>;
+
     OverlayStrItem() = default;
 
     void resetCharItemArray(Overlay& overlay);
@@ -242,7 +248,7 @@ public:
              const unsigned startX, const unsigned startY, const unsigned overlayHeight,
              const std::string& str, const C3& c3);
 
-    void setupAllCharItems(std::vector<std::shared_ptr<OverlayCharItem>>& outCharItemArray);
+    void setupAllCharItems(std::vector<OverlayCharItemShPtr>& outCharItemArray);
 
     unsigned getFirstCharStepX() const; // return first char's stepX
 
@@ -264,7 +270,7 @@ private:
     unsigned mStartY {0};
     unsigned mOverlayHeight {0};
 
-    std::vector<std::shared_ptr<OverlayCharItem>> mCharItemArray;
+    std::vector<OverlayCharItemShPtr> mCharItemArray;
 };
 
 class OverlayBoxItem
@@ -291,12 +297,42 @@ private:
     unsigned char mAlpha {0};
 };
 
+class OverlayVLineItem
+{
+public:
+    OverlayVLineItem() = default;
+
+    void set(unsigned x, unsigned minY, unsigned maxY, const C3& c, unsigned char alpha)
+    {
+        mX = x;
+        mMinY = minY;
+        mMaxY = maxY;
+        mC = c;
+        mAlpha = alpha;
+    }
+
+    unsigned getX() const { return mX; }
+    unsigned getMinY() const { return mMinY; }
+    unsigned getMaxY() const { return mMaxY; }
+    const C3& getC() const { return mC; }
+    unsigned char getAlpha() const { return mAlpha; }
+
+private:
+    unsigned mX {0};
+    unsigned mMinY {0};
+    unsigned mMaxY {0};
+
+    C3 mC {0, 0, 0};
+    unsigned char mAlpha {0};
+};
+
 class Overlay
 {
 public:
     using Arg = scene_rdl2::grid_util::Arg;
-    using Parser = scene_rdl2::grid_util::Parser;
     using BBox2i = scene_rdl2::math::BBox2i;
+    using OverlayCharItemShPtr = std::shared_ptr<OverlayCharItem>;
+    using Parser = scene_rdl2::grid_util::Parser;
 
     enum class Align {
         SMALL,  // left or bottom
@@ -315,7 +351,9 @@ public:
 
     inline void resize(const unsigned width, const unsigned height); // no clear internally just change size
     void clear(const C3& c3, const unsigned char alpha, bool doParallel);
-    void boxFill(const C3& c3, const unsigned char alpha, const BBox2i& bbox, bool doParallel);
+    void boxFill(const BBox2i& bbox, const C3& c3, const unsigned char alpha, bool doParallel);
+    void vLine(const unsigned x, const unsigned minY, const unsigned maxY,
+               const C3& c3, const unsigned char alpha); // no parallel option
     void fill(unsigned char r, unsigned char g, unsigned char b, unsigned char a); // for debug
 
     unsigned getWidth() const { return mWidth; }
@@ -323,8 +361,8 @@ public:
 
     unsigned getMaxYLines(const Font& font, unsigned& offsetBottomPixY, unsigned& stepPixY) const;
 
-    std::shared_ptr<OverlayCharItem> getNewOverlayCharItem() { return getMemOverlayCharItem(); }
-    void restoreOverlayCharItemMem(std::shared_ptr<OverlayCharItem> ptr) { setMemOverlayCharItem(ptr); }
+    OverlayCharItemShPtr getNewOverlayCharItem() { return getMemOverlayCharItem(); }
+    void restoreOverlayCharItemMem(OverlayCharItemShPtr ptr) { setMemOverlayCharItem(ptr); }
 
     void drawStrClear();
     bool drawStr(Font& font,
@@ -336,9 +374,14 @@ public:
     void drawStrFlush(bool doParallel);
 
     void drawBoxClear();
-    void drawBox(const BBox2i box, const C3& c3, const unsigned char alpha);
-    void drawBoxBar(const BBox2i box, const C3& c3, const unsigned char alpha);
+    void drawBox(const BBox2i box, const C3& c3, const unsigned char alpha); // push into mDrawBoxArray
+    void drawBoxBar(const BBox2i box, const C3& c3, const unsigned char alpha); // push into mDrawBoxBarArray
     void drawBoxFlush(bool doParallel);
+
+    void drawVLineClear();
+    void drawVLine(const unsigned x, const unsigned minY, const unsigned maxY,
+                   const C3& c3, const unsigned char alpha);
+    void drawVLineFlush(bool doParallel);
 
     // available after first call of drawStr. (only works properly monospace font)
     unsigned getFontStepX() const { return mFontStepX; }
@@ -363,6 +406,10 @@ public:
     static size_t msgDisplayWidth(const std::string& msg); // skip escape sequence and return max width
 
 private:
+    using OverlayBoxItemShPtr = std::shared_ptr<OverlayBoxItem>;
+    using OverlayStrItemShPtr = std::shared_ptr<OverlayStrItem>;
+    using OverlayVLineItemShPtr = std::shared_ptr<OverlayVLineItem>;
+
     inline unsigned getPixOffset(const unsigned x, const unsigned y) const;
     inline unsigned getPixDataOffset(const unsigned x, const unsigned y) const;
     inline unsigned char* getPixDataAddr(const unsigned x, const unsigned y);
@@ -376,7 +423,7 @@ private:
     inline void setCol4(const C3& inC3, unsigned char inAlpha, unsigned char* outPix) const;
     inline void setCol3(const C3& inC3, unsigned char* outPix) const;
 
-    void overlayDrawFontCache(std::shared_ptr<OverlayCharItem> charItem);
+    void overlayDrawFontCache(OverlayCharItemShPtr charItem);
 
     inline void resizeRgb888(std::vector<unsigned char>& rgbFrame, unsigned width, unsigned height) const;
     inline void clearRgb888(std::vector<unsigned char>& rgbFrame) const;
@@ -401,28 +448,33 @@ private:
                                  const unsigned pixX,
                                  const unsigned pixY) const; // for debug
 
-    std::shared_ptr<OverlayStrItem> getMemOverlayStrItem();
-    void setMemOverlayStrItem(std::shared_ptr<OverlayStrItem> ptr);
-    std::shared_ptr<OverlayCharItem> getMemOverlayCharItem();
-    void setMemOverlayCharItem(std::shared_ptr<OverlayCharItem> ptr);
-    std::shared_ptr<OverlayBoxItem> getMemOverlayBoxItem();
-    void setMemOverlayBoxItem(std::shared_ptr<OverlayBoxItem> ptr);
+    OverlayStrItemShPtr getMemOverlayStrItem();
+    void setMemOverlayStrItem(OverlayStrItemShPtr ptr);
+    OverlayCharItemShPtr getMemOverlayCharItem();
+    void setMemOverlayCharItem(OverlayCharItemShPtr ptr);
+    OverlayBoxItemShPtr getMemOverlayBoxItem();
+    void setMemOverlayBoxItem(OverlayBoxItemShPtr ptr);
+    OverlayVLineItemShPtr getMemOverlayVLineItem();
+    void setMemOverlayVLineItem(OverlayVLineItemShPtr ptr);
 
     void parserConfigure();
     std::string showMemPoolSize() const;
 
     //------------------------------
 
-    std::vector<std::shared_ptr<OverlayStrItem>> mDrawStrArray;
-    std::vector<std::shared_ptr<OverlayBoxItem>> mDrawBoxArray;
-    std::vector<std::shared_ptr<OverlayBoxItem>> mDrawBoxBarArray;
+    std::vector<OverlayStrItemShPtr> mDrawStrArray;
+    std::vector<OverlayBoxItemShPtr> mDrawBoxArray;
+    std::vector<OverlayBoxItemShPtr> mDrawBoxBarArray;
+    std::vector<OverlayVLineItemShPtr> mDrawVLineArray;
 
     unsigned mMaxOverlayStrItemMemPool {0};
     unsigned mMaxOverlayCharItemMemPool {0};
     unsigned mMaxOverlayBoxItemMemPool {0};
-    std::deque<std::shared_ptr<OverlayStrItem>> mOverlayStrItemMemPool;
-    std::deque<std::shared_ptr<OverlayCharItem>> mOverlayCharItemMemPool;
-    std::deque<std::shared_ptr<OverlayBoxItem>> mOverlayBoxItemMemPool;
+    unsigned mMaxOverlayVLineItemMemPool {0};
+    std::deque<OverlayStrItemShPtr> mOverlayStrItemMemPool;
+    std::deque<OverlayCharItemShPtr> mOverlayCharItemMemPool;
+    std::deque<OverlayBoxItemShPtr> mOverlayBoxItemMemPool;
+    std::deque<OverlayVLineItemShPtr> mOverlayVLineItemMemPool;
 
     unsigned mFontStepX {0};
 
@@ -430,7 +482,7 @@ private:
     unsigned mHeight {0};
     std::vector<unsigned char> mPixelsRGBA;
 
-    Parser mParser;    
+    Parser mParser;
 };
 
 inline void

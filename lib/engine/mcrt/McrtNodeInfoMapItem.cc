@@ -1,15 +1,13 @@
 // Copyright 2023 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
-//
-//
 #include "McrtNodeInfoMapItem.h"
 
 namespace mcrt_dataio {
 
-McrtNodeInfoMapItem::McrtNodeInfoMapItem() :
-    mMcrtNodeInfo(false), // decodeOnly = false
-    mInfoCodec("globalNodeInfo", false) // decodeOnly = false
+McrtNodeInfoMapItem::McrtNodeInfoMapItem()
+    : mMcrtNodeInfo(/* decodeOnly = */ false,
+                    /* valueKeepDurationSec = */ 0.0f)
+    , mInfoCodec("globalNodeInfo", false) // decodeOnly = false
 {
 }
 
@@ -24,4 +22,3 @@ McrtNodeInfoMapItem::encode(std::string &outputData)
 }
 
 } // namespace mcrt_dataio
-

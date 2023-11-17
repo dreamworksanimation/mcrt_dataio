@@ -75,7 +75,7 @@ FontCacheItem::FontCacheItem(const char c,
 
 //------------------------------------------------------------------------------------------
 
-std::shared_ptr<FontCacheItem>
+Font::FontCacheItemShPtr
 Font::getFontCacheItem(char c)
 {
     unsigned glyphIndex = FT_Get_Char_Index(mFace, c);
@@ -92,11 +92,11 @@ Font::getFontCacheItem(char c)
             return nullptr;
         }
 
-        std::shared_ptr<FontCacheItem> shPtr = std::make_shared<FontCacheItem>(c,
-                                                                               mFace->glyph->bitmap,
-                                                                               mFace->glyph->bitmap_left,
-                                                                               mFace->glyph->bitmap_top,
-                                                                               mFace->glyph->advance.x);
+        FontCacheItemShPtr shPtr = std::make_shared<FontCacheItem>(c,
+                                                                   mFace->glyph->bitmap,
+                                                                   mFace->glyph->bitmap_left,
+                                                                   mFace->glyph->bitmap_top,
+                                                                   mFace->glyph->advance.x);
 
         mFontCacheMap[glyphIndex] = shPtr;
         return shPtr;
@@ -287,7 +287,7 @@ OverlayStrItem::set(Overlay& overlay,
 }
 
 void
-OverlayStrItem::setupAllCharItems(std::vector<std::shared_ptr<OverlayCharItem>>& outCacheItemArray)
+OverlayStrItem::setupAllCharItems(std::vector<OverlayCharItemShPtr>& outCacheItemArray)
 {
     for (size_t i = 0; i < mCharItemArray.size(); ++i) {
         if (mCharItemArray[i]) {
@@ -324,7 +324,7 @@ OverlayStrItem::entryNewCharItem(Overlay& overlay,
     std::shared_ptr<FontCacheItem> fontCacheItem = font.getFontCacheItem(c);
     if (!fontCacheItem) return false;
 
-    std::shared_ptr<OverlayCharItem> overlayCharItem = overlay.getNewOverlayCharItem();
+    OverlayCharItemShPtr overlayCharItem = overlay.getNewOverlayCharItem();
     overlayCharItem->set(fontCacheItem,
                          fontPos, // FreeType coordinate pos
                          font.getFontSizePoint(),
@@ -363,7 +363,7 @@ Overlay::clear(const C3& c3, const unsigned char alpha, bool doParallel)
 }
 
 void
-Overlay::boxFill(const C3& c3, const unsigned char alpha, const BBox2i& bbox, bool doParallel)
+Overlay::boxFill(const BBox2i& bbox, const C3& c3, const unsigned char alpha, bool doParallel)
 {
     if (!doParallel) {
         for (unsigned y = bbox.lower.y; y <= bbox.upper.y; ++y) {
@@ -384,6 +384,18 @@ Overlay::boxFill(const C3& c3, const unsigned char alpha, const BBox2i& bbox, bo
                     }
                 }
             });
+    }
+}
+
+void
+Overlay::vLine(const unsigned x, const unsigned minY, const unsigned maxY,
+               const C3& c3, const unsigned char alpha)
+{
+    unsigned char *ptr = getPixDataAddr(x, minY);
+    int offset = mWidth * 4;
+    for (unsigned y = minY; y <= maxY; ++y) {
+        setCol4(c3, alpha, ptr);
+        ptr += offset;
     }
 }
 
@@ -430,7 +442,7 @@ Overlay::drawStr(Font& font,
                  std::string& error)
 {
     try {
-        std::shared_ptr<OverlayStrItem> item = getMemOverlayStrItem();
+        OverlayStrItemShPtr item = getMemOverlayStrItem();
         item->set(*this, font, startX, startY, mHeight, str, c3);
         mDrawStrArray.push_back(item);
         mFontStepX = item->getFirstCharStepX();
@@ -449,7 +461,7 @@ Overlay::drawStr(Font& font,
 void
 Overlay::drawStrFlush(bool doParallel)
 {
-    std::vector<std::shared_ptr<OverlayCharItem>> charItemArray;
+    std::vector<OverlayCharItemShPtr> charItemArray;
     for (size_t i = 0; i < mDrawStrArray.size(); ++i) {
         mDrawStrArray[i]->setupAllCharItems(charItemArray);
     }
@@ -491,7 +503,7 @@ Overlay::drawBox(const BBox2i box,
                  const C3& c3,
                  const unsigned char alpha)
 {
-    std::shared_ptr<OverlayBoxItem> item = getMemOverlayBoxItem();
+    OverlayBoxItemShPtr item = getMemOverlayBoxItem();
     item->set(box, c3, alpha);
     mDrawBoxArray.push_back(item);
 }
@@ -501,7 +513,7 @@ Overlay::drawBoxBar(const BBox2i box,
                     const C3& c3,
                     const unsigned char alpha)
 {
-    std::shared_ptr<OverlayBoxItem> item = getMemOverlayBoxItem();
+    OverlayBoxItemShPtr item = getMemOverlayBoxItem();
     item->set(box, c3, alpha);
     mDrawBoxBarArray.push_back(item);
 }
@@ -509,21 +521,21 @@ Overlay::drawBoxBar(const BBox2i box,
 void    
 Overlay::drawBoxFlush(bool doParallel)
 {
-    auto drawBoxArray = [&](std::vector<std::shared_ptr<OverlayBoxItem>>& boxArray) {
+    auto drawBoxArray = [&](std::vector<OverlayBoxItemShPtr>& boxArray) {
         if (!doParallel) {
             for (size_t id = 0; id < boxArray.size(); ++id) {
-                boxFill(boxArray[id]->getC(),
+                boxFill(boxArray[id]->getBBox(),
+                        boxArray[id]->getC(),
                         boxArray[id]->getAlpha(),
-                        boxArray[id]->getBBox(),
                         false);
             }
         } else {
             tbb::blocked_range<size_t> range(0, boxArray.size(), 1);
             tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
                     for (size_t id = range.begin(); id < range.end(); ++id) {
-                        boxFill(boxArray[id]->getC(),
+                        boxFill(boxArray[id]->getBBox(),
+                                boxArray[id]->getC(),
                                 boxArray[id]->getAlpha(),
-                                boxArray[id]->getBBox(),
                                 true);
                     }
                 });
@@ -532,6 +544,57 @@ Overlay::drawBoxFlush(bool doParallel)
 
     drawBoxArray(mDrawBoxArray);
     drawBoxArray(mDrawBoxBarArray);
+}
+
+void
+Overlay::drawVLineClear()
+{
+    for (auto itr : mDrawVLineArray) {
+        setMemOverlayVLineItem(itr);
+    }
+
+    if (mOverlayVLineItemMemPool.size() > mMaxOverlayVLineItemMemPool) {
+        mMaxOverlayVLineItemMemPool = mOverlayVLineItemMemPool.size();
+    }
+
+    mDrawVLineArray.clear();
+}
+
+void
+Overlay::drawVLine(const unsigned x,
+                   const unsigned minY,
+                   const unsigned maxY,
+                   const C3& c3,
+                   const unsigned char alpha)
+{
+    OverlayVLineItemShPtr item = getMemOverlayVLineItem();
+    item->set(x, minY, maxY, c3, alpha);
+    mDrawVLineArray.push_back(item);
+}
+
+void
+Overlay::drawVLineFlush(bool doParallel)
+{
+    if (!doParallel) {
+        for (size_t id = 0; id < mDrawVLineArray.size(); ++id) {
+            vLine(mDrawVLineArray[id]->getX(),
+                  mDrawVLineArray[id]->getMinY(),
+                  mDrawVLineArray[id]->getMaxY(),
+                  mDrawVLineArray[id]->getC(),
+                  mDrawVLineArray[id]->getAlpha());
+        }
+    } else {
+        tbb::blocked_range<size_t> range(0, mDrawVLineArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+                for (size_t id = range.begin(); id < range.end(); ++id) {
+                    vLine(mDrawVLineArray[id]->getX(),
+                          mDrawVLineArray[id]->getMinY(),
+                          mDrawVLineArray[id]->getMaxY(),
+                          mDrawVLineArray[id]->getC(),
+                          mDrawVLineArray[id]->getAlpha());
+                }
+            });
+    }
 }
 
 Overlay::BBox2i
@@ -648,7 +711,7 @@ Overlay::msgDisplayWidth(const std::string& msg)
 //------------------------------------------------------------------------------------------
 
 void
-Overlay::overlayDrawFontCache(const std::shared_ptr<OverlayCharItem> charItem)
+Overlay::overlayDrawFontCache(const OverlayCharItemShPtr charItem)
 {
     auto flipY = [&](unsigned freeTypeY) {
         return mHeight - 1 - freeTypeY;
@@ -826,20 +889,20 @@ Overlay::showPixFrameRGBA(const std::vector<unsigned char>& frameRGBA,
     return ostr.str();
 }
 
-std::shared_ptr<OverlayStrItem>
+Overlay::OverlayStrItemShPtr
 Overlay::getMemOverlayStrItem()
 {
     if (mOverlayStrItemMemPool.empty()) {
         return std::make_shared<OverlayStrItem>();
     }
 
-    std::shared_ptr<OverlayStrItem> overlayStrItem = mOverlayStrItemMemPool.front();
+    OverlayStrItemShPtr overlayStrItem = mOverlayStrItemMemPool.front();
     mOverlayStrItemMemPool.pop_front();
     return overlayStrItem;
 }
 
 void
-Overlay::setMemOverlayStrItem(std::shared_ptr<OverlayStrItem> ptr)
+Overlay::setMemOverlayStrItem(OverlayStrItemShPtr ptr)
 {
     ptr->resetCharItemArray(*this);
 #   ifdef ENABLE_MEMPOOL
@@ -849,20 +912,20 @@ Overlay::setMemOverlayStrItem(std::shared_ptr<OverlayStrItem> ptr)
 #   endif // end !ENABLE_MEMPOOL
 }
 
-std::shared_ptr<OverlayCharItem>
+Overlay::OverlayCharItemShPtr
 Overlay::getMemOverlayCharItem()
 {
     if (mOverlayCharItemMemPool.empty()) {
         return std::make_shared<OverlayCharItem>();
     }
 
-    std::shared_ptr<OverlayCharItem> overlayCharItem = mOverlayCharItemMemPool.front();
+    OverlayCharItemShPtr overlayCharItem = mOverlayCharItemMemPool.front();
     mOverlayCharItemMemPool.pop_front();
     return overlayCharItem;
 }
 
 void
-Overlay::setMemOverlayCharItem(std::shared_ptr<OverlayCharItem> ptr)
+Overlay::setMemOverlayCharItem(OverlayCharItemShPtr ptr)
 {
 #   ifdef ENABLE_MEMPOOL
     mOverlayCharItemMemPool.push_front(ptr);
@@ -871,23 +934,45 @@ Overlay::setMemOverlayCharItem(std::shared_ptr<OverlayCharItem> ptr)
 #   endif // end !ENABLE_MEMPOOL
 }
 
-std::shared_ptr<OverlayBoxItem>
+Overlay::OverlayBoxItemShPtr
 Overlay::getMemOverlayBoxItem()
 {
     if (mOverlayBoxItemMemPool.empty()) {
         return std::make_shared<OverlayBoxItem>();
     }
 
-    std::shared_ptr<OverlayBoxItem> overlayBoxItem = mOverlayBoxItemMemPool.front();
+    OverlayBoxItemShPtr overlayBoxItem = mOverlayBoxItemMemPool.front();
     mOverlayBoxItemMemPool.pop_front();
     return overlayBoxItem;
 }
 
 void
-Overlay::setMemOverlayBoxItem(std::shared_ptr<OverlayBoxItem> ptr)
+Overlay::setMemOverlayBoxItem(OverlayBoxItemShPtr ptr)
 {
 #   ifdef ENABLE_MEMPOOL
     mOverlayBoxItemMemPool.push_front(ptr);
+#   else // else ENABLE_MEMPOOL    
+    ptr.reset();
+#   endif // end !ENABLE_MEMPOOL
+}
+
+Overlay::OverlayVLineItemShPtr
+Overlay::getMemOverlayVLineItem()
+{
+    if (mOverlayVLineItemMemPool.empty()) {
+        return std::make_shared<OverlayVLineItem>();
+    }
+
+    OverlayVLineItemShPtr overlayVLineItem = mOverlayVLineItemMemPool.front();
+    mOverlayVLineItemMemPool.pop_front();
+    return overlayVLineItem;
+}
+
+void
+Overlay::setMemOverlayVLineItem(OverlayVLineItemShPtr ptr)
+{
+#   ifdef ENABLE_MEMPOOL
+    mOverlayVLineItemMemPool.push_front(ptr);
 #   else // else ENABLE_MEMPOOL    
     ptr.reset();
 #   endif // end !ENABLE_MEMPOOL
@@ -908,6 +993,7 @@ Overlay::showMemPoolSize() const
     size_t strItemSize = mMaxOverlayStrItemMemPool * sizeof(OverlayStrItem);
     size_t charItemSize = mMaxOverlayCharItemMemPool * sizeof(OverlayCharItem);
     size_t boxItemSize = mMaxOverlayBoxItemMemPool * sizeof(OverlayBoxItem);
+    size_t vLineItemSize = mMaxOverlayVLineItemMemPool * sizeof(OverlayVLineItem);
 
     using scene_rdl2::str_util::byteStr;
 
@@ -916,6 +1002,7 @@ Overlay::showMemPoolSize() const
          << "  mMaxOverlayStrItemMemPool:" << mMaxOverlayStrItemMemPool << " (" << byteStr(strItemSize) << ")\n"
          << "  mMaxOverlayCharItemMemPool:" << mMaxOverlayCharItemMemPool << " (" << byteStr(charItemSize) << ")\n"
          << "  mMaxOverlayBoxItemMemPool:" << mMaxOverlayBoxItemMemPool << " (" << byteStr(boxItemSize) << ")\n"
+         << "  mMaxOverlayVLineItemMemPool:" << mMaxOverlayVLineItemMemPool << " (" << byteStr(vLineItemSize) << ")\n"
          << "}";
     return ostr.str();
 }

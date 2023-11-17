@@ -11,11 +11,14 @@
 #include <scene_rdl2/common/grid_util/Parser.h>
 
 #include <functional>
+#include <memory> // shared_ptr
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace mcrt_dataio {
+
+class ValueTimeTracker;
 
 class GlobalNodeInfo
 //
@@ -34,8 +37,9 @@ public:
     using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
     using NodeStat = McrtNodeInfo::NodeStat;
+    using ValueTimeTrackerShPtr = std::shared_ptr<ValueTimeTracker>;
 
-    GlobalNodeInfo(bool decodeOnly, MsgSendHandlerShPtr msgSendHandler);
+    GlobalNodeInfo(bool decodeOnly, float valueKeepDurationSec, MsgSendHandlerShPtr msgSendHandler);
 
     void reset();
 
@@ -44,8 +48,25 @@ public:
     void setClientHostName(const std::string& hostName); // MTsafe
     void setClientClockTimeShift(const float ms); // MTsafe : millisec
     void setClientRoundTripTime(const float ms); // MTsafe : millisec
+    void setClientCpuTotal(const int total); // MTsafe
+    void setClientCpuUsage(const float fraction); // MTsafe fraction 0.0~1.0
+    void setClientMemTotal(const size_t size); // MTsafe byte
+    void setClientMemUsage(const float fraction); // MTsafe fraction 0.0~1.0
+    void setClientNetRecvBps(const float bytesPerSec); // MTsafe Byte/Sec
+    void setClientNetSendBps(const float bytesPerSec); // MTsafe Byte/Sec
+
+    const std::string& getClientHostName() const { return mClientHostName; }
     float getClientClockTimeShift() const { return mClientClockTimeShift; } // millisec
-    
+    int getClientCpuTotal() const { return mClientCpuTotal; }
+    float getClientCpuUsage() const { return mClientCpuUsage; } // fraction
+    size_t getClientMemTotal() const { return mClientMemTotal; } // byte
+    float getClientMemUsage() const { return mClientMemUsage; } // fraction
+    float getClientNetRecvBps() const { return mClientNetRecvBps; } // byte/sec
+    float getClientNetSendBps() const { return mClientNetSendBps; } // byte/sec
+
+    ValueTimeTrackerShPtr getClientNetRecvVtt() const { return mClientNetRecvVtt; }
+    ValueTimeTrackerShPtr getClientNetSendVtt() const { return mClientNetSendVtt; }
+
     //------------------------------
     
     void setDispatchHostName(const std::string& hostName); // MTsafe
@@ -59,7 +80,9 @@ public:
     void setMergeHostName(const std::string& hostName); // MTsafe
     void setMergeClockDeltaSvrPort(const int port); // MTsafe
     void setMergeClockDeltaSvrPath(const std::string& path); // MTsafe : unix-domain ipc path
+    void setMergeMcrtTotal(const int total); // MTsafe
     void setMergeCpuTotal(const int total); // MTsafe
+    void setMergeAssignedCpuTotal(const int total); // MTsafe
     void setMergeCpuUsage(const float fraction); // MTsafe fraction 0.0~1.0
     void setMergeCoreUsage(const std::vector<float>& fractions); // MTsafe fraction 0.0~1.0
     void setMergeMemTotal(const size_t size); // MTsafe byte
@@ -79,11 +102,13 @@ public:
     const std::string& getMergeHostName() const { return mMergeHostName; }
     int getMergeClockDeltaSvrPort() const { return mMergeClockDeltaSvrPort; }
     const std::string& getMergeClockDeltaSvrPath() const { return mMergeClockDeltaSvrPath; }
+    int getMergeMcrtTotal() const { return mMergeMcrtTotal; }
     int getMergeCpuTotal() const { return mMergeCpuTotal; }
+    int getMergeAssignedCpuTotal() const { return mMergeAssignedCpuTotal; }
     float getMergeCpuUsage() const { return mMergeCpuUsage; } // fraction
     std::vector<float> getMergeCoreUsage() const { return mMergeCoreUsage; } // fraction    
-    size_t getMergeMemTotal() const { return mMergeMemTotal; }
-    float getMergeMemUsage() const { return mMergeMemUsage; }
+    size_t getMergeMemTotal() const { return mMergeMemTotal; } // byte
+    float getMergeMemUsage() const { return mMergeMemUsage; } // fraction
     float getMergeNetRecvBps() const { return mMergeNetRecvBps; } // byte/sec
     float getMergeNetSendBps() const { return mMergeNetSendBps; } // byte/sec
     float getMergeRecvBps() const { return mMergeRecvBps; }
@@ -96,6 +121,9 @@ public:
     float getMergeSendFeedbackFps() const { return mMergeSendFeedbackFps; } // fps
     float getMergeSendFeedbackBps() const { return mMergeSendFeedbackBps; } // Byte/Sec
 
+    ValueTimeTrackerShPtr getMergeNetRecvVtt() const { return mMergeNetRecvVtt; }
+    ValueTimeTrackerShPtr getMergeNetSendVtt() const { return mMergeNetSendVtt; }
+
     //------------------------------
 
     size_t getMcrtTotal() const { return mMcrtNodeInfoMap.size(); }
@@ -103,6 +131,7 @@ public:
     bool isMcrtAllStop() const;
     bool isMcrtAllStart() const;
     bool isMcrtAllRenderPrepCompletedOrCanceled() const;
+    size_t getMaxMcrtHostName() const; // max name len of all mcrt host name
     bool crawlAllMcrtNodeInfo(std::function<bool(McrtNodeInfoShPtr)> func) const;
     bool accessMcrtNodeInfo(int mcrtId, std::function<bool(McrtNodeInfoShPtr)> func) const;
 
@@ -135,6 +164,9 @@ public:
     Parser& getParser() { return mParser; }
 
 private:
+
+    float mValueKeepDurationSec {0.0f};
+
     //------------------------------
     //
     // client information
@@ -142,6 +174,15 @@ private:
     std::string mClientHostName;
     float mClientClockTimeShift {0.0f}; // millisec
     float mClientRoundTripTime {0.0f};  // millisec
+    int mClientCpuTotal {0};            // CPU core total
+    float mClientCpuUsage {0.0f};       // fraction 0.0~1.0
+    size_t mClientMemTotal {0};          // memory total byte
+    float mClientMemUsage {0.0f};       // fraction 0.0~1.0
+    float mClientNetRecvBps {0.0f};     // recv network bandwidth byte/sec
+    float mClientNetSendBps {0.0f};     // send network bandwidth byte/sec
+
+    ValueTimeTrackerShPtr mClientNetRecvVtt;
+    ValueTimeTrackerShPtr mClientNetSendVtt;
 
     //------------------------------
     //
@@ -158,7 +199,9 @@ private:
     std::string mMergeHostName;
     int mMergeClockDeltaSvrPort {0};
     std::string mMergeClockDeltaSvrPath; // unix-domain ipc path
+    int mMergeMcrtTotal {0};             // initial mcrtTotal count for merge computation
     int mMergeCpuTotal {0};              // CPU core total
+    int mMergeAssignedCpuTotal {0};      // assigned CPU core total
     float mMergeCpuUsage {0.0f};         // fraction 0.0~1.0
     std::vector<float> mMergeCoreUsage;  // fraction 0.0~1.0    
     size_t mMergeMemTotal {0};           // memory total byte
@@ -178,6 +221,9 @@ private:
     std::mutex mMergeGenericCommentMutex;
     std::string mMergeGenericComment; // merge computation's generic comment data for any purpose
 
+    ValueTimeTrackerShPtr mMergeNetRecvVtt;
+    ValueTimeTrackerShPtr mMergeNetSendVtt;
+
     //------------------------------
     //
     // mcrt computation information
@@ -192,6 +238,8 @@ private:
     Parser mParser;
 
     //------------------------------
+
+    void setupValueTimeTrackerMemory();
 
     void sendClockDeltaClientMainToMcrt(const int machineId);
     void sendClockOffsetToMcrt(McrtNodeInfoShPtr nodeInfo);

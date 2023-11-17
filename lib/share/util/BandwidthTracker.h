@@ -47,8 +47,8 @@ class BandwidthTracker
 //
 {
 public:
-    BandwidthTracker(float keepIntervalSec) :
-        mKeepIntervalSec(keepIntervalSec)
+    BandwidthTracker(float keepIntervalSec)
+        : mKeepIntervalSec(keepIntervalSec)
     {}
 
     void setKeepIntervalSec(float sec) { mKeepIntervalSec = sec; }
@@ -71,7 +71,7 @@ private:
     size_t getMaxSize() const;
     size_t getDataSizeWhole() const;
     double getDeltaSecWhole() const;
-    static double getDeltaSec(const uint64_t currTIme, const uint64_t oldTime); // both microSec
+    static double getDeltaSec(const uint64_t currTime, const uint64_t oldTime); // both microSec
 };
 
 } // namespace mcrt_dataio

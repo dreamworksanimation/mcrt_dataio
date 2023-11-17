@@ -308,7 +308,7 @@ PanelTableStack::currentPanelToPrev() const
 }
 
 bool
-PanelTableStack::currentPanelToParent() const
+PanelTableStack::currentPanelToParent()
 {
     if (mStack.empty()) return false;
     if (mStack.size() == 1) return false; // stack is one level. can not move to parent
@@ -317,7 +317,7 @@ PanelTableStack::currentPanelToParent() const
 }
 
 bool
-PanelTableStack::currentPanelToChild() const
+PanelTableStack::currentPanelToChild()
 {
     if (mStack.empty()) return false;
     PanelShPtr currPanel = getCurrentPanel();

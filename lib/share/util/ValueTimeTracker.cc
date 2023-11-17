@@ -98,7 +98,7 @@ ValueTimeTracker::getResampleValue(size_t totalResampleCount,
 
     double timeStepSec = static_cast<double>(mValueKeepDurationSec) / static_cast<double>(totalResampleCount);
 
-    const auto& rValItr = mEventList.crbegin(); // reverse const iterator
+    auto rValItr = mEventList.rbegin(); // reverse iterator
     float prevVal = 0.0f;
     uint64_t prevValTimeStamp = 0;
 
@@ -119,13 +119,13 @@ ValueTimeTracker::getResampleValue(size_t totalResampleCount,
         auto incrementCurr = [&](float currVal, uint64_t currValTimeStamp) {
             prevVal = currVal;
             prevValTimeStamp = currValTimeStamp;
-            if (rValItr == mEventList.crend()) return false; // end of list.
+            if (rValItr == mEventList.rend()) return false; // end of list.
             ++rValItr;
             return true;
         };
         auto max = [](uint64_t a, uint64_t b) { return (a < b) ? b : a; };
 
-        if (rValItr == mEventList.crend()) {
+        if (rValItr == mEventList.rend()) {
             return prevVal;
         }
 
@@ -195,8 +195,8 @@ ValueTimeTracker::getResampleValueExhaust(size_t totalResampleCount, std::vector
     }
     std::memset(&outValTbl[0], 0x0, outValTbl.size() * sizeof(float)); // set all 0.0f
 
-    if (mEventList.empty()) return 0.0f;
-    if (!totalResampleCount) return 0.0f;
+    if (mEventList.empty()) return;
+    if (!totalResampleCount) return;
 
     double timeStepSec = static_cast<double>(mValueKeepDurationSec) / static_cast<double>(totalResampleCount);
 
@@ -229,7 +229,7 @@ ValueTimeTracker::getResampleValueExhaust(size_t totalResampleCount, std::vector
             if (currValTimeStamp < startTimeStamp) return currVal;
             return static_cast<float>(currVal * calcWeight(endTimeStamp - currValTimeStamp));
         } else {
-            const auto& currValItr = mEventList.begin();
+            auto currValItr = mEventList.begin();
             float valTotal = 0.0f;
             while (true) {
                 uint64_t currValTimeStamp = (*currValItr)->getTimeStamp();
@@ -383,7 +383,7 @@ ValueTimeTracker::showEventListReverse() const
     std::ostringstream ostr;
     ostr << "mEventList reverse list (size:" << mEventList.size() << ") {\n";
     size_t id = mEventList.size() - 1;
-    for (const auto& rItr = mEventList.crbegin() ; rItr != mEventList.crend(); ++rItr) {
+    for (auto rItr = mEventList.rbegin() ; rItr != mEventList.rend(); ++rItr) {
         ostr << "  id:" << std::setw(w) << id << ' ' << (*rItr)->show2(baseTimeStamp) << '\n';        
         --id;
     }

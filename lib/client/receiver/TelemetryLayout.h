@@ -192,7 +192,7 @@ protected:
     void subPanelGlobalInfo(unsigned x,
                             unsigned y,
                             const DisplayInfo& info,
-                            Overlay::BBox2i& bbox) const;
+                            Overlay::BBox2i& bbox);
 
     // Global progress bar
     void subPanelGlobalProgressBar(unsigned barLeftBottomX,

@@ -666,7 +666,7 @@ Display::showCurrentPanelName() const
 }
 
 std::string
-Display::showAllPanelName() const
+Display::showAllPanelName()
 {
     std::vector<std::string> panelNameList = getAllPanelName();
 

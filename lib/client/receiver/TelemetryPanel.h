@@ -128,8 +128,8 @@ public:
     PanelShPtr getCurrentPanel() const;
     bool currentPanelToNext() const;
     bool currentPanelToPrev() const;
-    bool currentPanelToParent() const;
-    bool currentPanelToChild() const;
+    bool currentPanelToParent();
+    bool currentPanelToChild();
     
     std::string getCurrentPanelName() const;
 

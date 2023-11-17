@@ -39,7 +39,7 @@ LayoutPanel::subPanelMessage(unsigned x, unsigned y, const std::string& str, Ove
 }
 
 void
-LayoutPanel::subPanelGlobalInfo(unsigned x, unsigned y, const DisplayInfo& info, Overlay::BBox2i& bbox) const
+LayoutPanel::subPanelGlobalInfo(unsigned x, unsigned y, const DisplayInfo& info, Overlay::BBox2i& bbox)
 {
     std::ostringstream ostr;
     ostr << colReset()

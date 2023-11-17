@@ -125,7 +125,7 @@ private:
     std::string showTimingProfile() const;
     std::string showFindPanelTest(const std::string& panelName) const;
     std::string showCurrentPanelName() const;
-    std::string showAllPanelName() const;
+    std::string showAllPanelName();
     void resetTimingProfile();
 
     //------------------------------

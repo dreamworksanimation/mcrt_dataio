@@ -1,5 +1,7 @@
-// copyright 2023 DreamWorks Animation LLC
+// Copyright 2024 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
+
+// copyright 2023 DreamWorks Animation LLC
 #include "FbMsgMultiChans.h"
 #include "GlobalNodeInfo.h"
 #include "MergeActionTracker.h"

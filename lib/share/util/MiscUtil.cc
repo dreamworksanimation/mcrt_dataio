@@ -13,6 +13,14 @@
 #include <sys/time.h>           // gettimeofday()
 #include <unistd.h>             // gethostname()
 
+#ifndef HOST_NAME_MAX
+# ifdef _POSIX_HOST_NAME_MAX
+#  define HOST_NAME_MAX _POSIX_HOST_NAME_MAX
+# else
+#  define HOST_NAME_MAX 255
+# endif
+#endif
+
 namespace mcrt_dataio {
 
 // static function    
@@ -38,7 +46,7 @@ MiscUtil::timeFromEpochStr(const uint64_t microsecFromEpoch)
 {
     struct timeval tv;
     tv.tv_sec = (long)(microsecFromEpoch / 1000 / 1000);
-    tv.tv_usec = (long)(microsecFromEpoch - (uint64_t)(tv.tv_sec * 1000 * 1000));
+    tv.tv_usec = (int)(microsecFromEpoch - (uint64_t)(tv.tv_sec * 1000 * 1000));
     return timeFromEpochStr(tv);
 }
 
@@ -72,7 +80,7 @@ MiscUtil::currentTimeStr()
 
     struct timeval tv;
     tv.tv_sec = (long)(microsecFromEpoch / 1000 / 1000);
-    tv.tv_usec = (long)(microsecFromEpoch - (uint64_t)(tv.tv_sec * 1000 * 1000));
+    tv.tv_usec = (int)(microsecFromEpoch - (uint64_t)(tv.tv_sec * 1000 * 1000));
 
     struct tm *time_st = localtime(&tv.tv_sec);
 

@@ -8,13 +8,15 @@ add_executable(${target})
 target_sources(${target}
     PRIVATE
         main.cc
-	TestValueTimeTracker.cc
+        TestValueTimeTracker.cc
 )
 
+find_package(ZLIB REQUIRED)
 target_link_libraries(${target}
     PRIVATE
         SceneRdl2::pdevunit
         McrtDataio::client_receiver
+        ZLIB::ZLIB
 )
 
 # Set standard compile/link options
@@ -24,4 +26,7 @@ McrtDataio_cxx_compile_options(${target})
 McrtDataio_link_options(${target})
 
 add_test(NAME ${target} COMMAND ${target})
-set_tests_properties(${target} PROPERTIES LABELS "unit")
+set_tests_properties(${target} PROPERTIES
+    LABELS "unit"
+    WORKING_DIRECTORY $<TARGET_FILE_DIR:${target}>
+)

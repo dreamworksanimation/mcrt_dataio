@@ -71,9 +71,12 @@ McrtDataio_cxx_compile_features(${component})
 McrtDataio_cxx_compile_options(${component})
 McrtDataio_link_options(${component})
 
-if (MOONRAY_USE_CUDA)
+if(MOONRAY_USE_OPTIX)
     target_compile_definitions(${component}
-        PRIVATE MOONRAY_USE_CUDA)
+        PRIVATE MOONRAY_USE_OPTIX)
+elseif(MOONRAY_USE_METAL)
+    target_compile_definitions(${component}
+        PRIVATE MOONRAY_USE_METAL)
 endif()
 
 # -------------------------------------

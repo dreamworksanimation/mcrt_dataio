@@ -3,7 +3,7 @@
 
 cmake_minimum_required (VERSION 3.23.1)
 
-include(packageVersion)  # Sets versionString, projectString and PACKAGE_NAME
+include(OMR_PackageVersion)  # Sets versionString, projectString and PACKAGE_NAME
 project(${projectString}
     VERSION ${versionString}
     LANGUAGES CXX
@@ -13,6 +13,8 @@ string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
 list(APPEND CMAKE_MESSAGE_CONTEXT ${PROJECT_NAME})
 list (APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
+include(OMR_Platform)
+
 if(CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
     include(CTest)
 endif()
@@ -20,10 +22,13 @@ endif()
 # ================================================
 # Options
 # ================================================
-option(${PROJECT_NAME_UPPER}_BUILD_TESTING
-    "Whether or not to build the unittests" YES)
-option(MOONRAY_USE_CUDA
-    "Whether to use CUDA (and Optix) - Enables XPU mode and Optix denoising" YES)
+option(${PROJECT_NAME_UPPER}_BUILD_TESTING "Whether or not to build the unittests" YES)
+
+if(IsLinuxPlatform)
+    option(MOONRAY_USE_OPTIX "Whether to enable XPU mode and Optix denoising" YES)
+elseif(IsDarwinPlatform)
+    option(MOONRAY_USE_METAL "Whether to enable XPU mode and OIDN Metal denoising" YES)
+endif()
 
 option(ABI_SET_VERSION "Enable the abi-version option" OFF)
 if(ABI_SET_VERSION)

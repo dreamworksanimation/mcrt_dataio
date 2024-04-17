@@ -3,7 +3,7 @@
 
 #include "ClientReceiverDenoiser.h"
 
-#ifdef MOONRAY_USE_CUDA
+#ifdef MOONRAY_USE_OPTIX
 // This header must be included in .cc file for the link to succeed
 #include <optix_function_table_definition.h>
 #endif

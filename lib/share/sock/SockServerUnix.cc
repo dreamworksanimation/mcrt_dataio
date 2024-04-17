@@ -10,7 +10,13 @@
 #include <fcntl.h>              // fcntl
 #include <iostream>
 #include <sstream>
-#include <linux/un.h>           // UNIX_PATH_MAX
+#ifndef __APPLE__
+  #include <linux/un.h>           // UNIX_PATH_MAX
+#else
+  #include <sys/un.h>
+  #include <sys/syslimits.h>
+  #define UNIX_PATH_MAX	PATH_MAX 
+#endif
 #include <sys/socket.h>
 #include <unistd.h>             // read()/write()/close()
 

@@ -10,7 +10,12 @@
 #include <sstream>
 #include <thread>
 
-#include <sys/sysinfo.h> // sysinfo
+#if !defined(__APPLE__)
+  #include <sys/sysinfo.h> // sysinfo
+#else
+  #include <sys/types.h>
+  #include <sys/sysctl.h>
+#endif 
 
 namespace mcrt_dataio {
 
@@ -29,7 +34,9 @@ SysUsage::isCpuUsageReady() const
     // (= 100 for example).
     constexpr clock_t minInterval = 16; // clock ticks
     
-    clock_t now = times(nullptr); // get current time    
+    struct tms tp;
+    clock_t now = times(&tp); // get current time    
+
     return (now - mAll.getPrevTime() > minInterval);
 }
 
@@ -37,22 +44,23 @@ float
 SysUsage::getCpuUsage()
 // return all CPU usage fraction 0.0~1.0, negative value is error
 {
+#if !defined(__APPLE__)
     std::ifstream ifs("/proc/stat");
     if (!ifs) return -1.0f; // error
-
+    
     clock_t now = times(nullptr); // get current time
-
+    
     std::string line;
     while (1) {
         if (!getline(ifs, line)) return false;
-
+        
         std::istringstream istr(line);
         std::string token;
         size_t usr, nice, sys;
         istr >> token >> usr >> nice >> sys;
-
+        
         if (token.substr(0, 3) != "cpu") break;
-
+        
         size_t currTick = usr + nice + sys;
         
         if (token.size() == 3) {
@@ -64,29 +72,35 @@ SysUsage::getCpuUsage()
             mCores[cpuId].set(now, currTick, 1.0f);
         }
     }
-
+    
     return mAll.getFraction();
-}
+#else 
+        struct loadavg avgLoad; 
+        size_t len = sizeof(avgLoad);
 
-std::vector<float>
-SysUsage::getCoreUsage() const
-{
-    std::vector<float> vec(mCores.size(), 0.0f);
-    for (size_t i = 0; i < mCores.size(); ++i) {
-        vec[i] = mCores[i].getFraction();
-    }
-    return vec; // returns copy data
+        sysctlbyname("vm.loadavg", &avgLoad, &len, NULL, 0);
+
+    return (avgLoad.ldavg[0]/avgLoad.fscale);
+#endif
 }
 
 // static function
 size_t
 SysUsage::getMemTotal()
 {
+#if !defined(__APPLE__)
     struct sysinfo info;
     sysinfo(&info);
 
     size_t totalRam = (info.totalram * info.mem_unit); // Byte
     return totalRam;
+#else
+    int64_t memsize;
+    size_t len = sizeof(memsize);
+    sysctlbyname("hw.memsize", &memsize, &len, NULL, 0);
+
+    return memsize;
+#endif 
 }
 
 // static function
@@ -94,6 +108,7 @@ float
 SysUsage::getMemUsage()
 // return memory usage fraction 0.0~1.0
 {
+#if !defined(__APPLE__)
     struct sysinfo info;
     sysinfo(&info);
 
@@ -101,6 +116,11 @@ SysUsage::getMemUsage()
     size_t freeRam = (info.freeram * info.mem_unit) / 1024; // KByte
 
     return (float)(totalRam - freeRam) / (float)totalRam;
+#else 
+
+return 0.01;
+
+#endif  // TODO: figure out a programatic way of doing this
 }
 
 bool

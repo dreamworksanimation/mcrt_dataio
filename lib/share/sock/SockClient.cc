@@ -14,7 +14,11 @@
 #include <sstream>
 #include <thread>
 #include <netdb.h>              // gethostbyname()
+#ifndef __APPLE__
 #include <linux/un.h>           // sockaddr_un
+#else
+#include <sys/un.h>
+#endif
 #include <netinet/in.h>         // struct sockaddr_in
 #include <netinet/tcp.h>        // TCP_NODELAY
 #include <signal.h>
@@ -150,11 +154,19 @@ SockClient::openInetSockMain(const bool errorDisplayST)
 
     //
     // send/recv internal buffer size setup
+    //
+
+#ifndef __APPLE__
+    //
     // We can not set more than /proc/sys/net/core/rmem_max value
     // Default value is set at /proc/sys/net/core/rmem_default
     // I'll try to set 32MByte but probably this value is more than rmem_max
     //
     if (!setSockBufferSize(sock, SOL_SOCKET, static_cast<int>(32_MiB))) {
+#else
+    // Apple max is 4_MiB
+    if (!setSockBufferSize(sock, SOL_SOCKET, static_cast<int>(4_MiB))) {
+#endif 
         if (errorDisplayST) {
             std::cerr << ">> SockClient.cc ERROR : setSockBufferSize() for Internet-domain sock failed.\n";
         }
@@ -214,11 +226,19 @@ SockClient::openUnixSockMain(const bool errorDisplayST)
 
     //
     // send/recv internal buffer size setup
+    //
+
+#ifndef __APPLE__
+    //
     // We can not set more than /proc/sys/net/core/rmem_max value
     // Default value is set at /proc/sys/net/core/rmem_default
     // I'll try to set 32MByte but probably this value is more than rmem_max
     //
     if (!setSockBufferSize(sock, SOL_SOCKET, static_cast<int>(32_MiB))) {
+#else
+    // Apple max is 4_MiB
+    if (!setSockBufferSize(sock, SOL_SOCKET, static_cast<int>(4_MiB))) {
+#endif 
         if (errorDisplayST) {
             std::cerr << ">> SockClient.cc ERROR : setSockBufferSize() for Unix-domain sock failed.\n";
         }

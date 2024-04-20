@@ -84,6 +84,20 @@ SysUsage::getCpuUsage()
 #endif
 }
 
+std::vector<float>
+SysUsage::getCoreUsage() const
+{
+    std::vector<float> vec(mCores.size(), 0.0f);
+#if !defined(__APPLE__)
+    for (size_t i = 0; i < mCores.size(); ++i) {
+        vec[i] = mCores[i].getFraction();
+    }
+#else
+    // TODO : Needs more work for APPLE
+#endif    
+    return vec; // return copy data
+}
+
 // static function
 size_t
 SysUsage::getMemTotal()

@@ -27,6 +27,7 @@
 #include <json/json.h>
 #include <json/writer.h>
 #include <limits>
+#include <mutex>
 #include <tbb/parallel_for.h>
 
 // This directive is used only for debug purpose.
@@ -127,73 +128,86 @@ public:
 
     //------------------------------
 
+    bool getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                               const bool top2bottom, const bool isSrgb);
     bool getBeautyRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
-    void getBeautyRgb888NoDenoise(std::vector<unsigned char>& rgbFrame,
-                                  const bool top2bottom, const bool isSrgb);
 
+    bool getPixelInfoRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                                  const bool top2bottom, const bool isSrgb);
     bool getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+
+    bool getHeatMapRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                                const bool top2bottom, const bool isSrgb);
     bool getHeatMapRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+
+    bool getWeightBufferRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                                     const bool top2bottom, const bool isSrgb);
     bool getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+
+    bool getBeautyAuxRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                                  const bool top2bottom, const bool isSrgb);
     bool getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
 
+    bool getRenderOutputRgb888MTSafe(const unsigned id,
+                                     std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                                     const bool top2bottom, const bool isSrgb, const bool closestFilterDepthOutput);
+    bool getRenderOutputRgb888MTSafe(const std::string& aovName,
+                                     std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
+                                     const bool top2bottom, const bool isSrgb, const bool closestFilterDepthOutput);
     bool getRenderOutputRgb888(const unsigned id,
                                std::vector<unsigned char>& rgbFrame,
-                               const bool top2bottom,
-                               const bool isSrgb,
-                               const bool closestFilterDepthOutput);
-    void getRenderOutputRgb888NoDenoise(const unsigned id,
-                                        std::vector<unsigned char>& rgbFrame,
-                                        const bool top2bottom,
-                                        const bool isSrgb,
-                                        const bool closestFilterDepthOutput);
+                               const bool top2bottom, const bool isSrgb, const bool closestFilterDepthOutput);
     bool getRenderOutputRgb888(const std::string& aovName,
                                std::vector<unsigned char>& rgbFrame,
-                               const bool top2bottom,
-                               const bool isSrgb,
-                               const bool closestFilterDepthOutput);
-    void getRenderOutputRgb888NoDenoise(const std::string& aovName,
-                                        std::vector<unsigned char>& rgbFrame,
-                                        const bool top2bottom,
-                                        const bool isSrgb,
-                                        const bool closestFilterDepthOutput);
+                               const bool top2bottom, const bool isSrgb, const bool closestFilterDepthOutput);
 
     //------------------------------
 
+    bool getBeautyMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height, const bool top2bottom);
     bool getBeauty(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
-    void getBeautyNoDenoise(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
 
+    bool getPixelInfoMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
+                            const bool top2bottom); // 1 channel/pixel
     bool getPixelInfo(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
-    bool getHeatMap(std::vector<float>& data, const bool top2bottom);   // 1 channel/pixel
-    bool getWeightBuffer(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
-    bool getBeautyOdd(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
-    bool getBeautyOddNoDenoise(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
 
+    bool getHeatMapMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
+                          const bool top2bottom);   // 1 channel/pixel
+    bool getHeatMap(std::vector<float>& data, const bool top2bottom);   // 1 channel/pixel
+
+    bool getWeightBufferMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
+                               const bool top2bottom); // 1 channel/pixel
+    bool getWeightBuffer(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
+
+    bool getBeautyAuxMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height,
+                            const bool top2bottom); // 4 channels/pixel
+    bool getBeautyAux(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
+
+    int  getRenderOutputMTSafe(const unsigned id,
+                               std::vector<float>& data, unsigned& width, unsigned& height,
+                               const bool top2bottom, const bool closestFilterDepthOutput);
+    int  getRenderOutputMTSafe(const std::string& aovName,
+                               std::vector<float>& data, unsigned& width, unsigned& height,
+                               const bool top2bottom, const bool closestFilterDepthOutput);
     int  getRenderOutput(const unsigned id,
                          std::vector<float>& data,
-                         const bool top2bottom,
-                         const bool closestFilterDepthOutput);
-    int  getRenderOutputNoDenoise(const unsigned id,
-                                  std::vector<float>& data,
-                                  const bool top2bottom,
-                                  const bool closestFilterDepthOutput);
+                         const bool top2bottom, const bool closestFilterDepthOutput);
     int  getRenderOutput(const std::string& aovName,
                          std::vector<float>& data,
-                         const bool top2bottom,
-                         const bool closestFilterDepthOutput);
-    int  getRenderOutputNoDenoise(const std::string& aovName,
-                                  std::vector<float>& data,
-                                  const bool top2bottom,
-                                  const bool closestFilterDepthOutput);
+                         const bool top2bottom, const bool closestFilterDepthOutput);
 
     // always store data into float4 pixel
+    int getRenderOutputF4MTSafe(const unsigned id,
+                                std::vector<float>& data, unsigned& width, unsigned& height,
+                                const bool top2bottom, const bool closestFilterDepthOutput);
+    int getRenderOutputF4MTSafe(const std::string& aovName,
+                                std::vector<float>& data, unsigned& width, unsigned& height,
+                                const bool top2bottom, const bool closestFilterDepthOutput);
     int getRenderOutputF4(const unsigned id,
                           std::vector<float>& data,
-                          const bool top2bottom,
-                          const bool closestFilterDepthOutput);
+                          const bool top2bottom, const bool closestFilterDepthOutput);
     int getRenderOutputF4(const std::string& aovName,
                           std::vector<float>& data,
-                          const bool top2bottom,
-                          const bool closestFilterDepthOutput);
+                          const bool top2bottom, const bool closestFilterDepthOutput);
 
     //------------------------------
 
@@ -290,6 +304,7 @@ private:
     scene_rdl2::math::Viewport mRoiViewport;
 
     bool mResetFbWithColorMode {false};
+    std::mutex mFbAccessMutex;
     scene_rdl2::grid_util::Fb mFb;
 
     DenoiseEngine mDenoiseEngine {DenoiseEngine::OPTIX};
@@ -354,6 +369,72 @@ private:
 
     std::shared_ptr<TimingRecorderHydra> mTimingRecorderHydra;
     TimingAnalysis mTimingAnalysis {mGlobalNodeInfo};
+
+    //------------------------------
+
+    template <typename F>
+    bool getDataMTSafe(unsigned& width, unsigned& height, F getFuncMain) {
+        initErrorMsg();
+        bool result;
+        {
+            std::lock_guard<std::mutex> lock(mFbAccessMutex);
+            width = getWidth();
+            height = getHeight();
+            result = getFuncMain();
+        }
+        return result;
+    }
+
+    template <typename F>
+    bool getData(F getFunctionMain) {
+        initErrorMsg();
+        return getFunctionMain();
+    }
+
+    //------------------------------
+
+    void getBeautyRgb888NoDenoiseMTSafe(std::vector<unsigned char>& rgbFrame,
+                                        unsigned& width, unsigned& height,
+                                        const bool top2bottom, const bool isSrgb);
+    void getBeautyRgb888NoDenoise(std::vector<unsigned char>& rgbFrame,
+                                  const bool top2bottom, const bool isSrgb);
+    bool getPixelInfoRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                const bool top2bottom, const bool isSrgb);
+    bool getHeatMapRgb888Main(std::vector<unsigned char>& rgbFrame,
+                              const bool top2bottom, const bool isSrgb);
+    bool getWeightBufferRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                   const bool top2bottom, const bool isSrgb);
+    bool getBeautyAuxRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                const bool top2bottom, const bool isSrgb);
+    template <typename T>
+    bool getRenderOutputRgb888Main(T aovIdentifierInfo, std::vector<unsigned char>& rgbFrame,
+                                   const bool top2bottom, const bool isSrgb,
+                                   const bool closestFilterDepthOutput);
+    template <typename T>
+    void getRenderOutputRgb888NoDenoise(T aovIdentifireInfo, std::vector<unsigned char>& rgbFrame,
+                                        const bool top2bottom, const bool isSrgb,
+                                        const bool closestFilterDepthOutput);
+
+    //------------------------------
+
+    void getBeautyNoDenoiseMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height,
+                                  const bool top2bottom); // 4 channles/pixel
+    void getBeautyNoDenoise(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
+    bool getPixelInfoMain(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
+    bool getHeatMapMain(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
+    bool getWeightBufferMain(std::vector<float>& data, const bool top2bottom); // 1 channel/pixel
+    bool getBeautyAuxMain(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
+
+    template <typename T>
+    int getRenderOutputMain(T aovIdentifierInfo, std::vector<float>& data,
+                            const bool top2bottom, const bool closestFilterDepthOutput);
+    template <typename T>
+    int  getRenderOutputNoDenoise(T aovIdentifierInfo, std::vector<float>& data,
+                                  const bool top2bottom, const bool closestFilterDepthOutput);
+
+    template <typename T>
+    int getRenderOutputF4Main(T aovIdentifierInfo, std::vector<float>& data,
+                              const bool top2bottom, const bool closestFilterDepthOutput);
 
     //------------------------------
 
@@ -526,6 +607,16 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
         mCurrentLatencySec = scene_rdl2::grid_util::LatencyItem::getLatencySec(startTimeAdjusted);
     }
 
+    mcrt::BaseFrame::Status currStatus = message.getStatus();
+
+    // The frame start timing might make a big topology change for the internal frame buffer,
+    // including resolution change and RenderOutput AOV configurations. So we should enable MTSafe lock.
+    bool enableLock = (currStatus == mcrt::BaseFrame::STARTED);
+    std::unique_lock<std::mutex> lock(mFbAccessMutex, std::defer_lock);
+    if (enableLock) lock.lock();
+
+    //------------------------------
+
     mRezedViewport =
         scene_rdl2::math::
         Viewport(message.getRezedViewport().minX(),
@@ -551,7 +642,6 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
         mFb.init(mRezedViewport);
     }
 
-    mcrt::BaseFrame::Status currStatus = message.getStatus();
     if (currStatus == mcrt::BaseFrame::STARTED) {
         if (mFrameId != mLastFrameId) {
             if (mResetFbWithColorMode) {
@@ -598,6 +688,8 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
             if (error) return false;
         }
     }
+    if (enableLock) lock.unlock();
+
     afterDecode(callBackFuncForGenericComment);
     return true;
 }
@@ -684,6 +776,51 @@ ClientReceiverFb::Impl::getRenderOutputClosestFilter(const std::string& aovName)
 }
 
 bool
+ClientReceiverFb::Impl::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                              unsigned& width,
+                                              unsigned& height,
+                                              const bool top2bottom,
+                                              const bool isSrgb)
+{
+    bool telemetryOverlayWithPrevArchive = false;
+    if (getProgress() == 0.0f) {
+        // This situation only be happened under telemetryOverlay active condition.
+        // Not received image data yet for this frame. We only update telemetryOverlay info
+        telemetryOverlayWithPrevArchive = true;
+        if (mFrameId == 0) {
+            // This is before receiving any images
+            telemetry::DisplayInfo info;
+            setupTelemetryDisplayInfo(info);
+            mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
+            return true;
+        }
+    }
+
+    initErrorMsg();
+
+    bool result = true;
+    if (mBeautyDenoiseMode == DenoiseMode::DISABLE) {
+        getBeautyRgb888NoDenoiseMTSafe(rgbFrame, width, height, top2bottom, isSrgb);
+    } else {
+        bool fallback;
+        result = runDenoise888(rgbFrame, top2bottom, isSrgb,
+                               [&](std::vector<float>& buff) {
+                                   getBeautyNoDenoiseMTSafe(buff, width, height, top2bottom);
+                               },
+                               fallback);
+        if (fallback) getBeautyRgb888NoDenoiseMTSafe(rgbFrame, width, height, top2bottom, isSrgb);
+    }
+
+    if (mTelemetryDisplay.getActive()) {
+        telemetry::DisplayInfo info;
+        setupTelemetryDisplayInfo(info);
+        mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
+    }
+    
+    return result;
+}
+
+bool
 ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                                         const bool top2bottom,
                                         const bool isSrgb)
@@ -713,7 +850,7 @@ ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
         std::vector<float> work;
         result = runDenoise(4, work,
                             top2bottom,
-                            [&, top2bottom](std::vector<float>& buff) {
+                            [&](std::vector<float>& buff) {
                                 getBeautyNoDenoise(buff, top2bottom);
                             },
                             fallback);
@@ -721,7 +858,7 @@ ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
         mFb.conv888Beauty(work, isSrgb, rgbFrame);
 #       else // else VERIFY_FLOAT_API_BY_UC        
         result = runDenoise888(rgbFrame, top2bottom, isSrgb,
-                               [&, top2bottom](std::vector<float>& buff) {
+                               [&](std::vector<float>& buff) {
                                    getBeautyNoDenoise(buff, top2bottom);
                                },
                                fallback);
@@ -738,329 +875,143 @@ ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
     return result;
 }
 
-void
-ClientReceiverFb::Impl::getBeautyRgb888NoDenoise(std::vector<unsigned char>& rgbFrame,
-                                                 const bool top2bottom,
-                                                 const bool isSrgb)
+bool
+ClientReceiverFb::Impl::getPixelInfoRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                                 unsigned& w, unsigned& h,
+                                                 const bool top2btm, const bool isSrgb)
 {
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderBuffer();
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    // We test untileBeauty() here instead of untileBeautyRGB() because untileBeautyRGB() is
-    // easily tested by getRenderOutputRgb888() with proper "beauty" AOV definition
-    mFb.untileBeauty(top2bottom,  ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
-    mFb.conv888Beauty(work, isSrgb, rgbFrame);
-#   else  // else VERIFY_FLOAT_API_BY_UC
-    mFb.untileBeauty(isSrgb, top2bottom,
-                     ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                     rgbFrame);
-#   endif // end !VERIFY_FLOAT_API_BY_UC
+    return getDataMTSafe(w, h, [&]() { return getPixelInfoRgb888Main(rgbFrame, top2btm, isSrgb); });
 }
 
 bool
 ClientReceiverFb::Impl::getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame,
-                                           const bool top2bottom,
-                                           const bool isSrgb)
+                                           const bool top2btm, const bool isSrgb)
 {
-    initErrorMsg();
+    return getData([&]() { return getPixelInfoRgb888Main(rgbFrame, top2btm, isSrgb); });
+}
 
-    if (!mFb.getPixelInfoStatus()) return false;
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolatePixelInfo(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                     mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolatePixelInfo();
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    mFb.untilePixelInfo(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
-    mFb.conv888PixelInfo(work, isSrgb, rgbFrame);
-#   else  // else VERIFY_FLOAT_API_BY_UC
-    mFb.untilePixelInfo(isSrgb, top2bottom,
-                        ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                        rgbFrame);
-#   endif // end !VERIFY_FLOAT_API_BY_UC
-
-    return true;
+bool
+ClientReceiverFb::Impl::getHeatMapRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                               unsigned& w, unsigned& h,
+                                               const bool top2btm, const bool isSrgb)
+{
+    return getDataMTSafe(w, h, [&]() { return getHeatMapRgb888Main(rgbFrame, top2btm, isSrgb); });
 }
 
 bool
 ClientReceiverFb::Impl::getHeatMapRgb888(std::vector<unsigned char>& rgbFrame,
-                                         const bool top2bottom,
-                                         const bool isSrgb)
+                                         const bool top2btm, const bool isSrgb)
 {
-    initErrorMsg();
+    return getData([&]() { return getHeatMapRgb888Main(rgbFrame, top2btm, isSrgb); });
+}
 
-    if (!mFb.getHeatMapStatus()) return false;
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateHeatMap(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                   mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateHeatMap();
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    mFb.untileHeatMap(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
-    mFb.conv888HeatMap(work, isSrgb, rgbFrame);
-#   else  // else VERIFY_FLOAT_API_BY_UC
-    mFb.untileHeatMap(isSrgb, top2bottom,
-                      ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                      rgbFrame);
-#   endif  // end !VERIFY_FLOAT_API_BY_UC
-
-    return true;
+bool
+ClientReceiverFb::Impl::getWeightBufferRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                                    unsigned& w, unsigned& h,
+                                                    const bool top2btm, const bool isSrgb)
+{
+    return getDataMTSafe(w, h, [&]() { return getWeightBufferRgb888Main(rgbFrame, top2btm, isSrgb); });
 }
 
 bool
 ClientReceiverFb::Impl::getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame,
-                                              const bool top2bottom,
-                                              const bool isSrgb)
+                                              const bool top2btm, const bool isSrgb)
 {
-    initErrorMsg();
+    return getData([&]() { return getWeightBufferRgb888Main(rgbFrame, top2btm, isSrgb); });
+}
 
-    if (!mFb.getWeightBufferStatus()) return false;
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateWeightBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateWeightBuffer();
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    mFb.untileWeightBuffer(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
-    mFb.conv888WeightBuffer(work, isSrgb, rgbFrame);
-#   else // else VERIFY_FLOAT_API_BY_UC
-    mFb.untileWeightBuffer(isSrgb, top2bottom,
-                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                           rgbFrame);
-#   endif // end !VERIFY_FLOAT_API_BY_UC
-
-    return true;
+bool
+ClientReceiverFb::Impl::getBeautyAuxRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                                 unsigned& w, unsigned& h,
+                                                 const bool top2btm, const bool isSrgb)
+{
+    return getDataMTSafe(w, h, [&]() { return getBeautyAuxRgb888Main(rgbFrame, top2btm, isSrgb); });
 }
 
 bool
 ClientReceiverFb::Impl::getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame,
-                                           const bool top2bottom,
-                                           const bool isSrgb)
+                                           const bool top2btm, const bool isSrgb)
 {
-    initErrorMsg();
+    return getData([&]() { return getBeautyAuxRgb888Main(rgbFrame, top2btm, isSrgb); });
+}
 
-    if (!mFb.getRenderBufferOddStatus()) return false;
+bool
+ClientReceiverFb::Impl::getRenderOutputRgb888MTSafe(const unsigned id,
+                                                    std::vector<unsigned char>& rgbFrame,
+                                                    unsigned& width, unsigned& height,
+                                                    const bool top2bottom, const bool isSrgb,
+                                                    const bool closestFilterDepthOutput)
+{
+    return getDataMTSafe(width, height,
+                         [&]() {
+                             if (mFb.getTotalRenderOutput() <= id) return false; // no AOV
+                             return getRenderOutputRgb888Main(id, rgbFrame,
+                                                              top2bottom, isSrgb, closestFilterDepthOutput);
+                         });
+}
 
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderBufferOdd(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                           mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderBufferOdd();
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    // We test untileBeautyOdd() here instead of untileBeautyAux() because untileBeautyAux() is
-    // easily tested by getRenderOutputRgb888() with proper "beautyAUX" AOV definition
-    mFb.untileBeautyOdd(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
-    mFb.conv888BeautyOdd(work, isSrgb, rgbFrame);
-#   else // else VERIFY_FLOAT_API_BY_UC
-    mFb.untileBeautyAux(isSrgb, top2bottom,
-                        ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                        rgbFrame);
-#   endif // end !VERIFY_FLOAT_API_BY_UC
-
-    return true;
+bool
+ClientReceiverFb::Impl::getRenderOutputRgb888MTSafe(const std::string& aovName,
+                                                    std::vector<unsigned char>& rgbFrame,
+                                                    unsigned& width, unsigned& height,
+                                                    const bool top2bottom, const bool isSrgb,
+                                                    const bool closestFilterDepthOutput)
+{
+    return getDataMTSafe(width, height,
+                         [&]() {
+                             return getRenderOutputRgb888Main(aovName, rgbFrame,
+                                                              top2bottom, isSrgb, closestFilterDepthOutput);
+                         });
 }
 
 bool
 ClientReceiverFb::Impl::getRenderOutputRgb888(const unsigned id,
                                               std::vector<unsigned char>& rgbFrame,
-                                              const bool top2bottom,
-                                              const bool isSrgb,
+                                              const bool top2bottom, const bool isSrgb,
                                               const bool closestFilterDepthOutput)
 {
-    initErrorMsg();
-
-    if (mFb.getTotalRenderOutput() <= id) return false; // no AOV
-
-    bool denoise = false;
-    if (mBeautyDenoiseMode != DenoiseMode::DISABLE &&
-        mFb.isBeautyRelatedAov(id) &&
-        !closestFilterDepthOutput) {
-        denoise = true;
-    }
-        
-    bool result = true;
-    if (!denoise) {
-        getRenderOutputRgb888NoDenoise(id, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
-    } else {
-        // beauty related AOV with denoise
-        bool fallback;
-#       ifdef VERIFY_FLOAT_API_BY_UC
-        std::vector<float> work;
-        result = runDenoise(3, work,
-                            top2bottom,
-                            [&, top2bottom](std::vector<float>& buff) {
-                                getRenderOutputF4(id, buff, top2bottom, closestFilterDepthOutput);
-                            },
-                            fallback);
-        if (fallback) getRenderOutputNoDenoise(id, work, top2bottom, closestFilterDepthOutput);
-        mFb.conv888BeautyRGB(work, isSrgb, rgbFrame);
-#       else // else VERIFY_FLOAT_API_BY_UC        
-        result = runDenoise888(rgbFrame, top2bottom, isSrgb,
-                               [&, id, top2bottom, closestFilterDepthOutput](std::vector<float>& buff) {
-                                   getRenderOutputF4(id, buff, top2bottom, closestFilterDepthOutput); 
-                               },
-                               fallback);
-        if (fallback) {
-            getRenderOutputRgb888NoDenoise(id, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
-        }
-#       endif // end !VERIFY_FLOAT_API_BY_UC
-    }
-    return result;
-}
-
-void
-ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(const unsigned id,
-                                                       std::vector<unsigned char>& rgbFrame,
-                                                       const bool top2bottom,
-                                                       const bool isSrgb,
-                                                       const bool closestFilterDepthOutput)
-{
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderOutput(id,
-                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderOutput(id);
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    mFb.untileRenderOutput(id,
-                           top2bottom,
-                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                           closestFilterDepthOutput,
-                           work);
-    mFb.conv888RenderOutput(id, work, isSrgb, closestFilterDepthOutput, rgbFrame);
-#   else // else VERIFY_FLOAT_API_BY_UC
-    mFb.untileRenderOutput(id, isSrgb,
-                           top2bottom,
-                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                           closestFilterDepthOutput,
-                           rgbFrame);
-#   endif // end !VERIFY_FLOAT_API_BY_UC
+    return getData([&]() {
+        if (mFb.getTotalRenderOutput() <= id) return false; // no AOV
+        return getRenderOutputRgb888Main(id, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
+    });
 }
 
 bool
 ClientReceiverFb::Impl::getRenderOutputRgb888(const std::string& aovName,
                                               std::vector<unsigned char>& rgbFrame,
-                                              const bool top2bottom,
-                                              const bool isSrgb,
+                                              const bool top2bottom, const bool isSrgb,
                                               const bool closestFilterDepthOutput)
+{
+    return getData([&]() {
+        return getRenderOutputRgb888Main(aovName, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
+    });
+}
+
+//------------------------------------------------------------------------------
+
+bool
+ClientReceiverFb::Impl::getBeautyMTSafe(std::vector<float>& rgba,
+                                        unsigned& width,
+                                        unsigned& height,
+                                        const bool top2bottom)
 {
     initErrorMsg();
 
-    bool denoise = false;
-    if (mBeautyDenoiseMode != DenoiseMode::DISABLE &&
-        mFb.isBeautyRelatedAov(aovName) &&
-        !closestFilterDepthOutput) {
-        denoise = true;
-    }
-
     bool result = true;
-    if (!denoise) {
-        getRenderOutputRgb888NoDenoise(aovName, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
+    if (mBeautyDenoiseMode == DenoiseMode::DISABLE) {
+        getBeautyNoDenoiseMTSafe(rgba, width, height, top2bottom);
     } else {
-        // beauty related AOV with denoise
         bool fallback;
-#       ifdef VERIFY_FLOAT_API_BY_UC
-        std::vector<float> work;
-        result = runDenoise(3, work,
+        result = runDenoise(4, rgba,
                             top2bottom,
-                            [&, top2bottom](std::vector<float>& buff) {
-                                getRenderOutputF4(aovName, buff, top2bottom, closestFilterDepthOutput);
+                            [&](std::vector<float>& buff) {
+                                getBeautyNoDenoiseMTSafe(buff, width, height, top2bottom);
                             },
                             fallback);
-        if (fallback) getRenderOutputNoDenoise(aovName, work, top2bottom, closestFilterDepthOutput);
-        mFb.conv888BeautyRGB(work, isSrgb, rgbFrame);
-#       else // else VERIFY_FLOAT_API_BY_UC
-        result = runDenoise888(rgbFrame, top2bottom, isSrgb,
-                               [&, aovName, top2bottom, closestFilterDepthOutput](std::vector<float>& buff) {
-                                   getRenderOutputF4(aovName, buff, top2bottom, closestFilterDepthOutput); 
-                               },
-                               fallback);
-        if (fallback) {
-            getRenderOutputRgb888NoDenoise(aovName, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
-        }
-#       endif // end !VERIFY_FLOAT_API_BY_UC
+        if (fallback) getBeautyNoDenoiseMTSafe(rgba, width, height, top2bottom);
     }
     return result;
 }
-
-void
-ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(const std::string& aovName,
-                                                       std::vector<unsigned char>& rgbFrame,
-                                                       const bool top2bottom,
-                                                       const bool isSrgb,
-                                                       const bool closestFilterDepthOutput)
-{
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderOutput(aovName,
-                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderOutput(aovName);
-        }
-    }
-
-#   ifdef VERIFY_FLOAT_API_BY_UC
-    std::vector<float> work;
-    mFb.untileRenderOutput(aovName,
-                           top2bottom,
-                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                           closestFilterDepthOutput,
-                           work);
-    mFb.conv888RenderOutput(aovName, work, isSrgb, closestFilterDepthOutput, rgbFrame);
-#   else // else VERIFY_FLOAT_API_BY_UC
-    mFb.untileRenderOutput(aovName, isSrgb,
-                           top2bottom,
-                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                           closestFilterDepthOutput,
-                           rgbFrame);
-#   endif // end !VERIFY_FLOAT_API_BY_UC
-}
-    
-//------------------------------------------------------------------------------
 
 bool
 ClientReceiverFb::Impl::getBeauty(std::vector<float>& rgba,
@@ -1075,7 +1026,7 @@ ClientReceiverFb::Impl::getBeauty(std::vector<float>& rgba,
         bool fallback;
         result = runDenoise(4, rgba,
                             top2bottom,
-                            [&, top2bottom](std::vector<float>& buff) {
+                            [&](std::vector<float>& buff) {
                                 getBeautyNoDenoise(buff, top2bottom);
                             },
                             fallback);
@@ -1084,275 +1035,132 @@ ClientReceiverFb::Impl::getBeauty(std::vector<float>& rgba,
     return result;
 }
 
-void
-ClientReceiverFb::Impl::getBeautyNoDenoise(std::vector<float>& rgba,
-                                           const bool top2bottom)
+bool
+ClientReceiverFb::Impl::getPixelInfoMTSafe(std::vector<float>& data,
+                                           unsigned& w, unsigned& h, const bool top2bottom)
 {
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderBuffer();
-        }
-    }
-
-    mFb.untileBeauty(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), rgba);
+    return getDataMTSafe(w, h, [&]() { return getPixelInfoMain(data, top2bottom); });
 }
 
 bool
-ClientReceiverFb::Impl::getPixelInfo(std::vector<float>& data,
-                                     const bool top2bottom)
+ClientReceiverFb::Impl::getPixelInfo(std::vector<float>& data, const bool top2bottom)
 {
-    initErrorMsg();
-
-    if (!mFb.getPixelInfoStatus()) return false;
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolatePixelInfo(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                     mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolatePixelInfo();
-        }
-    }
-
-    mFb.untilePixelInfo(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), data);
-
-    return true;
+    return getData([&]() { return getPixelInfoMain(data, top2bottom); });
 }
 
 bool    
-ClientReceiverFb::Impl::getHeatMap(std::vector<float>& data,
-                                   const bool top2bottom)
+ClientReceiverFb::Impl::getHeatMapMTSafe(std::vector<float>& data,
+                                         unsigned& w, unsigned& h, const bool top2bottom)
 {
-    initErrorMsg();
+    return getDataMTSafe(w, h, [&]() { return getHeatMapMain(data, top2bottom); });
+}
 
-    if (!mFb.getHeatMapStatus()) return false;
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateHeatMap(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                   mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateHeatMap();
-        }
-    }
-
-    mFb.untileHeatMap(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), data);
-
-    return true;
+bool    
+ClientReceiverFb::Impl::getHeatMap(std::vector<float>& data, const bool top2bottom)
+{
+    return getData([&]() { return getHeatMapMain(data, top2bottom); });
 }
 
 bool
-ClientReceiverFb::Impl::getWeightBuffer(std::vector<float>& data,
-                                        const bool top2bottom)
+ClientReceiverFb::Impl::getWeightBufferMTSafe(std::vector<float>& data,
+                                              unsigned& w, unsigned& h, const bool top2bottom)
 {
-    initErrorMsg();
-
-    if (!mFb.getWeightBufferStatus()) return false;
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateWeightBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateWeightBuffer();
-        }
-    }
-
-    mFb.untileWeightBuffer(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), data);
-
-    return true;
+    return getDataMTSafe(w, h, [&]() { return getWeightBufferMain(data, top2bottom); });
 }
 
 bool
-ClientReceiverFb::Impl::getBeautyOdd(std::vector<float>& rgba,
-                                     const bool top2bottom)
+ClientReceiverFb::Impl::getWeightBuffer(std::vector<float>& data, const bool top2bottom)
 {
-    initErrorMsg();
+    return getData([&]() { return getWeightBufferMain(data, top2bottom); });
+}
 
-    if (!mFb.getRenderBufferOddStatus()) return false;
+bool
+ClientReceiverFb::Impl::getBeautyAuxMTSafe(std::vector<float>& rgba,
+                                           unsigned& w, unsigned& h, const bool top2bottom)
+{
+    return getDataMTSafe(w, h, [&]() { return getBeautyAuxMain(rgba, top2bottom); });
+}
 
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderBufferOdd(mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                           mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderBufferOdd();
-        }
-    }
+bool
+ClientReceiverFb::Impl::getBeautyAux(std::vector<float>& rgba, const bool top2bottom)
+{
+    return getData([&]() { return getBeautyAuxMain(rgba, top2bottom); });
+}
 
-    mFb.untileBeautyOdd(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), rgba);
+int    
+ClientReceiverFb::Impl::getRenderOutputMTSafe(const unsigned id,
+                                              std::vector<float>& data, unsigned& w, unsigned& h,
+                                              const bool top2bottom, const bool closestFilterDepthOutput)
+{
+    return getDataMTSafe(w, h,
+                         [&]() {
+                             return getRenderOutputMain(id, data, top2bottom, closestFilterDepthOutput);
+                         }); 
+}
 
-    return true;
+int    
+ClientReceiverFb::Impl::getRenderOutputMTSafe(const std::string& aovName,
+                                              std::vector<float>& data, unsigned& w, unsigned& h,
+                                              const bool top2bottom, const bool closestFilterDepthOutput)
+{
+    return getDataMTSafe(w, h,
+                         [&]() {
+                             return getRenderOutputMain(aovName, data, top2bottom, closestFilterDepthOutput);
+                         });
 }
 
 int    
 ClientReceiverFb::Impl::getRenderOutput(const unsigned id,
                                         std::vector<float>& data,
-                                        const bool top2bottom,
-                                        const bool closestFilterDepthOutput)
+                                        const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    initErrorMsg();
-
-    if (mFb.getTotalRenderOutput() <= id) return 0; // no AOV
-
-    bool denoise = false;
-    if (mBeautyDenoiseMode != DenoiseMode::DISABLE &&
-        mFb.isBeautyRelatedAov(id) &&
-        !closestFilterDepthOutput) {
-        denoise = true;
-    }
-
-    if (!denoise) {
-        return getRenderOutputNoDenoise(id, data, top2bottom, closestFilterDepthOutput);
-    } else {
-        // beauty related AOV (BEAUTY or BEAUTY_AUX) with denoise. channel total is 3 in this case.
-        bool fallback;
-        bool result = runDenoise(3, data,
-                                 top2bottom,
-                                 [&, top2bottom](std::vector<float>& buff) {
-                                     getRenderOutputF4(id, buff, top2bottom, closestFilterDepthOutput);
-                                 },
-                                 fallback);
-        if (fallback) getRenderOutputNoDenoise(id, data, top2bottom, closestFilterDepthOutput);
-        return result ? 3 : -1;        // -1 is error
-    }
-}
-
-int    
-ClientReceiverFb::Impl::getRenderOutputNoDenoise(const unsigned id,
-                                                 std::vector<float>& data,
-                                                 const bool top2bottom,
-                                                 const bool closestFilterDepthOutput)
-{
-    if (mFb.getTotalRenderOutput() <= id) return 0; // no AOV
-
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderOutput(id,
-                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderOutput(id);
-        }
-    }
-
-    return mFb.untileRenderOutput(id,
-                                  top2bottom,
-                                  ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                                  closestFilterDepthOutput,
-                                  data);
+    return getData([&]() { return getRenderOutputMain(id, data, top2bottom, closestFilterDepthOutput); }); 
 }
 
 int    
 ClientReceiverFb::Impl::getRenderOutput(const std::string& aovName,
                                         std::vector<float>& data,
-                                        const bool top2bottom,
-                                        const bool closestFilterDepthOutput)
+                                        const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    initErrorMsg();
-
-    bool denoise = false;
-    if (mBeautyDenoiseMode != DenoiseMode::DISABLE &&
-        mFb.isBeautyRelatedAov(aovName) &&
-        !closestFilterDepthOutput) {
-        denoise = true;
-    }
-
-    if (!denoise) {
-        return getRenderOutputNoDenoise(aovName, data, top2bottom, closestFilterDepthOutput);
-    } else {
-        // beauty related AOV (BEAUTY or BEAUTY_AUX) with denoise. channel total is 3 in this case.
-        bool fallback;
-        bool result = runDenoise(3, data,
-                                 top2bottom,
-                                 [&, top2bottom](std::vector<float>& buff) {
-                                     getRenderOutputF4(aovName, buff, top2bottom, closestFilterDepthOutput);
-                                 },
-                                 fallback);
-        if (fallback) getRenderOutputNoDenoise(aovName, data, top2bottom, closestFilterDepthOutput);
-        return result ? 3 : -1; // -1 is error
-    }
+    return getData([&]() { return getRenderOutputMain(aovName, data, top2bottom, closestFilterDepthOutput); });
 }
 
 int    
-ClientReceiverFb::Impl::getRenderOutputNoDenoise(const std::string& aovName,
-                                                 std::vector<float>& data,
-                                                 const bool top2bottom,
-                                                 const bool closestFilterDepthOutput)
+ClientReceiverFb::Impl::getRenderOutputF4MTSafe(const unsigned id,
+                                                std::vector<float>& data, unsigned& w, unsigned& h,
+                                                const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderOutput(aovName,
-                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderOutput(aovName);
-        }
-    }
+    return getDataMTSafe(w, h,
+                         [&]() {
+                             return getRenderOutputF4Main(id, data, top2bottom, closestFilterDepthOutput);
+                         });
+}
 
-    return mFb.untileRenderOutput(aovName,
-                                  top2bottom,
-                                  ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                                  closestFilterDepthOutput,
-                                  data);
+int    
+ClientReceiverFb::Impl::getRenderOutputF4MTSafe(const std::string& aovName,
+                                                std::vector<float>& data, unsigned& w, unsigned& h,
+                                                const bool top2bottom, const bool closestFilterDepthOutput)
+{
+    return getDataMTSafe(w, h,
+                         [&]() {
+                             return getRenderOutputF4Main(aovName, data, top2bottom, closestFilterDepthOutput);
+                         });
 }
 
 int    
 ClientReceiverFb::Impl::getRenderOutputF4(const unsigned id,
                                           std::vector<float>& data,
-                                          const bool top2bottom,
-                                          const bool closestFilterDepthOutput)
+                                          const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderOutput(id,
-                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderOutput(id);
-        }
-    }
-
-    return mFb.untileRenderOutputF4(id,
-                                    top2bottom,
-                                    ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                                    closestFilterDepthOutput,
-                                    data);
+    return getData([&]() { return getRenderOutputF4Main(id, data, top2bottom, closestFilterDepthOutput); });
 }
 
 int    
 ClientReceiverFb::Impl::getRenderOutputF4(const std::string& aovName,
                                           std::vector<float>& data,
-                                          const bool top2bottom,
-                                          const bool closestFilterDepthOutput)
+                                          const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    if (mCoarsePassStatus != 1) {
-        // need extrapolation
-        if (mRoiViewportStatus) {
-            mFb.extrapolateRenderOutput(aovName,
-                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
-                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
-        } else {
-            mFb.extrapolateRenderOutput(aovName);
-        }
-    }
-
-    return mFb.untileRenderOutputF4(aovName,
-                                    top2bottom,
-                                    ((mRoiViewportStatus)? &mRoiViewport: nullptr),
-                                    closestFilterDepthOutput,
-                                    data);
+    return getData([&]() { return getRenderOutputF4Main(aovName, data, top2bottom, closestFilterDepthOutput); });
 }
 
 scene_rdl2::math::Vec4f
@@ -1701,6 +1509,455 @@ void
 ClientReceiverFb::Impl::switchTelemetryPanelToChild()
 {
     mTelemetryDisplay.switchPanelToChild();
+}
+
+//------------------------------------------------------------------------------
+//------------------------------------------------------------------------------
+
+void
+ClientReceiverFb::Impl::getBeautyRgb888NoDenoiseMTSafe(std::vector<unsigned char>& rgbFrame,
+                                                       unsigned& width,
+                                                       unsigned& height,
+                                                       const bool top2bottom,
+                                                       const bool isSrgb)
+{
+    std::lock_guard<std::mutex> lock(mFbAccessMutex);
+    width = getWidth();
+    height = getHeight();
+    getBeautyRgb888NoDenoise(rgbFrame, top2bottom, isSrgb);
+}
+
+void
+ClientReceiverFb::Impl::getBeautyRgb888NoDenoise(std::vector<unsigned char>& rgbFrame,
+                                                 const bool top2bottom,
+                                                 const bool isSrgb)
+{
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderBuffer();
+        }
+    }
+
+#   ifdef VERIFY_FLOAT_API_BY_UC
+    std::vector<float> work;
+    // We test untileBeauty() here instead of untileBeautyRGB() because untileBeautyRGB() is
+    // easily tested by getRenderOutputRgb888() with proper "beauty" AOV definition
+    mFb.untileBeauty(top2bottom,  ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
+    mFb.conv888Beauty(work, isSrgb, rgbFrame);
+#   else  // else VERIFY_FLOAT_API_BY_UC
+    mFb.untileBeauty(isSrgb, top2bottom,
+                     ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                     rgbFrame);
+#   endif // end !VERIFY_FLOAT_API_BY_UC
+}
+
+bool
+ClientReceiverFb::Impl::getPixelInfoRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                               const bool top2bottom,
+                                               const bool isSrgb)
+{
+    if (!mFb.getPixelInfoStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolatePixelInfo(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                     mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolatePixelInfo();
+        }
+    }
+
+#   ifdef VERIFY_FLOAT_API_BY_UC
+    std::vector<float> work;
+    mFb.untilePixelInfo(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
+    mFb.conv888PixelInfo(work, isSrgb, rgbFrame);
+#   else  // else VERIFY_FLOAT_API_BY_UC
+    mFb.untilePixelInfo(isSrgb, top2bottom,
+                        ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                        rgbFrame);
+#   endif // end !VERIFY_FLOAT_API_BY_UC
+
+    return true;
+}
+
+bool
+ClientReceiverFb::Impl::getHeatMapRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                             const bool top2bottom,
+                                             const bool isSrgb)
+{
+    if (!mFb.getHeatMapStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateHeatMap(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                   mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateHeatMap();
+        }
+    }
+
+#   ifdef VERIFY_FLOAT_API_BY_UC
+    std::vector<float> work;
+    mFb.untileHeatMap(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
+    mFb.conv888HeatMap(work, isSrgb, rgbFrame);
+#   else  // else VERIFY_FLOAT_API_BY_UC
+    mFb.untileHeatMap(isSrgb, top2bottom,
+                      ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                      rgbFrame);
+#   endif  // end !VERIFY_FLOAT_API_BY_UC
+
+    return true;
+}
+
+bool
+ClientReceiverFb::Impl::getWeightBufferRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                                  const bool top2bottom,
+                                                  const bool isSrgb)
+{
+    if (!mFb.getWeightBufferStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateWeightBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateWeightBuffer();
+        }
+    }
+
+#   ifdef VERIFY_FLOAT_API_BY_UC
+    std::vector<float> work;
+    mFb.untileWeightBuffer(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
+    mFb.conv888WeightBuffer(work, isSrgb, rgbFrame);
+#   else // else VERIFY_FLOAT_API_BY_UC
+    mFb.untileWeightBuffer(isSrgb, top2bottom,
+                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                           rgbFrame);
+#   endif // end !VERIFY_FLOAT_API_BY_UC
+
+    return true;
+}
+
+bool
+ClientReceiverFb::Impl::getBeautyAuxRgb888Main(std::vector<unsigned char>& rgbFrame,
+                                               const bool top2bottom,
+                                               const bool isSrgb)
+{
+    if (!mFb.getRenderBufferOddStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderBufferOdd(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                           mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderBufferOdd();
+        }
+    }
+
+#   ifdef VERIFY_FLOAT_API_BY_UC
+    std::vector<float> work;
+    // We test untileBeautyOdd() here instead of untileBeautyAux() because untileBeautyAux() is
+    // easily tested by getRenderOutputRgb888() with proper "beautyAUX" AOV definition
+    mFb.untileBeautyOdd(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), work);
+    mFb.conv888BeautyOdd(work, isSrgb, rgbFrame);
+#   else // else VERIFY_FLOAT_API_BY_UC
+    mFb.untileBeautyAux(isSrgb, top2bottom,
+                        ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                        rgbFrame);
+#   endif // end !VERIFY_FLOAT_API_BY_UC
+
+    return true;
+}
+
+template <typename T>
+bool
+ClientReceiverFb::Impl::getRenderOutputRgb888Main(T aovIdentifierInfo,
+                                                  std::vector<unsigned char>& rgbFrame,
+                                                  const bool top2bottom,
+                                                  const bool isSrgb,
+                                                  const bool closestFilterDepthOutput)
+{
+    bool denoise = false;
+    if (mBeautyDenoiseMode != DenoiseMode::DISABLE &&
+        mFb.isBeautyRelatedAov(aovIdentifierInfo) &&
+        !closestFilterDepthOutput) {
+        denoise = true;
+    }
+        
+    bool result = true;
+    if (!denoise) {
+        getRenderOutputRgb888NoDenoise(aovIdentifierInfo, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
+    } else {
+        // beauty related AOV with denoise
+        bool fallback;
+#       ifdef VERIFY_FLOAT_API_BY_UC
+        std::vector<float> work;
+        result = runDenoise(3, work,
+                            top2bottom,
+                            [&](std::vector<float>& buff) {
+                                getRenderOutputF4Main(aovIdentifierInfo, buff, top2bottom, closestFilterDepthOutput);
+                            },
+                            fallback);
+        if (fallback) getRenderOutputNoDenoise(aovIdentifierInfo, work, top2bottom, closestFilterDepthOutput);
+        mFb.conv888BeautyRGB(work, isSrgb, rgbFrame);
+#       else // else VERIFY_FLOAT_API_BY_UC        
+        result = runDenoise888(rgbFrame, top2bottom, isSrgb,
+                               [&](std::vector<float>& buff) {
+                                   getRenderOutputF4Main(aovIdentifierInfo, buff, top2bottom, closestFilterDepthOutput); 
+                               },
+                               fallback);
+        if (fallback) {
+            getRenderOutputRgb888NoDenoise(aovIdentifierInfo, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
+        }
+#       endif // end !VERIFY_FLOAT_API_BY_UC
+    }
+    return result;
+}
+
+template <typename T>
+void
+ClientReceiverFb::Impl::getRenderOutputRgb888NoDenoise(T aovIdentifierInfo,
+                                                       std::vector<unsigned char>& rgbFrame,
+                                                       const bool top2bottom,
+                                                       const bool isSrgb,
+                                                       const bool closestFilterDepthOutput)
+{
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderOutput(aovIdentifierInfo,
+                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderOutput(aovIdentifierInfo);
+        }
+    }
+
+#   ifdef VERIFY_FLOAT_API_BY_UC
+    std::vector<float> work;
+    mFb.untileRenderOutput(aovIdentifierInfo,
+                           top2bottom,
+                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                           closestFilterDepthOutput,
+                           work);
+    mFb.conv888RenderOutput(aovIdentifierInfo, work, isSrgb, closestFilterDepthOutput, rgbFrame);
+#   else // else VERIFY_FLOAT_API_BY_UC
+    mFb.untileRenderOutput(aovIdentifierInfo, isSrgb,
+                           top2bottom,
+                           ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                           closestFilterDepthOutput,
+                           rgbFrame);
+#   endif // end !VERIFY_FLOAT_API_BY_UC
+}
+
+//------------------------------------------------------------------------------
+
+void
+ClientReceiverFb::Impl::getBeautyNoDenoiseMTSafe(std::vector<float>& rgba,
+                                                 unsigned& width,
+                                                 unsigned& height,
+                                                 const bool top2bottom)
+{
+    std::lock_guard<std::mutex> lock(mFbAccessMutex);
+    getBeautyNoDenoise(rgba, top2bottom);
+    width = getWidth();
+    height = getHeight();
+}
+
+void
+ClientReceiverFb::Impl::getBeautyNoDenoise(std::vector<float>& rgba, const bool top2bottom)
+{
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderBuffer();
+        }
+    }
+
+    mFb.untileBeauty(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), rgba);
+}
+
+bool
+ClientReceiverFb::Impl::getPixelInfoMain(std::vector<float>& data,
+                                         const bool top2bottom)
+{
+    if (!mFb.getPixelInfoStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolatePixelInfo(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                     mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolatePixelInfo();
+        }
+    }
+
+    mFb.untilePixelInfo(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), data);
+
+    return true;
+}
+
+bool    
+ClientReceiverFb::Impl::getHeatMapMain(std::vector<float>& data,
+                                       const bool top2bottom)
+{
+    if (!mFb.getHeatMapStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateHeatMap(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                   mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateHeatMap();
+        }
+    }
+
+    mFb.untileHeatMap(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), data);
+
+    return true;
+}
+
+bool
+ClientReceiverFb::Impl::getWeightBufferMain(std::vector<float>& data,
+                                            const bool top2bottom)
+{
+    if (!mFb.getWeightBufferStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateWeightBuffer(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateWeightBuffer();
+        }
+    }
+
+    mFb.untileWeightBuffer(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), data);
+
+    return true;
+}
+
+bool
+ClientReceiverFb::Impl::getBeautyAuxMain(std::vector<float>& rgba,
+                                         const bool top2bottom)
+{
+    if (!mFb.getRenderBufferOddStatus()) return false;
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderBufferOdd(mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                           mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderBufferOdd();
+        }
+    }
+
+    mFb.untileBeautyOdd(top2bottom, ((mRoiViewportStatus)? &mRoiViewport: nullptr), rgba);
+
+    return true;
+}
+
+template <typename T>
+int    
+ClientReceiverFb::Impl::getRenderOutputMain(T aovIdentifierInfo,
+                                            std::vector<float>& data,
+                                            const bool top2bottom,
+                                            const bool closestFilterDepthOutput)
+{
+    if constexpr (std::is_same_v<T, unsigned>) {
+        if (mFb.getTotalRenderOutput() <= aovIdentifierInfo) return 0; // no AOV
+    }
+
+    bool denoise = false;
+    if (mBeautyDenoiseMode != DenoiseMode::DISABLE &&
+        mFb.isBeautyRelatedAov(aovIdentifierInfo) &&
+        !closestFilterDepthOutput) {
+        denoise = true;
+    }
+
+    if (!denoise) {
+        return getRenderOutputNoDenoise(aovIdentifierInfo, data, top2bottom, closestFilterDepthOutput);
+    } else {
+        // beauty related AOV (BEAUTY or BEAUTY_AUX) with denoise. channel total is 3 in this case.
+        bool fallback;
+        bool result = runDenoise(3, data,
+                                 top2bottom,
+                                 [&](std::vector<float>& buff) {
+                                     getRenderOutputF4Main(aovIdentifierInfo, buff, top2bottom, closestFilterDepthOutput);
+                                 },
+                                 fallback);
+        if (fallback) getRenderOutputNoDenoise(aovIdentifierInfo, data, top2bottom, closestFilterDepthOutput);
+        return result ? 3 : -1; // -1 is error
+    }
+}
+
+template <typename T>
+int    
+ClientReceiverFb::Impl::getRenderOutputNoDenoise(T aovIdentifierInfo,
+                                                 std::vector<float>& data,
+                                                 const bool top2bottom,
+                                                 const bool closestFilterDepthOutput)
+{
+    if constexpr (std::is_same_v<T, unsigned>) {
+        if (mFb.getTotalRenderOutput() <= aovIdentifierInfo) return 0; // no AOV
+    }
+
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderOutput(aovIdentifierInfo,
+                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderOutput(aovIdentifierInfo);
+        }
+    }
+
+    return mFb.untileRenderOutput(aovIdentifierInfo,
+                                  top2bottom,
+                                  ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                                  closestFilterDepthOutput,
+                                  data);
+}
+
+template <typename T>
+int
+ClientReceiverFb::Impl::getRenderOutputF4Main(T aovIdentifierInfo,
+                                              std::vector<float>& data,
+                                              const bool top2bottom,
+                                              const bool closestFilterDepthOutput)
+{
+    if (mCoarsePassStatus != 1) {
+        // need extrapolation
+        if (mRoiViewportStatus) {
+            mFb.extrapolateRenderOutput(aovIdentifierInfo,
+                                        mRoiViewport.mMinX, mRoiViewport.mMinY,
+                                        mRoiViewport.mMaxX, mRoiViewport.mMaxY);
+        } else {
+            mFb.extrapolateRenderOutput(aovIdentifierInfo);
+        }
+    }
+
+    return mFb.untileRenderOutputF4(aovIdentifierInfo,
+                                    top2bottom,
+                                    ((mRoiViewportStatus)? &mRoiViewport: nullptr),
+                                    closestFilterDepthOutput,
+                                    data);
 }
 
 //------------------------------------------------------------------------------
@@ -2352,13 +2609,13 @@ ClientReceiverFb::Impl::runDenoise888(std::vector<unsigned char>& rgbFrame,
                          setInputCallBack,
                          (!denoiseAlbedoInputCheck(mBeautyDenoiseMode, mDenoiserAlbedoInputName) ?
                           nullCallBack :
-                          [&, top2bottom](std::vector<float>& buff) {
-                             getRenderOutputF4(mDenoiserAlbedoInputName, buff, top2bottom, false);
+                          [&](std::vector<float>& buff) {
+                             getRenderOutputF4Main(mDenoiserAlbedoInputName, buff, top2bottom, false);
                          }),
                          (!denoiseNormalInputCheck(mBeautyDenoiseMode, mDenoiserNormalInputName) ?
                           nullCallBack :
-                          [&, top2bottom](std::vector<float>& buff) {
-                             getRenderOutputF4(mDenoiserNormalInputName, buff, top2bottom, false);
+                          [&](std::vector<float>& buff) {
+                             getRenderOutputF4Main(mDenoiserNormalInputName, buff, top2bottom, false);
                          }),
                          rgbFrame,
                          isSrgb,
@@ -2394,13 +2651,13 @@ ClientReceiverFb::Impl::runDenoise(const int outputNumChan,
                       setInputCallBack,
                       (!denoiseAlbedoInputCheck(mBeautyDenoiseMode, mDenoiserAlbedoInputName) ?
                        nullCallBack :
-                       [&, top2bottom](std::vector<float>& buff) {
-                          getRenderOutputF4(mDenoiserAlbedoInputName, buff, top2bottom, false);
+                       [&](std::vector<float>& buff) {
+                          getRenderOutputF4Main(mDenoiserAlbedoInputName, buff, top2bottom, false);
                       }),
                       (!denoiseNormalInputCheck(mBeautyDenoiseMode, mDenoiserNormalInputName) ?
                        nullCallBack :
-                       [&, top2bottom](std::vector<float>& buff) {
-                          getRenderOutputF4(mDenoiserNormalInputName, buff, top2bottom, false);
+                       [&](std::vector<float>& buff) {
+                          getRenderOutputF4Main(mDenoiserNormalInputName, buff, top2bottom, false);
                       }),
                       outputNumChan,
                       rgba,
@@ -2857,63 +3114,129 @@ ClientReceiverFb::getErrorMsg() const
 //------------------------------------------------------------------------------------------
 
 bool
+ClientReceiverFb::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                        unsigned& width, unsigned& height,
+                                        const bool top2botton, const bool isSrgb)
+{
+    return mImpl->getBeautyRgb888MTSafe(rgbFrame, width, height, top2botton, isSrgb);
+}
+
+bool
 ClientReceiverFb::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
-                                  const bool top2botton,
-                                  const bool isSrgb)
+                                  const bool top2botton, const bool isSrgb)
 {
     return mImpl->getBeautyRgb888(rgbFrame, top2botton, isSrgb);
 }
 
 bool
+ClientReceiverFb::getPixelInfoRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                           unsigned& width, unsigned& height,
+                                           const bool top2bottom, const bool isSrgb)
+{
+    return mImpl->getPixelInfoRgb888MTSafe(rgbFrame, width, height, top2bottom, isSrgb);
+}
+
+bool
 ClientReceiverFb::getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame,
-                                     const bool top2bottom,
-                                     const bool isSrgb)
+                                     const bool top2bottom, const bool isSrgb)
 {
     return mImpl->getPixelInfoRgb888(rgbFrame, top2bottom, isSrgb);
 }
 
 bool
+ClientReceiverFb::getHeatMapRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                         unsigned& width, unsigned& height,
+                                         const bool top2bottom, const bool isSrgb)
+{
+    return mImpl->getHeatMapRgb888MTSafe(rgbFrame, width, height, top2bottom, isSrgb);
+}
+
+bool
 ClientReceiverFb::getHeatMapRgb888(std::vector<unsigned char>& rgbFrame,
-                                   const bool top2bottom,
-                                   const bool isSrgb)
+                                   const bool top2bottom, const bool isSrgb)
 {
     return mImpl->getHeatMapRgb888(rgbFrame, top2bottom, isSrgb);
 }
 
 bool
+ClientReceiverFb::getWeightBufferRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                              unsigned& width, unsigned& height,
+                                              const bool top2bottom, const bool isSrgb)
+{
+    return mImpl->getWeightBufferRgb888MTSafe(rgbFrame, width, height, top2bottom, isSrgb);
+}
+
+bool
 ClientReceiverFb::getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame,
-                                        const bool top2bottom,
-                                        const bool isSrgb)
+                                        const bool top2bottom, const bool isSrgb)
 {
     return mImpl->getWeightBufferRgb888(rgbFrame, top2bottom, isSrgb);
 }
 
 bool
+ClientReceiverFb::getBeautyAuxRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                           unsigned& width, unsigned& height,
+                                           const bool top2bottom, const bool isSrgb)
+{
+    return mImpl->getBeautyAuxRgb888MTSafe(rgbFrame, width, height, top2bottom, isSrgb);
+}
+
+bool
 ClientReceiverFb::getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame,
-                                     const bool top2bottom,
-                                     const bool isSrgb)
+                                     const bool top2bottom, const bool isSrgb)
 {
     return mImpl->getBeautyAuxRgb888(rgbFrame, top2bottom, isSrgb);
 }
 
 bool
+ClientReceiverFb::getRenderOutputRgb888MTSafe(const unsigned id,
+                                              std::vector<unsigned char>& rgbFrame,
+                                              unsigned& width, unsigned& height,
+                                              const bool top2bottom, const bool isSrgb,
+                                              const bool closestFilterDepthOutput)
+{
+    return mImpl->getRenderOutputRgb888MTSafe(id, rgbFrame, width, height,
+                                              top2bottom, isSrgb, closestFilterDepthOutput);
+}
+
+bool
 ClientReceiverFb::getRenderOutputRgb888(const unsigned id,
                                         std::vector<unsigned char>& rgbFrame,
-                                        const bool top2bottom,
-                                        const bool isSrgb,
+                                        const bool top2bottom, const bool isSrgb,
                                         const bool closestFilterDepthOutput)
 {
     return mImpl->getRenderOutputRgb888(id, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
 }
 
 bool
+ClientReceiverFb::getRenderOutputRgb888MTSafe(const std::string& aovName,
+                                              std::vector<unsigned char>& rgbFrame,
+                                              unsigned& width, unsigned& height,
+                                              const bool top2bottom, const bool isSrgb,
+                                              const bool closestFilterDepthOutput)
+{
+    return mImpl->getRenderOutputRgb888MTSafe(aovName, rgbFrame, width, height,
+                                              top2bottom, isSrgb, closestFilterDepthOutput);
+}
+
+bool
 ClientReceiverFb::getRenderOutputRgb888(const std::string& aovName,
                                         std::vector<unsigned char>& rgbFrame,
-                                        const bool top2bottom,
-                                        const bool isSrgb,
+                                        const bool top2bottom, const bool isSrgb,
                                         const bool closestFilterDepthOutput)
 {
     return mImpl->getRenderOutputRgb888(aovName, rgbFrame, top2bottom, isSrgb, closestFilterDepthOutput);
+}
+
+//------------------------------------------------------------------------------------------
+
+bool
+ClientReceiverFb::getBeautyMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height,
+                                  const bool top2bottom)
+// 4 channels per pixel
+{
+
+    return mImpl->getBeautyMTSafe(rgba, width, height, top2bottom);
 }
 
 bool
@@ -2925,10 +3248,26 @@ ClientReceiverFb::getBeauty(std::vector<float>& rgba,
 }
     
 bool
+ClientReceiverFb::getPixelInfoMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
+                                     const bool top2bottom)
+// 1 channel per pixel
+{
+    return mImpl->getPixelInfoMTSafe(data, width, height, top2bottom);
+}
+
+bool
 ClientReceiverFb::getPixelInfo(std::vector<float>& data, const bool top2bottom)
 // 1 channel per pixel
 {
     return mImpl->getPixelInfo(data, top2bottom);
+}
+
+bool
+ClientReceiverFb::getHeatMapMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
+                                   const bool top2bottom)
+// 1 channel per pixel
+{
+    return mImpl->getHeatMapMTSafe(data, width, height, top2bottom);
 }
 
 bool
@@ -2939,6 +3278,14 @@ ClientReceiverFb::getHeatMap(std::vector<float>& data, const bool top2bottom)
 }
 
 bool
+ClientReceiverFb::getWeightBufferMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
+                                        const bool top2bottom)
+// 1 channel per pixel
+{
+    return mImpl->getWeightBufferMTSafe(data, width, height, top2bottom);
+}
+
+bool
 ClientReceiverFb::getWeightBuffer(std::vector<float>& data, const bool top2bottom)
 // 1 channel per pixel
 {
@@ -2946,29 +3293,53 @@ ClientReceiverFb::getWeightBuffer(std::vector<float>& data, const bool top2botto
 }
 
 bool
-ClientReceiverFb::getBeautyOdd(std::vector<float>& rgba, const bool top2bottom)
+ClientReceiverFb::getBeautyAuxMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height,
+                                     const bool top2bottom)
 // 4 channels per pixel
 {
-    return mImpl->getBeautyOdd(rgba, top2bottom);
+    return mImpl->getBeautyAuxMTSafe(rgba, width, height, top2bottom);
+}
+
+bool
+ClientReceiverFb::getBeautyAux(std::vector<float>& rgba, const bool top2bottom)
+// 4 channels per pixel
+{
+    return mImpl->getBeautyAux(rgba, top2bottom);
+}
+
+int
+ClientReceiverFb::getRenderOutputMTSafe(const unsigned id,
+                                        std::vector<float>& data, unsigned& width, unsigned& height,
+                                        const bool top2bottom, const bool closestFilterDepthOutput)
+{
+    return mImpl->getRenderOutputMTSafe(id, data, width, height, top2bottom, closestFilterDepthOutput);
 }
 
 int
 ClientReceiverFb::getRenderOutput(const unsigned id,
                                   std::vector<float>& data,
-                                  const bool top2bottom,
-                                  const bool closestFilterDepthOutput)
+                                  const bool top2bottom, const bool closestFilterDepthOutput)
 {
     return mImpl->getRenderOutput(id, data, top2bottom, closestFilterDepthOutput);
 }
 
 int
+ClientReceiverFb::getRenderOutputMTSafe(const std::string& aovName,
+                                        std::vector<float>& data, unsigned& width, unsigned& height,
+                                        const bool top2bottom, const bool closestFilterDepthOutput)
+{
+    return mImpl->getRenderOutputMTSafe(aovName, data, width, height, top2bottom, closestFilterDepthOutput);
+}
+
+int
 ClientReceiverFb::getRenderOutput(const std::string& aovName,
                                   std::vector<float>& data,
-                                  const bool top2bottom,
-                                  const bool closestFilterDepthOutput)
+                                  const bool top2bottom, const bool closestFilterDepthOutput)
 {
     return mImpl->getRenderOutput(aovName, data, top2bottom, closestFilterDepthOutput);
 }
+
+//------------------------------------------------------------------------------------------
 
 scene_rdl2::math::Vec4f
 ClientReceiverFb::getPixBeauty(const int sx, const int sy) const

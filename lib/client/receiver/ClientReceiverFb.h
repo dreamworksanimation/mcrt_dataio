@@ -217,6 +217,7 @@ public:
 
     /// @brief Get elapsed time from snapshot was executed on MCRT computation to current
     /// @return Second
+    ///
     /// @detail
     /// This API and decodeProgressiveFrame() should be called from same thread.
     float getElapsedSecFromStart(); // return sec
@@ -366,7 +367,7 @@ public:
 
     /// @brief Get error message
     ///
-    /// @defail
+    /// @detail
     /// The get related APIs might leave error messages internally when they return an error status.
     /// For example, getBeauty() API returns false if the internal denoise operation failed and leaves
     /// the error messages. This function gets these error messages for the caller.
@@ -398,6 +399,24 @@ public:
     bool getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                          const bool top2bottom = false,
                          const bool isSrgb = false);
+    /// @brief MT-safe version of getBeautyRgb888()
+    /// @param rgbFrame returned current beauty buffer which is gamma2.2 or sRGB conversion.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param isSrgb specify sRGB 8bit quantize mode.
+    /// @return Return true if properly get beauty information. 
+    ///         Return false if an error happened inside the denoise operation but try to return data
+    ///         by falling back to non-denoise mode.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getBeautyRgb888() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                               unsigned& width,
+                               unsigned& height,
+                               const bool top2bottom = false,
+                               const bool isSrgb = false);
 
     /// @brief Get current PixelInfo buffer data as 8bit monochrome color RGB 3 channels.
     /// @param rgbFrame returned current PixelInfo buffer which properly converted depth info to monochrome image.
@@ -421,6 +440,21 @@ public:
     bool getPixelInfoRgb888(std::vector<unsigned char>& rgbFrame,
                             const bool top2bottom = false,
                             const bool isSrgb = false);
+    /// @brief MT-safe version of getPixelInfoRgb888()
+    /// @param rgbFrame returned current PixelInfo buffer which properly converted depth info to monochrome image.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return return true if image has PixelInfo buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getPixelInfoRgb888() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getPixelInfoRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                  unsigned& width,
+                                  unsigned& height,
+                                  const bool top2bottom = false,
+                                  const bool isSrgb = false);
 
     /// @brief Get current HeatMap buffer data as 8bit RGB 3 channels.
     /// @param rgbFrame returned current HeatMap buffer which properly converted to color image.
@@ -444,6 +478,21 @@ public:
     bool getHeatMapRgb888(std::vector<unsigned char>& rgbFrame,
                           const bool top2bottom = false,
                           const bool isSrgb = false);
+    /// @brief MT-safe version of getHeatMapRgb888()
+    /// @param rgbFrame returned current HeatMap buffer which properly converted to color image.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return return true if image has HeatMap buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getHeatMapRgb888() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getHeatMapRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                unsigned& width,
+                                unsigned& height,
+                                const bool top2bottom = false,
+                                const bool isSrgb = false);
 
     /// @brief Get current Weight buffer data as 8bit RGB 3 channels.
     /// @param rgbFrame returned current Weight buffer which properly converted to color image.
@@ -468,6 +517,22 @@ public:
     bool getWeightBufferRgb888(std::vector<unsigned char>& rgbFrame,
                                const bool top2bottom = false,
                                const bool isSrgb = false);
+    /// @brief MT-safe version of getWeightBufferRgb888()
+    /// @param rgbFrame returned current Weight buffer which properly converted to color image.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param isSrgb specify sRGB 8bit quantize mode.
+    /// @return return true if image has Weight buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getWeightBufferRgb888() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getWeightBufferRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                     unsigned& width,
+                                     unsigned& height,
+                                     const bool top2bottom = false,
+                                     const bool isSrgb = false);
 
     /// @brief Get current RenderBufferOdd (aka BeautyAux) data as 8bit RGB 3 channels.
     /// @param rgbFrame returned current RenderBufferOdd buffer which is gamma corrected.
@@ -489,6 +554,21 @@ public:
     bool getBeautyAuxRgb888(std::vector<unsigned char>& rgbFrame,
                             const bool top2bottom = false,
                             const bool isSrgb = false);
+    /// @brief MT-safe version of getBeautyAuxRgb888()
+    /// @param rgbFrame returned current RenderBufferOdd buffer which is gamma corrected.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param isSrgb specify sRGB 8bit quantize mode.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getBeautyAuxRgb888() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getBeautyAuxRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
+                                  unsigned& width,
+                                  unsigned& height,
+                                  const bool top2bottom = false,
+                                  const bool isSrgb = false);
 
     /// @brief Get current RenderOutput(=AOV) buffer data as 8bit RGB 3 channels.
     /// @param id speficy AOV id (0 <= id < getTotalRenderOutput())
@@ -598,6 +678,26 @@ public:
                                const bool top2bottom = false,
                                const bool isSrgb = false,
                                const bool closestFilterDepthOutput = false);
+    /// @brief MT-safe version of getRenderOutputRgb888(id, ...)
+    /// @param id speficy AOV id (0 <= id < getTotalRenderOutput())
+    /// @param rgbFrame returned current RenderOutput buffer which pointed by id.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param isSrgb specify sRGB 8bit quantize mode.
+    /// @param closestFilterDepthOutput convert depth info when thie AOV is using closestFilter instead data itself
+    /// @return return true is image has apropriate buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getRenderOutputRgb888(id, ...) against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getRenderOutputRgb888MTSafe(const unsigned id,
+                                     std::vector<unsigned char>& rgbFrame,
+                                     unsigned& width,
+                                     unsigned& height,
+                                     const bool top2bottom = false,
+                                     const bool isSrgb = false,
+                                     const bool closestFilterDepthOutput = false);
 
     /// @brief Get current RenderOutput(=AOV) buffer data as 8bit RGB 3 channels.
     /// @param aovName specify AOV's buffer name.
@@ -622,7 +722,8 @@ public:
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
     /// If you set isSrgb = false (this is default), 8bit quantized logic is using gamma 2.2 conversion.
     /// If you set isSrgb argument as true, 8bit quantized logic changed from gamma 2.2 to sRGB mode.
-    /// If this AOV is using closestFilter and closestFilterDepthOutput is true, this function convert closestFilter's depth instead data itself.
+    /// If this AOV is using closestFilter and closestFilterDepthOutput is true, this function convert closestFilter's
+    /// depth instead data itself.
     /// Depth value mapped from minDepth~maxDepth to 0~255.
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
@@ -631,6 +732,26 @@ public:
                                const bool top2bottom = false,
                                const bool isSrgb = false,
                                const bool closestFilterDepthOutput = false);
+    /// @brief MT-safe version of getRenderOutputRgb888(aovName, ...)
+    /// @param aovName specify AOV's buffer name.
+    /// @param rgbFrame returned current RenderOutput buffer which pointed by aovName.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param isSrgb specify sRGB 8bit quantize mode.
+    /// @param closestFilterDepthOutput convert depth info when thie AOV is using closestFilter instead data itself
+    /// @return return true is image has apropriate buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getRenderOutputRgb888(aovName, ...) against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getRenderOutputRgb888MTSafe(const std::string& aovName,
+                                     std::vector<unsigned char>& rgbFrame,
+                                     unsigned& width,
+                                     unsigned& height,
+                                     const bool top2bottom = false,
+                                     const bool isSrgb = false,
+                                     const bool closestFilterDepthOutput = false);
 
     //------------------------------
 
@@ -653,6 +774,22 @@ public:
     /// If you set top2bottom as true, return rgba is flipped Y direction.
     bool getBeauty(std::vector<float>& rgba,
                    const bool top2bottom = false); // 4 channels per pixel
+    /// @brief MT-safe version of getBeauty()
+    /// @param rgba returned current beauty buffer as original data.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return Return true if properly get beauty information. 
+    ///         Return false if an error happened inside the denoise operation but try to return data
+    ///         by falling back to non-denoise mode.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getBeauty() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getBeautyMTSafe(std::vector<float>& rgba,
+                         unsigned& width,
+                         unsigned& height,
+                         const bool top2bottom = false);
 
     /// @brief Get current PixelInfo buffer data as float (=32bit single float) 1 channel data.
     /// @param data returned current PixelInfo buffer.
@@ -671,7 +808,22 @@ public:
     /// data's format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getPixelInfo(std::vector<float>& data, const bool top2bottom = false); // 1 channel per pixel
+    bool getPixelInfo(std::vector<float>& data,
+                      const bool top2bottom = false); // 1 channel per pixel
+    /// @brief MT-safe version of getPixelInfo()
+    /// @param data returned current PixelInfo buffer.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return return true if image has PixelInfo buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getPixelInfo() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getPixelInfoMTSafe(std::vector<float>& data,
+                            unsigned& width,
+                            unsigned& height,
+                            const bool top2bottom = false); // 1 channel per pixel
 
     /// @brief Get current HeatMap buffer data as float (=32bit single float) 1 channel data.
     /// @param data returned current HeatMap buffer.
@@ -689,7 +841,22 @@ public:
     /// data's data format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getHeatMap(std::vector<float>& data, const bool top2bottom = false);   // 1 channel per pixel
+    bool getHeatMap(std::vector<float>& data,
+                    const bool top2bottom = false);   // 1 channel per pixel
+    /// @brief MT-safe version of getHeatMap()
+    /// @param data returned current HeatMap buffer.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return return true if image has HeatMap buffer. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getHeatMap() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getHeatMapMTSafe(std::vector<float>& data,
+                          unsigned& width,
+                          unsigned& height,
+                          const bool top2bottom = false);   // 1 channel per pixel
 
     /// @brief Get current weight buffer data as float (=32bit single float) 1 channel data.
     /// @param data returned current weight buffer.
@@ -706,9 +873,24 @@ public:
     /// data's format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getWeightBuffer(std::vector<float>& data, const bool top2bottom = false); // 1 channel per pixel
+    bool getWeightBuffer(std::vector<float>& data,
+                         const bool top2bottom = false); // 1 channel per pixel
+    /// @brief MT-safe version of getWeightBuffer()
+    /// @param data returned current weight buffer.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return return true if image has Weight buffer data. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getWeightBuffer() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getWeightBufferMTSafe(std::vector<float>& data,
+                               unsigned& width,
+                               unsigned& height,
+                               const bool top2bottom = false); // 1 channel per pixel
 
-    /// @brief Get current RenderBufferOdd data as float (=32bit single float) RGBA 4 channels
+    /// @brief Get current RenderBufferOdd (aka BeautyAux) data as float (=32bit single float) RGBA 4 channels
     /// @param rgba returned current RenderBufferOdd data buffer.
     /// @param top2bottom specify output data Y direction order.
     /// @return return true if image has RenderBufferOdd data. false if image does not.
@@ -723,7 +905,23 @@ public:
     /// data's format is lined up from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, return data is flipped Y direction.
-    bool getBeautyOdd(std::vector<float>& rgba, const bool top2bottom = false); // 4 channels per pixel
+    /// This API used to be called getBeautyOdd() and was renamed.
+    bool getBeautyAux(std::vector<float>& rgba,
+                      const bool top2bottom = false); // 4 channels per pixel
+    /// @brief MT-safe version of getBeautyAux()
+    /// @param rgba returned current RenderBufferOdd data buffer.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @return return true if image has RenderBufferOdd data. false if image does not.
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getBeautyAux() against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    bool getBeautyAuxMTSafe(std::vector<float>& rgba,
+                            unsigned& width,
+                            unsigned& height,
+                            const bool top2bottom = false); // 4 channels per pixel
 
     /// @brief Get current RenderOutput(=AOV) buffer data
     /// @param id specify AOV id (0 <= id < getTotalRenderOutput())
@@ -793,7 +991,8 @@ public:
     ///   </tr>
     /// </table>
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
-    /// If this AOV is using closestFilter and closestFilterDepthOutput is true, this function convert closestFilter's depth instead data itself.
+    /// If this AOV is using closestFilter and closestFilterDepthOutput is true, this function convert closestFilter's
+    /// depth instead data itself.
     /// In this case, output data only has single float numChan.
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
@@ -801,10 +1000,29 @@ public:
                          std::vector<float>& data,
                          const bool top2bottom = false,
                          const bool closestFilterDepthOutput = false);
+    /// @brief MT-safe version of getRenderOutput(id, ...)
+    /// @param id specify AOV id (0 <= id < getTotalRenderOutput())
+    /// @param data returned current RenderOutput buffer which pointed by id.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param closestFilterDepthOutput convert depth info when thie AOV is using closestFilter instead data itself
+    /// @return return channel total number. 0 implies no data. -1 is error and you can get error message by
+    ///         getErrorMsg().
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getRenderOutput(id, ...) against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    int  getRenderOutputMTSafe(const unsigned id,
+                               std::vector<float>& data,
+                               unsigned& width,
+                               unsigned& height,
+                               const bool top2bottom = false,
+                               const bool closestFilterDepthOutput = false);
 
     /// @brief Get current RenderOutput(=AOV) buffer data
     /// @param aovName specify AOV's buffer name.
-    /// @param data returned current RenderOutput buffer which pointed by id.
+    /// @param data returned current RenderOutput buffer which is pointed to by aovName.
     /// @param top2bottom specify output data Y direction order.
     /// @param closestFilterDepthOutput convert depth info when thie AOV is using closestFilter instead data itself
     /// @return return channel total number. 0 implies no data. -1 is error and you can get error message by
@@ -825,7 +1043,8 @@ public:
     /// data's formats are same as previous getRenderOutput() function.
     /// (See comments of previous getRenderOutput() function for more detail).
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
-    /// If this AOV is using closestFilter and closestFilterDepthOutput is true, this function convert closestFilter's depth instead data itself.
+    /// If this AOV is using closestFilter and closestFilterDepthOutput is true, this function convert closestFilter's
+    /// depth instead data itself.
     /// In this case, output data only has single float numChan.
     /// If this AOV is not using closestFilter with closestFilterDepthOutput set to true, we don't have closestFilter depth info.
     /// So closestFilterDepthOutput is automatically set false.
@@ -833,6 +1052,25 @@ public:
                          std::vector<float>& data,
                          const bool top2bottom = false,
                          const bool closestFilterDepthOutput = false);
+    /// @brief MT-safe version of getRenderOutput(aovName, ...)
+    /// @param aovName specify AOV's buffer name.
+    /// @param data returned current RenderOutput buffer which pointed by aovName.
+    /// @param width returned data's width
+    /// @param height returned data's height
+    /// @param top2bottom specify output data Y direction order.
+    /// @param closestFilterDepthOutput convert depth info when thie AOV is using closestFilter instead data itself
+    /// @return return channel total number. 0 implies no data. -1 is error and you can get error message by
+    ///         getErrorMsg().
+    ///
+    /// @detail
+    /// This API is a multi-thread safe version of getRenderOutput(aovName, ...) against decodeProgressiveFrame().
+    /// You can call this API in a different thread from executing decodeProgressiveFrame().
+    int  getRenderOutputMTSafe(const std::string& aovName,
+                               std::vector<float>& data,
+                               unsigned& width,
+                               unsigned& height,
+                               const bool top2bottom = false,
+                               const bool closestFilterDepthOutput = false);
 
     //------------------------------
 

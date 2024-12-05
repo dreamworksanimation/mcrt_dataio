@@ -18,6 +18,7 @@
 #include <scene_rdl2/common/grid_util/Fb.h>
 #include <scene_rdl2/common/grid_util/LatencyLog.h>
 #include <scene_rdl2/common/grid_util/Parser.h>
+#include <scene_rdl2/common/grid_util/ShmFb.h>
 #include <scene_rdl2/common/math/Viewport.h>
 #include <scene_rdl2/common/rec_time/RecTime.h>
 
@@ -33,6 +34,7 @@ public:
     using CallBackGenericComment = std::function<void(const std::string &comment)>;
     using CallBackSendMessage = std::function<bool(const arras4::api::MessageContentConstPtr msg)>;
     using Parser = scene_rdl2::grid_util::Parser;
+    using ShmFb = scene_rdl2::grid_util::ShmFb;
 
     enum class DenoiseEngine : int {
         OPTIX,
@@ -85,11 +87,78 @@ public:
 
     //------------------------------
 
+    /// @brief Set shared memory framebuffer (ShmFb) functionality on or off
+    /// @param flag on or off
+    ///
+    /// @detail
+    /// You can set shared memory framebuffer (shmFb) functionality on or off by this API. Default is off
+    void setActiveShmFb(const bool flag);
+
+    /// @brief Get shared memory framebuffer (shmFb) functionality condition
+    /// @return Return true if shmFb functionality is enabled. Otherwise false.
+    bool getActiveShmFb() const;
+
+    /// @brief Set shared memory framebuffer (shmFb) channel mode
+    /// @param chanMode Specify channel mode by ShmFb::ChanMode::{UC8,H16,F32}
+    ///
+    /// @detail
+    /// Specify channel mode. We have 3 options so far.
+    /// <table>
+    ///   <tr>
+    ///     <th>type</th>
+    ///     <th>description</th>
+    ///   </tr>
+    ///   <tr>
+    ///     <td>ShmFb::ChanMode::UC8</td>
+    ///     <td>8bit unsigned char</td>
+    ///   </tr>
+    ///   <tr>
+    ///     <td>ShmFb::ChanMode::H16</td>
+    ///     <td>16bit half float</td>
+    ///   </tr>
+    ///   <tr> 
+    ///     <td>ShmFb::ChamMode::F32</td>
+    ///     <td>32bit full single float</td>
+    ///   </tr>
+    /// </table>
+    /// Default is ShmFb::ChanMode::UC8
+    void setShmFbChanMode(const ShmFb::ChanMode chanMode);
+
+    /// @brief Get shared memory framebuffer (shmFb) current channel mode
+    /// @return Return current shmFb channel mode
+    ShmFb::ChanMode getShmFbChanMode() const;
+
+    /// @brief Set shared memory framebuffer (shmFb) channel total count
+    /// @param chanTotal Specify the number of channels for shmFb
+    ///
+    /// @detail
+    /// You can set the number of channels for shmFb. Default is 3.
+    void setShmFbChanTotal(const unsigned chanTotal);
+
+    /// @brief Get the number of channels of shared memory framebuffer (shmFb)
+    /// @return Return the number of channels that shmFb currently has.
+    unsigned getShmFbChanTotal() const;
+
+    /// @brief Set shared memory framebuffer (shmFb) top2bottom (data order) condition
+    /// @param on or off
+    ///
+    /// @detail
+    /// Specify true if shmFb's data order is from top to bottom. False if the order is from bottom
+    /// to top. The default is false.
+    void setShmFbTop2BtmFlag(const bool flag);
+
+    /// @brief Get shared memory framebuffer (shmFb) top2bottom (data order) condition
+    /// @return Return true if shmFb's data order is from top to bottom. Otherwise, return false.
+    bool getShmFbTop2BtmFlag() const;
+
+    //------------------------------
+
     /// @brief decode ProgressiveFrame message and update internal fb data accordingly.
     ///
     /// @param message message which you would like to decode
     /// @param doParallel decode by multi-threads (=true) or single-thread (=false)
     /// @param callbackFuncAtStartedCondition callback function pointer which calls when received message has "STARTED" condition
+    /// @param headlessMode Need to be set to true if headless mode. Otherwise false. See the details section for more details.
     /// @return decode succeeded (true) or error (false)
     ///
     /// @detail
@@ -98,12 +167,18 @@ public:
     /// If you don't decode some of the ProgressiveFrame message or wrong order of messages,
     /// internal framebuffer data is not updated properly and image might be broken. 
     /// If you get this situation somehow, only solution to solve and back to normal condision is
-    /// "re-rendering from scratch".
+    /// "re-rendering from scratch".<br>
+    /// Regarding the shared memory framebuffer (shmFb). Basically, shmFb is updated by calling getBeautyRgb888()
+    /// or getBeauty() APIs. This is the ordinal situation. However, there is a situation that you never call
+    /// getBeautyRgb888() or getBeauty() APIs on purpose. This is a headless situation and we have to set the
+    /// headless option to true. In this case, the shmFb update is happened inside decodeProgressiveFrame().
+    /// There is no shmFb update if you forget to set headless mode true under headless situation.
     ///
     bool decodeProgressiveFrame(const mcrt::ProgressiveFrame& message,
                                 const bool doParallel,
                                 const CallBackStartedCondition& callBackFuncAtStartedCondition,
-                                const CallBackGenericComment& callBackForGenericComment = nullptr);
+                                const CallBackGenericComment& callBackForGenericComment = nullptr,
+                                const bool headlessMode = false);
 
     //------------------------------
 
@@ -380,6 +455,7 @@ public:
     /// @param rgbFrame returned current beauty buffer which is gamma2.2 or sRGB conversion.
     /// @param top2bottom specify output data Y direction order.
     /// @param isSrgb specify sRGB 8bit quantize mode.
+    /// @param cancelShmFbUpdate Specify the canceling condition of the shared memory framebuffer update
     /// @return Return true if properly get beauty information. 
     ///         Return false if an error happened inside the denoise operation but try to return data
     ///         by falling back to non-denoise mode.
@@ -395,16 +471,25 @@ public:
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
     /// If you set top2bottom as true, output rgbFrame is flipped Y direction.
     /// If you set isSrgb = false (this is default), 8bit quantized logic is using gamma 2.2 conversion.
-    /// If you set isSrgb argument as true, 8bit quantized logic changed from gamma 2.2 to sRGB mode.
+    /// If you set isSrgb argument as true, 8bit quantized logic changed from gamma 2.2 to sRGB mode.<br>
+    /// Set true to the cancelShmFbUpdate option if you want to cancel shmFb update by this call.
+    /// Otherwise, shmFb is updated as usual. The default is false. If your client code calls both of the
+    /// getBeautyRgb888() and getBeauty() to get UC8 and F32 data independently during continuous
+    /// decodeProgressiveFrame() calls, this causes performance issues regarding shmFb operation.
+    /// Because getBeautyRgb888() and getBeauty() try to save exactly the same data into shmFb.
+    /// We should skip one of them. To manually control this situation, we can use cancelShmFbUpdate
+    /// options and set true one of them.
     bool getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                          const bool top2bottom = false,
-                         const bool isSrgb = false);
+                         const bool isSrgb = false,
+                         const bool cancelShmFbUpdate = false);
     /// @brief MT-safe version of getBeautyRgb888()
     /// @param rgbFrame returned current beauty buffer which is gamma2.2 or sRGB conversion.
     /// @param width returned data's width
     /// @param height returned data's height
     /// @param top2bottom specify output data Y direction order.
     /// @param isSrgb specify sRGB 8bit quantize mode.
+    /// @param cancelShmFbUpdate Specify the canceling condition of the shared memory framebuffer update
     /// @return Return true if properly get beauty information. 
     ///         Return false if an error happened inside the denoise operation but try to return data
     ///         by falling back to non-denoise mode.
@@ -416,7 +501,8 @@ public:
                                unsigned& width,
                                unsigned& height,
                                const bool top2bottom = false,
-                               const bool isSrgb = false);
+                               const bool isSrgb = false,
+                               const bool cancelShmFbUpdate = false);
 
     /// @brief Get current PixelInfo buffer data as 8bit monochrome color RGB 3 channels.
     /// @param rgbFrame returned current PixelInfo buffer which properly converted depth info to monochrome image.
@@ -758,6 +844,7 @@ public:
     /// @brief Get current beauty buffer data as float (=32bit single float) RGBA 4 channels
     /// @param rgba returned current beauty buffer as original data.
     /// @param top2bottom specify output data Y direction order.
+    /// @param cancelShmFbUpdate Specify the canceling condition of the shared memory framebuffer update
     /// @return Return true if properly get beauty information. 
     ///         Return false if an error happened inside the denoise operation but try to return data
     ///         by falling back to non-denoise mode.
@@ -771,14 +858,23 @@ public:
     /// If current image condition is coarse pass, output rgba is properly extrapolated.<br>
     /// rgba's data format is R G B A R G B A ... from bottom scanline to top scanline and
     /// left pixel to right pixel for each scanline when you set top2bottom as false.<br>
-    /// If you set top2bottom as true, return rgba is flipped Y direction.
+    /// If you set top2bottom as true, return rgba is flipped Y direction.<br>
+    /// Set true to the cancelShmFbUpdate option if you want to cancel shmFb update by this call.
+    /// Otherwise, shmFb is updated as usual. The default is false. If your client code calls both of the
+    /// getBeautyRgb888() and getBeauty() to get UC8 and F32 data independently during continuous
+    /// decodeProgressiveFrame() calls, this causes performance issues regarding shmFb operation.
+    /// Because getBeautyRgb888() and getBeauty() try to save exactly the same data into shmFb.
+    /// We should skip one of them. To manually control this situation, we can use cancelShmFbUpdate
+    /// options and set true one of them.
     bool getBeauty(std::vector<float>& rgba,
-                   const bool top2bottom = false); // 4 channels per pixel
+                   const bool top2bottom = false,
+                   const bool cancelShmFbUpdate = false); // 4 channels per pixel
     /// @brief MT-safe version of getBeauty()
     /// @param rgba returned current beauty buffer as original data.
     /// @param width returned data's width
     /// @param height returned data's height
     /// @param top2bottom specify output data Y direction order.
+    /// @param cancelShmFbUpdate Specify the canceling condition of the shared memory framebuffer update
     /// @return Return true if properly get beauty information. 
     ///         Return false if an error happened inside the denoise operation but try to return data
     ///         by falling back to non-denoise mode.
@@ -789,7 +885,8 @@ public:
     bool getBeautyMTSafe(std::vector<float>& rgba,
                          unsigned& width,
                          unsigned& height,
-                         const bool top2bottom = false);
+                         const bool top2bottom = false,
+                         const bool cancelShmFbUpdate = false);
 
     /// @brief Get current PixelInfo buffer data as float (=32bit single float) 1 channel data.
     /// @param data returned current PixelInfo buffer.

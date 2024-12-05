@@ -18,6 +18,7 @@
 
 #include <scene_rdl2/common/grid_util/PackTiles.h>
 #include <scene_rdl2/common/grid_util/PackTilesPassPrecision.h>
+#include <scene_rdl2/common/grid_util/ShmFbOutput.h>
 #include <scene_rdl2/common/rec_time/RecTime.h>
 #include <scene_rdl2/render/util/StrUtil.h>
 
@@ -42,14 +43,16 @@ namespace mcrt_dataio {
 class ClientReceiverFb::Impl
 {
 public:
+    using Arg = scene_rdl2::grid_util::Arg;
     using CallBackStartedCondition = ClientReceiverFb::CallBackStartedCondition;
     using CallBackGenericComment = ClientReceiverFb::CallBackGenericComment;
     using CallBackSendMessage = std::function<bool(const arras4::api::MessageContentConstPtr msg)>;
     using DenoiseEngine = ClientReceiverFb::DenoiseEngine;
     using DenoiseMode = ClientReceiverFb::DenoiseMode;
-    using SenderMachineId = ClientReceiverFb::SenderMachineId;
-    using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
+    using SenderMachineId = ClientReceiverFb::SenderMachineId;
+    using ShmFb = scene_rdl2::grid_util::ShmFb;
+    using ShmFbOutput = scene_rdl2::grid_util::ShmFbOutput;
 
     Impl(bool initialTelemetryOverlayCondition);
     ~Impl() {}
@@ -63,10 +66,25 @@ public:
 
     //------------------------------
 
+    void setActiveShmFb(const bool flag) { mShmFbOutput.setActive(flag); }
+    bool getActiveShmFb() const { return mShmFbOutput.getActive(); }
+
+    void setShmFbChanMode(const ShmFb::ChanMode chanMode) { mShmFbChanMode = chanMode; }
+    ShmFb::ChanMode getShmFbChanMode() const { return mShmFbChanMode; }
+
+    void setShmFbChanTotal(const unsigned chanTotal) { mShmFbChanTotal = chanTotal; }
+    unsigned getShmFbChanTotal() const { return mShmFbChanTotal; }
+
+    void setShmFbTop2BtmFlag(const bool flag) { mShmFbTop2BtmFlag = flag; }
+    bool getShmFbTop2BtmFlag() const { return mShmFbTop2BtmFlag; }
+
+    //------------------------------
+
     bool decodeProgressiveFrame(const mcrt::ProgressiveFrame& message,
                                 const bool doParallel,
                                 const CallBackStartedCondition& callBackFuncAtStartedCondition,
-                                const CallBackGenericComment& callBackFuncForGenericComment);
+                                const CallBackGenericComment& callBackFuncForGenericComment,
+                                const bool headlessMode);
 
     //------------------------------
 
@@ -129,8 +147,9 @@ public:
     //------------------------------
 
     bool getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
-                               const bool top2bottom, const bool isSrgb);
-    bool getBeautyRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb);
+                               const bool top2bottom, const bool isSrgb, const bool cancelShmFbUpdate);
+    bool getBeautyRgb888(std::vector<unsigned char>& rgbFrame, const bool top2bottom, const bool isSrgb,
+                         const bool cancelShmFbUpdate);
 
     bool getPixelInfoRgb888MTSafe(std::vector<unsigned char>& rgbFrame, unsigned& width, unsigned& height,
                                   const bool top2bottom, const bool isSrgb);
@@ -163,8 +182,9 @@ public:
 
     //------------------------------
 
-    bool getBeautyMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height, const bool top2bottom);
-    bool getBeauty(std::vector<float>& rgba, const bool top2bottom); // 4 channels/pixel
+    bool getBeautyMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height, const bool top2bottom,
+                         const bool cancelShmFbUpdate);
+    bool getBeauty(std::vector<float>& rgba, const bool top2bottom, const bool cancelShmFbUpdate); // 4 channels/pixel
 
     bool getPixelInfoMTSafe(std::vector<float>& data, unsigned& width, unsigned& height,
                             const bool top2bottom); // 1 channel/pixel
@@ -320,6 +340,16 @@ private:
     telemetry::Display mTelemetryDisplay;
 
     SysUsage mSysUsage; // system info of client host
+
+    //------------------------------
+
+    ShmFb::ChanMode mShmFbChanMode {ShmFb::ChanMode::UC8};
+    unsigned mShmFbChanTotal {3};
+    bool mShmFbTop2BtmFlag {false};
+
+    std::vector<unsigned char> mHeadlessRgb888Frame; // for ShmFb::ChanMode::UC8
+    std::vector<float> mHeadlessRgbFloatFrame; // for ShmFb::ChanMode::{H16,F32}
+    ShmFbOutput mShmFbOutput;
 
     //------------------------------
 
@@ -479,6 +509,7 @@ private:
     std::string showDenoiseInfo() const;
     std::string showRenderPrepProgress() const;
     std::string showViewportInfo() const;
+    std::string showShmFbInfo() const;
 
     void telemetryResetTest(); // for the telemetry testing purposes
 }; // ClientReceiverFb::Impl
@@ -514,7 +545,8 @@ bool
 ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &message,
                                                const bool doParallel,
                                                const CallBackStartedCondition& callBackFuncAtStartedCondition,
-                                               const CallBackGenericComment& callBackFuncForGenericComment)
+                                               const CallBackGenericComment& callBackFuncForGenericComment,
+                                               const bool headlessMode)
 {
     if (mDecodeProgressiveFrameCounter == 0) {
         // very first progressiveFrame message decoding
@@ -688,7 +720,25 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
             if (error) return false;
         }
     }
+
     if (enableLock) lock.unlock();
+
+    if (headlessMode && mShmFbOutput.getActive()) {
+        // update telemetry overlay resolution as the same as image reso
+        setTelemetryOverlayReso(getWidth(), getHeight());
+
+        // We call get* function and update headlessRgbBuffer for shmFbOutput
+        switch (mShmFbChanMode) {
+        case ShmFb::ChanMode::UC8 :
+            // So far, not support SRGB mode
+            getBeautyRgb888(mHeadlessRgb888Frame, mShmFbTop2BtmFlag, false, false);
+            break;
+        case ShmFb::ChanMode::H16 :
+        case ShmFb::ChanMode::F32 :
+            getBeauty(mHeadlessRgbFloatFrame, mShmFbTop2BtmFlag, false);
+            break;
+        }
+    }
 
     afterDecode(callBackFuncForGenericComment);
     return true;
@@ -780,8 +830,16 @@ ClientReceiverFb::Impl::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFra
                                               unsigned& width,
                                               unsigned& height,
                                               const bool top2bottom,
-                                              const bool isSrgb)
+                                              const bool isSrgb,
+                                              const bool cancelShmFbUpdate)
 {
+    auto shmFbOutputUpdate = [&]() {
+        if (cancelShmFbUpdate) return;
+        mShmFbOutput.generalUpdateFb(getWidth(), getHeight(),
+                                     3, ShmFb::ChanMode::UC8, rgbFrame.data(), top2bottom,
+                                     mShmFbChanTotal, mShmFbChanMode, mShmFbTop2BtmFlag);
+    };
+
     bool telemetryOverlayWithPrevArchive = false;
     if (getProgress() == 0.0f) {
         // This situation only be happened under telemetryOverlay active condition.
@@ -792,6 +850,7 @@ ClientReceiverFb::Impl::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFra
             telemetry::DisplayInfo info;
             setupTelemetryDisplayInfo(info);
             mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
+            shmFbOutputUpdate();
             return true;
         }
     }
@@ -816,6 +875,7 @@ ClientReceiverFb::Impl::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFra
         setupTelemetryDisplayInfo(info);
         mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
     }
+    shmFbOutputUpdate();
     
     return result;
 }
@@ -823,8 +883,16 @@ ClientReceiverFb::Impl::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFra
 bool
 ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
                                         const bool top2bottom,
-                                        const bool isSrgb)
+                                        const bool isSrgb,
+                                        const bool cancelShmFbUpdate)
 {
+    auto shmFbOutputUpdate = [&]() {
+        if (cancelShmFbUpdate) return;
+        mShmFbOutput.generalUpdateFb(getWidth(), getHeight(),
+                                     3, ShmFb::ChanMode::UC8, rgbFrame.data(), top2bottom,
+                                     mShmFbChanTotal, mShmFbChanMode, mShmFbTop2BtmFlag);
+    };
+
     bool telemetryOverlayWithPrevArchive = false;
     if (getProgress() == 0.0f) {
         // This situation only be happened under telemetryOverlay active condition.
@@ -835,6 +903,7 @@ ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
             telemetry::DisplayInfo info;
             setupTelemetryDisplayInfo(info);
             mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
+            shmFbOutputUpdate();
             return true;
         }
     }
@@ -871,6 +940,7 @@ ClientReceiverFb::Impl::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
         setupTelemetryDisplayInfo(info);
         mTelemetryDisplay.bakeOverlayRgb888(rgbFrame, top2bottom, info, telemetryOverlayWithPrevArchive);
     }
+    shmFbOutputUpdate();
     
     return result;
 }
@@ -993,8 +1063,16 @@ bool
 ClientReceiverFb::Impl::getBeautyMTSafe(std::vector<float>& rgba,
                                         unsigned& width,
                                         unsigned& height,
-                                        const bool top2bottom)
+                                        const bool top2bottom,
+                                        const bool cancelShmFbUpdate)
 {
+    auto shmFbOutputUpdate = [&]() {
+        if (cancelShmFbUpdate) return;
+        mShmFbOutput.generalUpdateFb(getWidth(), getHeight(),
+                                     4, ShmFb::ChanMode::F32, rgba.data(), top2bottom,
+                                     mShmFbChanTotal, mShmFbChanMode, mShmFbTop2BtmFlag);
+    };
+
     initErrorMsg();
 
     bool result = true;
@@ -1010,13 +1088,23 @@ ClientReceiverFb::Impl::getBeautyMTSafe(std::vector<float>& rgba,
                             fallback);
         if (fallback) getBeautyNoDenoiseMTSafe(rgba, width, height, top2bottom);
     }
+    shmFbOutputUpdate();
+
     return result;
 }
 
 bool
 ClientReceiverFb::Impl::getBeauty(std::vector<float>& rgba,
-                                  const bool top2bottom)
+                                  const bool top2bottom,
+                                  const bool cancelShmFbUpdate)
 {
+    auto shmFbOutputUpdate = [&]() {
+        if (cancelShmFbUpdate) return;
+        mShmFbOutput.generalUpdateFb(getWidth(), getHeight(),
+                                     4, ShmFb::ChanMode::F32, rgba.data(), top2bottom,
+                                     mShmFbChanTotal, mShmFbChanMode, mShmFbTop2BtmFlag);
+    };
+
     initErrorMsg();
 
     bool result = true;
@@ -1032,6 +1120,8 @@ ClientReceiverFb::Impl::getBeauty(std::vector<float>& rgba,
                             fallback);
         if (fallback) getBeautyNoDenoise(rgba, top2bottom);
     }
+    shmFbOutputUpdate();
+
     return result;
 }
 
@@ -2782,6 +2872,23 @@ ClientReceiverFb::Impl::parserConfigure()
                 [&](Arg& arg) { return mFb.getParser().main(arg.childArg()); });
     mParser.opt("telemetryResetTest", "", "reset telemetry related info for simulation of proc start time",
                 [&](Arg& arg) { telemetryResetTest(); return arg.msg("testReset done\n"); });
+    mParser.opt("shmFbChanMode", "<UC8|H16|F32|show>", "set shmFb channel mode",
+                [&](Arg& arg) {
+                    std::string mode = (arg++)();
+                    if (mode == "UC8") mShmFbChanMode = ShmFb::ChanMode::UC8;
+                    else if (mode == "H16") mShmFbChanMode = ShmFb::ChanMode::H16;
+                    else if (mode == "F32") mShmFbChanMode = ShmFb::ChanMode::F32;
+                    else if (mode != "show") return arg.fmtMsg("unknown chanMode:%s\n", mode.c_str());
+                    return arg.msg(ShmFb::chanModeStr(mShmFbChanMode) + '\n');
+                });
+    mParser.opt("shmFbChanTotal", "<n>", "set shmFb channel total",
+                [&](Arg& arg) { mShmFbChanTotal = (arg++).as<unsigned>(0); return true; });
+    mParser.opt("shmFbTop2Btm", "<on|off>", "set shmFb top2btm flag",
+                [&](Arg& arg) { mShmFbTop2BtmFlag = (arg++).as<bool>(0); return true; });
+    mParser.opt("shmFbInfo", "", "show shmFb parameters",
+                [&](Arg& arg) { return arg.msg(showShmFbInfo() + '\n'); });
+    mParser.opt("shmFbOutput", "...command...", "shmFb output command",
+                [&](Arg& arg) { return mShmFbOutput.getParser().main(arg.childArg()); });
 }
 
 std::string
@@ -2842,6 +2949,19 @@ ClientReceiverFb::Impl::showViewportInfo() const
     return ostr.str();
 }
 
+std::string
+ClientReceiverFb::Impl::showShmFbInfo() const
+{
+    std::ostringstream ostr;
+    ostr << "ShmFb parameter {\n"
+         << "  activeShmFb:" << scene_rdl2::str_util::boolStr(mShmFbOutput.getActive()) << '\n' 
+         << "  mShmFbChanMode:" << ShmFb::chanModeStr(mShmFbChanMode) << '\n'
+         << "  mShmFbChanTotal:" << mShmFbChanTotal << '\n'
+         << "  mShmFbTop2BtmFlag:" << scene_rdl2::str_util::boolStr(mShmFbTop2BtmFlag) << '\n'
+         << "}";
+    return ostr.str();
+}
+
 void
 ClientReceiverFb::Impl::telemetryResetTest()
 //
@@ -2877,14 +2997,64 @@ ClientReceiverFb::clearClientMessage()
     mImpl->clearClientMessage();
 }
 
+void
+ClientReceiverFb::setActiveShmFb(const bool flag)
+{
+    mImpl->setActiveShmFb(flag);
+}
+
+bool
+ClientReceiverFb::getActiveShmFb() const
+{
+    return mImpl->getActiveShmFb();
+}
+
+void
+ClientReceiverFb::setShmFbChanMode(const ShmFb::ChanMode chanMode)
+{
+    mImpl->setShmFbChanMode(chanMode);
+}
+
+ClientReceiverFb::ShmFb::ChanMode
+ClientReceiverFb::getShmFbChanMode() const
+{
+    return mImpl->getShmFbChanMode();
+}
+
+void
+ClientReceiverFb::setShmFbChanTotal(const unsigned chanTotal)
+{
+    mImpl->setShmFbChanTotal(chanTotal);
+}
+
+unsigned
+ClientReceiverFb::getShmFbChanTotal() const
+{
+    return mImpl->getShmFbChanTotal();
+}
+
+void
+ClientReceiverFb::setShmFbTop2BtmFlag(const bool flag)
+{
+    mImpl->setShmFbTop2BtmFlag(flag);
+}
+
+bool
+ClientReceiverFb::getShmFbTop2BtmFlag() const
+{
+    return mImpl->getShmFbTop2BtmFlag();
+}
+
 bool
 ClientReceiverFb::decodeProgressiveFrame(const mcrt::ProgressiveFrame& message,
                                          const bool doParallel,
                                          const CallBackStartedCondition& callBackFuncAtStartedCondition,
-                                         const CallBackGenericComment& callBackFuncForGenericComment)
+                                         const CallBackGenericComment& callBackFuncForGenericComment,
+                                         const bool headlessMode)
 {
     return mImpl->decodeProgressiveFrame(message, doParallel,
-                                         callBackFuncAtStartedCondition, callBackFuncForGenericComment);
+                                         callBackFuncAtStartedCondition, callBackFuncForGenericComment,
+                                         headlessMode);
 }
  
 size_t
@@ -3116,16 +3286,18 @@ ClientReceiverFb::getErrorMsg() const
 bool
 ClientReceiverFb::getBeautyRgb888MTSafe(std::vector<unsigned char>& rgbFrame,
                                         unsigned& width, unsigned& height,
-                                        const bool top2botton, const bool isSrgb)
+                                        const bool top2botton, const bool isSrgb,
+                                        const bool cancelShmFbUpdate)
 {
-    return mImpl->getBeautyRgb888MTSafe(rgbFrame, width, height, top2botton, isSrgb);
+    return mImpl->getBeautyRgb888MTSafe(rgbFrame, width, height, top2botton, isSrgb, cancelShmFbUpdate);
 }
 
 bool
 ClientReceiverFb::getBeautyRgb888(std::vector<unsigned char>& rgbFrame,
-                                  const bool top2botton, const bool isSrgb)
+                                  const bool top2botton, const bool isSrgb,
+                                  const bool cancelShmFbUpdate)
 {
-    return mImpl->getBeautyRgb888(rgbFrame, top2botton, isSrgb);
+    return mImpl->getBeautyRgb888(rgbFrame, top2botton, isSrgb, cancelShmFbUpdate);
 }
 
 bool
@@ -3232,19 +3404,21 @@ ClientReceiverFb::getRenderOutputRgb888(const std::string& aovName,
 
 bool
 ClientReceiverFb::getBeautyMTSafe(std::vector<float>& rgba, unsigned& width, unsigned& height,
-                                  const bool top2bottom)
+                                  const bool top2bottom,
+                                  const bool cancelShmFbUpdate)
 // 4 channels per pixel
 {
 
-    return mImpl->getBeautyMTSafe(rgba, width, height, top2bottom);
+    return mImpl->getBeautyMTSafe(rgba, width, height, top2bottom, cancelShmFbUpdate);
 }
 
 bool
 ClientReceiverFb::getBeauty(std::vector<float>& rgba,
-                            const bool top2bottom)
+                            const bool top2bottom,
+                            const bool cancelShmFbUpdate)
 // 4 channels per pixel
 {
-    return mImpl->getBeauty(rgba, top2bottom);
+    return mImpl->getBeauty(rgba, top2bottom, cancelShmFbUpdate);
 }
     
 bool

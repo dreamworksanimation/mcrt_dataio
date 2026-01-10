@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 ///
@@ -1639,6 +1639,23 @@ public:
     /// The telemetry panel table can be constructed as tree structures. We can change the current
     /// displayed panel to the child if the current panel has the child.
     void switchTelemetryPanelToChild();
+
+    /// @brief Return the current telemetry panel name.
+    ///
+    /// @detail
+    /// Return the current telemetry panel name. Return an empty string if telemetry is turned off
+    std::string getCurrentTelemetryPanelName() const;
+
+    /// @brief Set callback functions to generate PathVisClient information strings for the telemetry panel "pathVis"
+    /// @param callBack callBack function object
+    ///
+    /// @detail
+    /// This callback function is executed when the "pathVis" telemetry panel wants to display the client information.
+    /// The generated string is displayed in the subpanel of the "pathVis" telemetry panel.
+    /// If you don't set any callback, "pathVis" telemetry panel displays empty for that field.
+    /// Usually, ClientReceiverFb expects to get the information as a string which related to the PathVisualizer,
+    /// like interactive camera condition and other user-interface related information.
+    void setTelemetryPanelPathVisClientInfoCallBack(const std::function<std::string()>& callBack);
 
 protected:
     class Impl;

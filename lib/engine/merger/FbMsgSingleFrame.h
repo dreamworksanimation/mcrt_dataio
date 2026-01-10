@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 //
@@ -43,6 +42,9 @@ class FbMsgSingleFrame
 public:
     using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
+    using DataPtr = std::shared_ptr<uint8_t>;
+    using VecPacketAddBuffFunc =
+        std::function<void(const std::string& buffName, DataPtr dataPtr, const size_t dataSize)>;
 
     enum class DecodeMode : unsigned {
         ONTHEFLY = 0, // on the fly decoding without data copy (for realtime context).
@@ -59,7 +61,7 @@ public:
         parserConfigure();
     }
 
-    void setGlobalNodeInfo(GlobalNodeInfo *globalNodeInfo) { mGlobalNodeInfo = globalNodeInfo; }
+    void setGlobalNodeInfo(GlobalNodeInfo* globalNodeInfo) { mGlobalNodeInfo = globalNodeInfo; }
     void setTunnelMachineIdStaged(int* tunnelMachineId) { mTunnelMachineIdStaged = tunnelMachineId; }
 
     finline bool init(const int numMachines);
@@ -74,23 +76,23 @@ public:
         mReceivedInfoOnlyMessagesAll = 0;
         mReceivedMessagesAll = 0;
     }
-    void resetFeedback(bool feedbackActive);
+    void resetFeedback(const bool feedbackActive);
 
     finline bool isInitialFrameMessage(const mcrt::ProgressiveFrame& progressive,
                                        bool& forceSend) const;
 
-    bool push(const mcrt::ProgressiveFrame &progressive);
+    bool push(const mcrt::ProgressiveFrame& progressive);
     void decodeAll();
     void merge(const unsigned partialMergeTilesTotal, // 0:non-partial-merge-mode
-               scene_rdl2::grid_util::Fb &fb,
-               scene_rdl2::grid_util::LatencyLog &latencyLog); // fb is always clear internally and
+               scene_rdl2::grid_util::Fb& fb,
+               scene_rdl2::grid_util::LatencyLog& latencyLog); // fb is always clear internally and
                                                                // return fresh combined result
 
     bool getFeedbackActive() const { return mFeedbackActive; }
-    MergeActionTracker& getMergeActionTracker(unsigned machineId) { return mMergeActionTracker[machineId]; }
+    MergeActionTracker& getMergeActionTracker(const unsigned machineId) { return mMergeActionTracker[machineId]; }
     void encodeMergeActionTracker(scene_rdl2::cache::CacheEnqueue& enqueue); // for feedback
     static std::string decodeMergeActionTrackerAndDump(scene_rdl2::cache::CacheDequeue& dequeue,
-                                                       unsigned targetMachineId); // for test
+                                                       const unsigned targetMachineId); // for test
 
     uint32_t getSyncId() const { return mMySyncId; }
     TaskType getTaskType() const { return mTaskType; }
@@ -110,11 +112,15 @@ public:
     finline const std::string& getDenoiserAlbedoInputName() const { return mDenoiserAlbedoInputName; }
     finline const std::string& getDenoiserNormalInputName() const { return mDenoiserNormalInputName; }
 
+    bool hasVecPacket() const { return mHasVecPacket; }
+
     finline uint64_t getSnapshotStartTime();
 
-    void encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq &vContainerEnq); // only encode latencyLog info
+    void encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq& vContainerEnq); // only encode latencyLog info
+    void encodeVecPacket(const VecPacketAddBuffFunc& addBuffFunc);
 
-    std::string show(const std::string &hd) const;
+    std::string show(const std::string& hd) const;
+    std::string showVecPacketInfo() const;
 
     Parser& getParser() { return mParser; }
 
@@ -168,6 +174,8 @@ private:
     float mProgressTotal {0.0f};                                  // current progress sum
     mcrt::BaseFrame::Status mStatus {mcrt::BaseFrame::CANCELLED}; // current frame's status
 
+    bool mHasVecPacket {false};
+
     // combined result for each machine from start of rendering
     std::vector<scene_rdl2::grid_util::Fb> mFb; // mFb[machineId] : auto resize by received ProgressiveFrame
 
@@ -192,24 +200,24 @@ private:
 
     void decodeFirstPushedData();
     void decodeAllPushedData();
-    void mergeFirstFb(scene_rdl2::grid_util::Fb &fb, scene_rdl2::grid_util::LatencyLog &latencyLog);
-    void mergeAllFb(scene_rdl2::grid_util::Fb &fb, scene_rdl2::grid_util::LatencyLog &latencyLog);
+    void mergeFirstFb(scene_rdl2::grid_util::Fb& fb, scene_rdl2::grid_util::LatencyLog& latencyLog);
+    void mergeAllFb(scene_rdl2::grid_util::Fb& fb, scene_rdl2::grid_util::LatencyLog& latencyLog);
     void mergeAllFb(const unsigned partialMergeTilesTotal,
-                    scene_rdl2::grid_util::Fb &fb, scene_rdl2::grid_util::LatencyLog &latencyLog);
-    void mergeSingleFb(const std::vector<char> *partialMergeTilesTbl, const int machineId,
-                       scene_rdl2::grid_util::Fb &fb);
+                    scene_rdl2::grid_util::Fb& fb, scene_rdl2::grid_util::LatencyLog& latencyLog);
+    void mergeSingleFb(const std::vector<char>* partialMergeTilesTbl, const int machineId,
+                       scene_rdl2::grid_util::Fb& fb);
     bool verifyMergedResultNumSample(const scene_rdl2::grid_util::Fb& mergedFb) const;
-    bool verifyMergedResultNumSampleSingleHost(int machineId,
+    bool verifyMergedResultNumSampleSingleHost(const int machineId,
                                                const scene_rdl2::grid_util::Fb& mergedFb) const;
 
     void partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
-                                 std::vector<char> &partialMergeTilesTbl);
+                                 std::vector<char>& partialMergeTilesTbl);
 
-    void timeLogUpdate(const std::string &msg,
-                       scene_rdl2::rec_time::RecTimeLog &timeLog, const uint64_t startMicroSec) const;
+    void timeLogUpdate(const std::string& msg,
+                       scene_rdl2::rec_time::RecTimeLog& timeLog, const uint64_t startMicroSec) const;
 
-    std::string showMessageAndReceived(const std::string &hd) const;
-    std::string showAllReceivedAndProgress(const std::string &hd) const;
+    std::string showMessageAndReceived(const std::string& hd) const;
+    std::string showAllReceivedAndProgress(const std::string& hd) const;
 
     void parserConfigure();
     bool parserCommandMultiChan(Arg& arg);
@@ -256,7 +264,7 @@ FbMsgSingleFrame::init(const int numMachines)
 }
 
 finline bool
-FbMsgSingleFrame::initFb(const scene_rdl2::math::Viewport &rezedViewport)
+FbMsgSingleFrame::initFb(const scene_rdl2::math::Viewport& rezedViewport)
 {
     if (mRezedViewport == rezedViewport) {
         return true;            // no need to update
@@ -300,6 +308,7 @@ FbMsgSingleFrame::resetWholeHistory(const uint32_t syncId)
     mDenoiserAlbedoInputName.clear();
     mDenoiserNormalInputName.clear();
     mProgressTotal = 0.0f;
+    mHasVecPacket = false;
     mDecodeCountTotal = 0;
     mMergeCountTotal = 0;
     mEncodeLatencyLogCountTotal = 0;

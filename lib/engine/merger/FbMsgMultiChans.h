@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 //
@@ -50,9 +49,11 @@ public:
 
     using FbMsgSingleChanShPtr = std::shared_ptr<FbMsgSingleChan>;
     using FbAovShPtr = std::shared_ptr<scene_rdl2::grid_util::FbAov>;
-    using DataPtr = std::shared_ptr<const uint8_t>;
+    using DataPtr = std::shared_ptr<uint8_t>;
+    using VecPacketAddBuffFunc =
+        std::function<void(const std::string& buffName, DataPtr dataPtr, const size_t dataSize)>;
 
-    explicit FbMsgMultiChans(bool debugMode = false)
+    explicit FbMsgMultiChans(const bool debugMode = false)
         : mDebugMode(debugMode)
     {
         parserConfigure();
@@ -72,6 +73,9 @@ public:
     mcrt::BaseFrame::Status getStatus() const { return mStatus; }
 
     bool hasStartedStatus() const { return mHasStartedStatus; }
+    bool isCoarsePass() const { return mCoarsePass; }
+
+    bool hasVecPacket() const { return mHasVecPacket; }
 
     /* Following APIs are valid after decodeData() : so far not used but might be useful for future enhancement
     bool hasBeauty() const { return mHasBeauty; }
@@ -80,14 +84,15 @@ public:
     bool hasRenderBufferOdd() const { return mHasRenderBufferOdd; }
     bool hasRenderOutput() const { return mHasRenderOutput; }
     */
-    bool isCoarsePass() const { return mCoarsePass; }
 
     uint64_t getSnapshotStartTime() const { return mSnapshotStartTime; }
 
     void encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq &vContainerEnq); // only encode latencyLog info
+    void encodeVecPacket(const VecPacketAddBuffFunc& addBuffFunc);
 
     std::string show(const std::string &hd) const;
     std::string show() const;
+    std::string showVecPacketInfo() const;
 
     Parser& getParser() { return mParser; }
 
@@ -104,6 +109,8 @@ protected:
 
     bool mHasStartedStatus {false}; // Does include STARTED status message ?
     bool mCoarsePass {true};
+
+    bool mHasVecPacket {false}; // valid by pushBuffer()
 
     bool mHasBeauty {false};          // valid by decodeData()
     bool mHasPixelInfo {false};       // valid by decodeData()
@@ -179,12 +186,17 @@ FbMsgMultiChans::reset()
     mStatus = mcrt::BaseFrame::STARTED;
 
     mHasStartedStatus = false;
+    mCoarsePass = true;
+
+    mHasVecPacket = false;
+
     mHasBeauty = false;
     mHasPixelInfo = false;
     mHasHeatMap = false;
     mHasRenderBufferOdd = false;
     mHasRenderOutput = false;
-    mCoarsePass = true;
+
+    mRoiViewportStatus = false;
 
     mSnapshotStartTime = 0;     // initialize
 

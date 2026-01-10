@@ -1,11 +1,11 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 #include "TelemetryLayout.h"
 #include "TelemetryOverlay.h"
 #include "TelemetryPanel.h"
+#include "VectorPacketManager.h"
 
 #include <mcrt_dataio/engine/merger/GlobalNodeInfo.h>
 #include <mcrt_dataio/share/util/FloatValueTracker.h>
@@ -44,6 +44,8 @@ public:
 
     const GlobalNodeInfo* mGlobalNodeInfo {nullptr};
 
+    vectorPacket::Manager* mVectorPacketManagerObsrPtr {nullptr};
+
     //------------------------------
 
     std::string show() const;
@@ -55,6 +57,7 @@ public:
     using Arg = scene_rdl2::grid_util::Arg;
     using Parser = scene_rdl2::grid_util::Parser;
     using Align = Overlay::Align;
+    using OverlayShPtr = std::shared_ptr<Overlay>;
 
     Display() { parserConfigure(); };
 
@@ -73,15 +76,26 @@ public:
     void switchPanelToPrev();
     void switchPanelToParent();
     void switchPanelToChild();
+    std::string getCurrentTelemetryPanelName() const;
 
     Parser& getParser() { return mParser; }
+
+    OverlayShPtr getOverlay() const { return mOverlay; }
+
+    void setTelemetryPanelPathVisClientInfoCallBack(const std::function<std::string()>& callBack)
+    {
+        mTelemetryPanelPathVisClientInfoCallBack = callBack;
+    }
+    const std::function<std::string()>& getTelemetryPanelPathVisClientInfoCallBack() const
+    {
+        return mTelemetryPanelPathVisClientInfoCallBack;
+    }
 
     std::string show() const;
 
 private:
     using FontShPtr = std::shared_ptr<Font>;
     using LayoutBaseShPtr = std::shared_ptr<LayoutBase>;
-    using OverlayShPtr = std::shared_ptr<Overlay>;
     using PanelShPtr = std::shared_ptr<Panel>;
     using PanelTableShPtr = std::shared_ptr<PanelTable>;
 
@@ -152,6 +166,8 @@ private:
     std::string mInitialPanelName;
     PanelTableShPtr mRootPanelTable {nullptr};
     PanelTableStack mPanelTableStack;
+
+    std::function<std::string()> mTelemetryPanelPathVisClientInfoCallBack;
 
     //
     // test parameters

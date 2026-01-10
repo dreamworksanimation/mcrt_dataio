@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -7,7 +7,9 @@
 
 #include <scene_rdl2/common/grid_util/Parser.h>
 #include <scene_rdl2/common/grid_util/RenderPrepStats.h>
+#include <scene_rdl2/common/math/Vec3.h>
 
+#include <cmath> // NAN std::isnan()
 #include <mutex>
 #include <string>
 
@@ -38,7 +40,7 @@ public:
     enum class NodeStat : int { IDLE, RENDER_PREP_RUN, RENDER_PREP_CANCEL, MCRT };
     enum class ExecMode : int { SCALAR, VECTOR, XPU, AUTO, UNKNOWN };
 
-    McrtNodeInfo(bool decodeOnly, float valueKeepDurationSec);
+    McrtNodeInfo(const bool decodeOnly, const float valueKeepDurationSec);
 
     InfoCodec& getInfoCodec() { return mInfoCodec; }
 
@@ -87,7 +89,9 @@ public:
     void set1stSendTiming(const float sec); // MTsafe
     void setProgress(const float fraction); // MTsafe
     void setGlobalProgress(const float fraction); // MTsafe
-
+    void setOrbitCamAutoFocusPoint(const scene_rdl2::math::Vec3f& p); // MTsafe
+    bool isReadyOrbitCamAutoFocusPoint() const;
+    
     void enqGenericComment(const std::string& comment); // MTsafe
 
     const std::string& getHostName() const { return mHostName; }
@@ -127,6 +131,7 @@ public:
     float get1stSendTiming() const { return m1stSendTiming; }
     float getProgress() const { return mProgress; }
     float getGlobalProgress() const { return mGlobalProgress; }
+    const scene_rdl2::math::Vec3f& getOrbitCamAutoFocusPoint() const { return mOrbitCamAutoFocusPoint; }
 
     ValueTimeTrackerShPtr getNetRecvVtt() const { return mNetRecvVtt; }
     ValueTimeTrackerShPtr getNetSendVtt() const { return mNetSendVtt; }
@@ -137,8 +142,8 @@ public:
     bool decode(const std::string& inputData);
 
     bool setClockDeltaTimeShift(const std::string& hostName,
-                                float clockDeltaTimeShift, // millisec
-                                float roundTripTime); // millisec
+                                const float clockDeltaTimeShift, // millisec
+                                const float roundTripTime); // millisec
 
     NodeStat getNodeStat() const;
 
@@ -160,10 +165,11 @@ private:
     std::string showCoreUsage() const;
     std::string showDataIO() const;
     std::string showProgress() const;
+    std::string showOrbitCamAutoFocusPoint() const;
 
-    static std::string pctShow(float fraction);
-    static std::string msShow(float ms);
-    static std::string bytesPerSecShow(float bytesPerSec);
+    static std::string pctShow(const float fraction);
+    static std::string msShow(const float ms);
+    static std::string bytesPerSecShow(const float bytesPerSec);
 
     //------------------------------
 
@@ -223,6 +229,8 @@ private:
 
     float mProgress {0.0f}; // render progress 0.0~1.0
     float mGlobalProgress {0.0f}; // global render progress 0.0~1.0
+
+    scene_rdl2::math::Vec3f mOrbitCamAutoFocusPoint {NAN, NAN, NAN};
 
     // For the genericComment, we use different logic from another regular member for infoCodec operation.
     // The biggest difference between genericComment and other items in this object is that genericComment

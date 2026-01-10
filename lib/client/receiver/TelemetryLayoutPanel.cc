@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #include "TelemetryDisplay.h"
@@ -12,7 +12,7 @@ LayoutPanel::subPanelTitle(const DisplayInfo& info)
 {
     constexpr unsigned gapX = 10;
 
-    unsigned y = (mMaxYLines - 1) * mStepPixY + mOffsetBottomPixY;
+    const unsigned y = (mMaxYLines - 1) * mStepPixY + mOffsetBottomPixY;
 
     std::ostringstream ostr;
     ostr << colReset()
@@ -28,7 +28,7 @@ LayoutPanel::subPanelTitle(const DisplayInfo& info)
 }
 
 void
-LayoutPanel::subPanelMessage(unsigned x, unsigned y, const std::string& str, Overlay::BBox2i& bbox)
+LayoutPanel::subPanelMessage(const unsigned x, const unsigned y, const std::string& str, Overlay::BBox2i& bbox)
 {
     if (!mOverlay->drawStr(*mFont, x, y, str, mCharFg, mError)) {
         std::cerr << ">> TelemetryLayoutPanel.cc subPanelMessage() drawStr() failed. " << mError << '\n';
@@ -40,7 +40,49 @@ LayoutPanel::subPanelMessage(unsigned x, unsigned y, const std::string& str, Ove
 }
 
 void
-LayoutPanel::subPanelGlobalInfo(unsigned x, unsigned y, const DisplayInfo& info, Overlay::BBox2i& bbox)
+LayoutPanel::subPanelMessageUpperRight(const unsigned x, const unsigned y,
+                                       const std::string& str, Overlay::BBox2i& bbox)
+{
+    if (!mOverlay->drawStr(*mFont, x, y, str, mCharFg, mError)) {
+        std::cerr << ">> TelemetryLayoutPanel.cc subPanelMessageUpperRight() drawStr() failed. " << mError << '\n';
+    } else {
+        const unsigned strItemId = mOverlay->getDrawStrItemTotal() - 1;
+        bbox = mOverlay->calcDrawBbox(strItemId, strItemId);
+        const int deltaX = x - bbox.upper.x;
+        const int deltaY = y - bbox.upper.y;
+        mOverlay->moveStr(strItemId, deltaX, deltaY);
+
+        bbox.lower.x += deltaX;
+        bbox.lower.y += deltaY;
+        bbox.upper.x += deltaX;
+        bbox.upper.y += deltaY;
+        mOverlay->drawBox(bbox, mPanelBg, mPanelBgAlpha);
+    }
+}
+
+void
+LayoutPanel::subPanelMessageCenter(const unsigned x, const unsigned y,
+                                   const std::string& str, Overlay::BBox2i& bbox)
+{
+    if (!mOverlay->drawStr(*mFont, x, y, str, mCharFg, mError)) {
+        std::cerr << ">> TelemetryLayoutPanel.cc subPanelMessageCenter() drawStr() failed. " << mError << '\n';
+    } else {
+        const unsigned strItemId = mOverlay->getDrawStrItemTotal() - 1;
+        bbox = mOverlay->calcDrawBbox(strItemId, strItemId);
+        const int deltaX = x - (bbox.upper.x + bbox.lower.x) / 2;
+        const int deltaY = y - (bbox.upper.y + bbox.lower.y) / 2;
+        mOverlay->moveStr(strItemId, deltaX, deltaY);
+
+        bbox.lower.x += deltaX;
+        bbox.lower.y += deltaY;
+        bbox.upper.x += deltaX;
+        bbox.upper.y += deltaY;
+        mOverlay->drawBox(bbox, mPanelBg, mPanelBgAlpha);
+    }
+}
+
+void
+LayoutPanel::subPanelGlobalInfo(const unsigned x, const unsigned y, const DisplayInfo& info, Overlay::BBox2i& bbox)
 {
     std::ostringstream ostr;
     ostr << colReset()
@@ -55,13 +97,13 @@ LayoutPanel::subPanelGlobalInfo(unsigned x, unsigned y, const DisplayInfo& info,
 }
 
 void
-LayoutPanel::subPanelGlobalProgressBar(unsigned barLeftBottomX,
-                                      unsigned barLeftBottomY,
-                                      unsigned barWidth,
-                                      const DisplayInfo& info,
-                                      Overlay::BBox2i& bboxGlobalProgressBar)
+LayoutPanel::subPanelGlobalProgressBar(const unsigned barLeftBottomX,
+                                       const unsigned barLeftBottomY,
+                                       const unsigned barWidth,
+                                       const DisplayInfo& info,
+                                       Overlay::BBox2i& bboxGlobalProgressBar)
 {
-    unsigned fontStepX = (mOverlay->getFontStepX() == 0) ? mFont->getFontSizePoint() : mOverlay->getFontStepX();
+    const unsigned fontStepX = (mOverlay->getFontStepX() == 0) ? mFont->getFontSizePoint() : mOverlay->getFontStepX();
 
     unsigned renderPrepBarOffsetStartX, renderPrepBarOffsetEndX, renderPrepBarHeight;
     std::string renderPrepBarStr = strBar(barWidth,
@@ -82,27 +124,27 @@ LayoutPanel::subPanelGlobalProgressBar(unsigned barLeftBottomX,
                                     &mcrtBarOffsetEndX,
                                     &mcrtBarHeight);
 
-    unsigned x = barLeftBottomX;
-    unsigned y = barLeftBottomY;
+    const unsigned x = barLeftBottomX;
+    const unsigned y = barLeftBottomY;
 
     if (!mOverlay->drawStr(*mFont, x, y, renderPrepBarStr, {255,255,255}, mError)) {
         std::cerr << ">> TelemetryLayoutPanel.cc subPanelGlobalProgressBar() drawStr() failed. "
                   << mError << '\n';
     }
-    unsigned startStrItemId = mOverlay->getDrawStrItemTotal() - 1;
+    const unsigned startStrItemId = mOverlay->getDrawStrItemTotal() - 1;
 
-    unsigned y2 = y - mFont->getFontSizePoint() * 1.1f;
+    const unsigned y2 = y - mFont->getFontSizePoint() * 1.1f;
     if (!mOverlay->drawStr(*mFont, x, y2, mcrtBarStr, {255,255,255}, mError)) {
         std::cerr << ">> TelemetryLayoutPanel.cc subPanelGlobalProgressBar() drawStr() failed. "
                   << mError << '\n';
     }
-    unsigned endStrItemId = mOverlay->getDrawStrItemTotal() - 1;
+    const unsigned endStrItemId = mOverlay->getDrawStrItemTotal() - 1;
 
     bboxGlobalProgressBar = mOverlay->calcDrawBbox(startStrItemId, endStrItemId);    
     mOverlay->drawBox(bboxGlobalProgressBar, mPanelBg, mPanelBgAlpha);
 
-    C3 cBar {255,255,0};
-    unsigned char cBarAlpha = 90;
+    const C3 cBar {255,255,0};
+    const unsigned char cBarAlpha = 90;
     if (info.mRenderPrepProgress < 1.0f) {
         drawHBoxBar(x, y, renderPrepBarOffsetStartX, renderPrepBarOffsetEndX, renderPrepBarHeight,
                     info.mRenderPrepProgress, cBar, cBarAlpha);
@@ -114,61 +156,60 @@ LayoutPanel::subPanelGlobalProgressBar(unsigned barLeftBottomX,
 }
 
 void
-LayoutPanel::subPanelNetIOCpuMemAndProgress(unsigned leftBottomX,
-                                           unsigned leftBottomY,
-                                           unsigned rightTopX,
-                                           unsigned rightTopY,
-                                           float graphTopY, // auto adjust Y if this value is 0 or negative
-                                           unsigned rulerYSize,
-                                           const std::string& title,
-                                           int cpuTotal,
-                                           float cpuFraction,
-                                           size_t memTotal, // Byte
-                                           float memFraction,
-                                           float renderPrepFraction,
-                                           float mcrtProgress,
-                                           float mcrtGlobalProgress,
-                                           const ValueTimeTracker& sendVtt,
-                                           const ValueTimeTracker& recvVtt,
-                                           bool activeBgColFlag,
-                                           Overlay::BBox2i& bbox)
+LayoutPanel::subPanelNetIOCpuMemAndProgress(const unsigned leftBottomX,
+                                            const unsigned leftBottomY,
+                                            const unsigned rightTopX,
+                                            const unsigned rightTopY,
+                                            const float graphTopY, // auto adjust Y if this value is 0 or negative
+                                            const unsigned rulerYSize,
+                                            const std::string& title,
+                                            const int cpuTotal,
+                                            const float cpuFraction,
+                                            const size_t memTotal, // Byte
+                                            const float memFraction,
+                                            const float renderPrepFraction,
+                                            const float mcrtProgress,
+                                            const float mcrtGlobalProgress,
+                                            const ValueTimeTracker& sendVtt,
+                                            const ValueTimeTracker& recvVtt,
+                                            const bool activeBgColFlag,
+                                            Overlay::BBox2i& bbox)
 {
-    unsigned height = rightTopY - leftBottomY;
-    unsigned width = rightTopX - leftBottomX;
+    const unsigned width = rightTopX - leftBottomX;
     
     constexpr unsigned gapY = 5;
 
-    unsigned titleStartX = leftBottomX;
-    unsigned titleStartY = rightTopY - mStepPixY;
-    unsigned titleHeight = mStepPixY;
+    const unsigned titleStartX = leftBottomX;
+    const unsigned titleStartY = rightTopY - mStepPixY;
+    const unsigned titleHeight = mStepPixY;
 
-    unsigned cpuStartX = leftBottomX;
-    unsigned cpuStartY = titleStartY - mStepPixY - gapY;
-    unsigned cpuBarWidth = width;
+    const unsigned cpuStartX = leftBottomX;
+    const unsigned cpuStartY = titleStartY - mStepPixY - gapY;
+    const unsigned cpuBarWidth = width;
 
-    unsigned memStartX = leftBottomX;
-    unsigned memStartY = cpuStartY - mStepPixY - gapY;
-    unsigned memBarWidth = width;
+    const unsigned memStartX = leftBottomX;
+    const unsigned memStartY = cpuStartY - mStepPixY - gapY;
+    const unsigned memBarWidth = width;
 
-    unsigned progressStartX = leftBottomX;
-    unsigned progressStartY = memStartY - mStepPixY - gapY;
-    unsigned progressBarWidth = width;
+    const unsigned progressStartX = leftBottomX;
+    const unsigned progressStartY = memStartY - mStepPixY - gapY;
+    const unsigned progressBarWidth = width;
 
     bool displayProgressBar = true;
     if (renderPrepFraction < 0.0f && mcrtProgress < 0.0f) displayProgressBar = false;
 
-    unsigned currY = (displayProgressBar) ? progressStartY : memStartY;
-    unsigned graphPanelHeight = (currY - gapY - leftBottomY - gapY) / 2;
+    const unsigned currY = (displayProgressBar) ? progressStartY : memStartY;
+    const unsigned graphPanelHeight = (currY - gapY - leftBottomY - gapY) / 2;
         
-    unsigned sendPanelMinX = leftBottomX;
-    unsigned sendPanelMaxX = rightTopX;
-    unsigned sendPanelMaxY = currY - gapY;
-    unsigned sendPanelMinY = sendPanelMaxY - graphPanelHeight;
+    const unsigned sendPanelMinX = leftBottomX;
+    const unsigned sendPanelMaxX = rightTopX;
+    const unsigned sendPanelMaxY = currY - gapY;
+    const unsigned sendPanelMinY = sendPanelMaxY - graphPanelHeight;
 
-    unsigned recvPanelMinX = sendPanelMinX;
-    unsigned recvPanelMaxX = sendPanelMaxX;
-    unsigned recvPanelMaxY = sendPanelMinY - gapY;
-    unsigned recvPanelMinY = recvPanelMaxY - graphPanelHeight;
+    const unsigned recvPanelMinX = sendPanelMinX;
+    const unsigned recvPanelMaxX = sendPanelMaxX;
+    const unsigned recvPanelMaxY = sendPanelMinY - gapY;
+    const unsigned recvPanelMinY = recvPanelMaxY - graphPanelHeight;
 
     if (!mOverlay->drawStr(*mFont, titleStartX, titleStartY, title, mCharFg, mError)) {
         std::cerr << ">> TelemetryLayoutPanel.cc subPanelNetIOCpuMemAndProgress() drawStr() failed. " << mError << '\n';
@@ -234,7 +275,7 @@ LayoutPanel::subPanelNetIOCpuMemAndProgress(unsigned leftBottomX,
 #endif
 
 
-    C3 cNonActive {96,96,96};
+    const C3 cNonActive {96,96,96};
     mOverlay->drawBox(bbox, ((activeBgColFlag) ? mPanelBg : cNonActive), mPanelBgAlpha);
 }
 

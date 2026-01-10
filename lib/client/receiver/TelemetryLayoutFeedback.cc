@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "TelemetryDisplay.h"
 #include "TelemetryLayout.h"
 
@@ -20,10 +19,10 @@ LayoutFeedback::drawMain(const DisplayInfo& info)
 void    
 LayoutFeedback::drawGlobalProgressBar(const DisplayInfo& info)
 {
-    unsigned gapWidth = 10;
-    unsigned barLeftBottomX = mBBoxGlobalInfo.upper.x + gapWidth;
-    unsigned barLeftBottomY = mBBoxTitle.lower.y - 10 - mStepPixY;
-    unsigned barWidth = mOverlay->getWidth() - barLeftBottomX - gapWidth;
+    const unsigned gapWidth = 10;
+    const unsigned barLeftBottomX = mBBoxGlobalInfo.upper.x + gapWidth;
+    const unsigned barLeftBottomY = mBBoxTitle.lower.y - 10 - mStepPixY;
+    const unsigned barWidth = mOverlay->getWidth() - barLeftBottomX - gapWidth;
     subPanelGlobalProgressBar(barLeftBottomX, barLeftBottomY, barWidth, info, mBBoxGlobalProgressBar);
 }
 
@@ -68,9 +67,9 @@ LayoutFeedback::drawMcrtComputation(const DisplayInfo& info)
     if (!gNodeInfo) return;
     if (gNodeInfo->getMcrtTotal() == 1) return;
 
-    int hostNameW = gNodeInfo->getMaxMcrtHostName();
+    const int hostNameW = gNodeInfo->getMaxMcrtHostName();
     auto drawNode = [&](std::shared_ptr<McrtNodeInfo> node) {
-        int w = scene_rdl2::str_util::getNumberOfDigits(gNodeInfo->getMcrtTotal());
+        const int w = scene_rdl2::str_util::getNumberOfDigits(gNodeInfo->getMcrtTotal());
 
         const scene_rdl2::grid_util::RenderPrepStats& renderPrepStats = node->getRenderPrepStats();
         float renderPrepProgress = (static_cast<float>(renderPrepStats.getCurrSteps()) /

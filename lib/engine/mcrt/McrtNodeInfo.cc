@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #include "McrtNodeInfo.h"
@@ -12,7 +12,7 @@
 
 namespace mcrt_dataio {
 
-McrtNodeInfo::McrtNodeInfo(bool decodeOnly, float valueKeepDurationSec)
+McrtNodeInfo::McrtNodeInfo(const bool decodeOnly, const float valueKeepDurationSec)
     : mValueKeepDurationSec(valueKeepDurationSec)
     , mInfoCodec("mcrtNodeInfo", decodeOnly)
 {
@@ -43,6 +43,7 @@ McrtNodeInfo::reset()
     setRenderPrepStatsInit();
     setProgress(0.0f);
     setGlobalProgress(0.0f);
+    setOrbitCamAutoFocusPoint(scene_rdl2::math::Vec3f(NAN, NAN, NAN));
 }
     
 void
@@ -440,6 +441,20 @@ McrtNodeInfo::setGlobalProgress(const float fraction)
 }
 
 void
+McrtNodeInfo::setOrbitCamAutoFocusPoint(const scene_rdl2::math::Vec3f& p)
+{
+    mInfoCodec.setVec3f("orbitCamAutoFocusPoint", p, &mOrbitCamAutoFocusPoint);
+}
+
+bool
+McrtNodeInfo::isReadyOrbitCamAutoFocusPoint() const
+{
+    return (!std::isnan(mOrbitCamAutoFocusPoint[0]) &&
+            !std::isnan(mOrbitCamAutoFocusPoint[1]) &&
+            !std::isnan(mOrbitCamAutoFocusPoint[2]));
+}
+
+void
 McrtNodeInfo::enqGenericComment(const std::string& comment)
 {
     std::lock_guard<std::mutex> lock(mGenericCommentMutex);
@@ -480,7 +495,7 @@ McrtNodeInfo::flushEncodeData()
             //
             // flush data for renderPrepStats loadGeometry
             //
-            RenderPrepStats::Stage flushStage = mRenderPrepStatsWork.stage();
+            const RenderPrepStats::Stage flushStage = mRenderPrepStatsWork.stage();
             setRenderPrepStatsStage(flushStage);
 
             if (flushStage == Stage::GM_LOADGEO0_PROCESS) {
@@ -498,7 +513,7 @@ McrtNodeInfo::flushEncodeData()
             //
             // flush data for renderPrepStats tessellation
             //
-            RenderPrepStats::Stage flushStage = mRenderPrepStatsWork.stage();
+            const RenderPrepStats::Stage flushStage = mRenderPrepStatsWork.stage();
             setRenderPrepStatsStage(flushStage);
 
             if (flushStage == Stage::GM_FINALIZE0_TESSELLATION_PROCESS) {
@@ -541,6 +556,7 @@ McrtNodeInfo::decode(const std::string& inputData)
             size_t t;
             bool b;
             std::vector<float> vecF;
+            scene_rdl2::math::Vec3f v3f;
             if (mInfoCodec.getString("hostName", str)) {
                 setHostName(str);
             } else if (mInfoCodec.getInt("machineId", i)) {
@@ -631,6 +647,8 @@ McrtNodeInfo::decode(const std::string& inputData)
                 setProgress(f);
             } else if (mInfoCodec.getFloat("globalProgress", f)) {
                 setGlobalProgress(f);
+            } else if (mInfoCodec.getVec3f("orbitCamAutoFocusPoint", v3f)) {
+                setOrbitCamAutoFocusPoint(v3f);
             } else if (mInfoCodec.getString("genericComment", str)) {
                 enqGenericComment(str);
             }
@@ -643,8 +661,8 @@ McrtNodeInfo::decode(const std::string& inputData)
 
 bool
 McrtNodeInfo::setClockDeltaTimeShift(const std::string& hostName,
-                                     float clockDeltaTimeShift, // millisec
-                                     float roundTripTime)       // millisec
+                                     const float clockDeltaTimeShift, // millisec
+                                     const float roundTripTime)       // millisec
 {
     if (hostName != mHostName) {
         return false;
@@ -674,7 +692,7 @@ McrtNodeInfo::show() const
     using scene_rdl2::str_util::byteStr;
     using scene_rdl2::str_util::secStr;
 
-    size_t memUsed = static_cast<size_t>(static_cast<float>(mMemTotal) * mMemUsage);
+    const size_t memUsed = static_cast<size_t>(static_cast<float>(mMemTotal) * mMemUsage);
 
     std::ostringstream ostr;
     ostr << "McrtNodeInfo {\n"
@@ -713,6 +731,7 @@ McrtNodeInfo::show() const
          << boolStr(mRenderPrepStatsTessellationRequestFlush) << '\n'
          << addIndent(showTimeLog()) << '\n'
          << addIndent(showProgress()) << '\n'
+         << addIndent(showOrbitCamAutoFocusPoint()) << '\n'
          << "  mGenericComment:" << mGenericComment << '\n'
          << "  getNodeStat():" << nodeStatStr(getNodeStat()) << '\n'
          << "}";
@@ -790,6 +809,8 @@ McrtNodeInfo::parserConfigure()
                     if (!mNetSendVtt) return arg.msg("mNetSendVtt is empty\n");
                     else return mNetSendVtt->getParser().main(arg.childArg());
                 });
+    mParser.opt("orbitCamAutoFocusPoint", "", "show orbitCamAutoFocusPoint",
+                [&](Arg& arg) { return arg.msg(showOrbitCamAutoFocusPoint() + '\n'); });
 }
 
 std::string
@@ -881,9 +902,25 @@ McrtNodeInfo::showProgress() const
     return ostr.str();
 }
 
+std::string
+McrtNodeInfo::showOrbitCamAutoFocusPoint() const
+{
+    std::ostringstream ostr;
+    if (isReadyOrbitCamAutoFocusPoint()) {
+        ostr << "OrbitCamAutoFocusPoint {\n"
+             << "  x:" << mOrbitCamAutoFocusPoint[0]
+             << "  y:" << mOrbitCamAutoFocusPoint[1]
+             << "  z:" << mOrbitCamAutoFocusPoint[2] << '\n'
+             << "}";
+    } else {
+        ostr << "OrbitCamAutoFocusPoint is not ready yet";
+    }
+    return ostr.str();
+}
+
 // static function
 std::string
-McrtNodeInfo::pctShow(float fraction)
+McrtNodeInfo::pctShow(const float fraction)
 {
     std::ostringstream ostr;
     ostr << std::setw(6) << std::fixed << std::setprecision(2) << (fraction * 100.0f) << " %";
@@ -892,7 +929,7 @@ McrtNodeInfo::pctShow(float fraction)
 
 // static function
 std::string
-McrtNodeInfo::msShow(float ms)
+McrtNodeInfo::msShow(const float ms)
 {
     std::ostringstream ostr;
     ostr << std::setw(7) << std::fixed << std::setprecision(2) << ms << " ms";
@@ -901,7 +938,7 @@ McrtNodeInfo::msShow(float ms)
 
 // static function
 std::string
-McrtNodeInfo::bytesPerSecShow(float bytesPerSec)
+McrtNodeInfo::bytesPerSecShow(const float bytesPerSec)
 {
     std::ostringstream ostr;
     ostr << scene_rdl2::str_util::byteStr(static_cast<size_t>(bytesPerSec)) << "/sec";

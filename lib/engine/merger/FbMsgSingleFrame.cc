@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "FbMsgSingleFrame.h"
 
 #include <scene_rdl2/common/grid_util/LatencyLog.h>
@@ -32,7 +31,7 @@ FbMsgSingleFrame::changeTaskType(const TaskType &type)
 }
 
 void
-FbMsgSingleFrame::resetFeedback(bool feedbackActive)
+FbMsgSingleFrame::resetFeedback(const bool feedbackActive)
 {
     mFeedbackActive = feedbackActive;
 
@@ -49,12 +48,12 @@ FbMsgSingleFrame::resetFeedback(bool feedbackActive)
 bool
 FbMsgSingleFrame::push(const mcrt::ProgressiveFrame &progressive)
 {
-    int currMachineId = progressive.mMachineId;
+    const int currMachineId = progressive.mMachineId;
     if (currMachineId < 0 || static_cast<int>(mMessage.size()) <= currMachineId) {
         return false; // out of machineId range
     }
 
-    bool delayDecode = (mDecodeMode == DecodeMode::DELAY)? true: false;
+    const bool delayDecode = (mDecodeMode == DecodeMode::DELAY)? true: false;
 
 #   ifdef DEBUG_TIMING_LOG
     uint64_t cMicroSec = 0;
@@ -63,6 +62,19 @@ FbMsgSingleFrame::push(const mcrt::ProgressiveFrame &progressive)
 
     if (!mMessage[currMachineId].push(delayDecode, progressive, mFb[currMachineId])) {
         return false; // error
+    }
+
+    if (mMessage[currMachineId].hasVecPacket()) {
+        mHasVecPacket = true;
+        /* for debug
+        std::cerr << ">> FbMsgSingleFrame.cc push()"
+                  << " hasVecPacket=ON"
+                  << " currMachineId:" << currMachineId
+                  << " mMySyncId:" << mMySyncId
+                  << " progressive.SnapshotId:" << progressive.mSnapshotId
+                  << " progressive.mSendImageActionId:" << progressive.mSendImageActionId
+                  << "\n";
+        */
     }
 
 #   ifdef DEBUG_TIMING_LOG
@@ -208,8 +220,8 @@ FbMsgSingleFrame::decodeAll()
 
 void
 FbMsgSingleFrame::merge(const unsigned partialMergeTilesTotal,
-                        scene_rdl2::grid_util::Fb &fb,
-                        scene_rdl2::grid_util::LatencyLog &latencyLog)
+                        scene_rdl2::grid_util::Fb& fb,
+                        scene_rdl2::grid_util::LatencyLog& latencyLog)
 {
     if (!mReceivedMessagesTotal) return; // empty messages
 
@@ -290,10 +302,10 @@ FbMsgSingleFrame::encodeMergeActionTracker(scene_rdl2::cache::CacheEnqueue& enqu
 // static function
 std::string
 FbMsgSingleFrame::decodeMergeActionTrackerAndDump(scene_rdl2::cache::CacheDequeue& dequeue,
-                                                  unsigned targetMachineId)
+                                                  const unsigned targetMachineId)
 {
     while (true) {
-        int machineId = dequeue.deqVLInt();
+        const int machineId = dequeue.deqVLInt();
         if (machineId < 0) break;
 
         if (machineId != static_cast<int>(targetMachineId)) {
@@ -311,7 +323,7 @@ FbMsgSingleFrame::decodeMergeActionTrackerAndDump(scene_rdl2::cache::CacheDequeu
 }
 
 void
-FbMsgSingleFrame::encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq &vContainerEnq)
+FbMsgSingleFrame::encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq& vContainerEnq)
 {
     if (mEncodeLatencyLogCountTotal == 0) {
         // Only encode 1st received data info for 1st try.
@@ -334,14 +346,38 @@ FbMsgSingleFrame::encodeLatencyLog(scene_rdl2::rdl2::ValueContainerEnq &vContain
     mEncodeLatencyLogCountTotal++;
 }
 
+void
+FbMsgSingleFrame::encodeVecPacket(const VecPacketAddBuffFunc& addBuffFunc)
+{
+    for (int machineId = 0; machineId < mNumMachines; ++machineId) {
+        if (!mReceived[machineId]) continue; // no data yet
+        if (!mMessage[machineId].hasVecPacket()) continue; // no vecPacket
+        mMessage[machineId].encodeVecPacket(addBuffFunc);
+    }
+}
+
 std::string
-FbMsgSingleFrame::show(const std::string &hd) const
+FbMsgSingleFrame::show(const std::string& hd) const
 {
     std::ostringstream ostr;
     ostr << hd << "FbMsgSingleFrame {\n";
     ostr << showMessageAndReceived(hd + "  ") << '\n';
     ostr << showAllReceivedAndProgress(hd + "  ") << '\n';
     ostr << hd << "}";
+    return ostr.str();
+}
+
+std::string
+FbMsgSingleFrame::showVecPacketInfo() const
+{
+    std::ostringstream ostr;
+    ostr << "FbMsgSingleFrame vecPacketInfo {\n"
+         << "  mHasVecPacket:" << scene_rdl2::str_util::boolStr(mHasVecPacket) << '\n';
+    for (int machineId = 0; machineId < mNumMachines; ++machineId) {
+        ostr << scene_rdl2::str_util::addIndent("machineId:" + std::to_string(machineId) + ' ' +
+                                                mMessage[machineId].showVecPacketInfo()) << '\n';
+    }
+    ostr << "}";
     return ostr.str();
 }
 
@@ -421,7 +457,7 @@ FbMsgSingleFrame::getCurrentMicroSec() const
 {
     struct timeval tv;
     gettimeofday(&tv, 0x0);
-    uint64_t cTime = static_cast<uint64_t>(tv.tv_sec) * 1000 * 1000 + static_cast<uint64_t>(tv.tv_usec);
+    const uint64_t cTime = static_cast<uint64_t>(tv.tv_sec) * 1000 * 1000 + static_cast<uint64_t>(tv.tv_usec);
     return cTime;
 }
 
@@ -436,7 +472,7 @@ FbMsgSingleFrame::decodeFirstPushedData()
     //
     // only decode first received data
     //
-    int machineId = mFirstMachineId;
+    const int machineId = mFirstMachineId;
     if (!mReceived[machineId]) return;
 
 #   ifdef DEBUG_TIMING_LOG
@@ -447,8 +483,8 @@ FbMsgSingleFrame::decodeFirstPushedData()
     mMessage[machineId].decodeAll(mFb[machineId], mergeActionTrackerPtr);
 
 #   ifdef DEBUG_TIMING_LOG
-    uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
-    float deltaMillSec = static_cast<float>(deltaMicroSec) / 1000.0f;
+    const uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
+    const float deltaMillSec = static_cast<float>(deltaMicroSec) / 1000.0f;
     std::cerr << ">> FbMsgSingleFrame.cc decodeFirst " << deltaMillSec << " ms" << std::endl;
 #   endif // end DEBUG_TIMING_LOG
 }
@@ -460,7 +496,7 @@ FbMsgSingleFrame::decodeAllPushedData()
 //
 {
 #   ifdef DEBUG_TIMING_LOG
-    uint64_t cMicroSec = getCurrentMicroSec();
+    const uint64_t cMicroSec = getCurrentMicroSec();
 #   endif // end DEBUG_TIMING_LOG
 
 #   ifdef SINGLE_THREAD
@@ -488,32 +524,32 @@ FbMsgSingleFrame::decodeAllPushedData()
 }
 
 void
-FbMsgSingleFrame::mergeFirstFb(scene_rdl2::grid_util::Fb &fb,
-                               scene_rdl2::grid_util::LatencyLog &latencyLog)
+FbMsgSingleFrame::mergeFirstFb(scene_rdl2::grid_util::Fb& fb,
+                               scene_rdl2::grid_util::LatencyLog& latencyLog)
 //
 // Only merge first received data
 //
 {
 #   ifdef DEBUG_TIMING_LOG
-    uint64_t startMicroSec = getCurrentMicroSec();
+    const uint64_t startMicroSec = getCurrentMicroSec();
 #   endif // end DEBUG_TIMING_LOG
 
     fb.reset();
     latencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_DEQ_FBRESET);
-    int machineId = mFirstMachineId;
+    const int machineId = mFirstMachineId;
     mergeSingleFb(nullptr, machineId, fb);
     latencyLog.enq(scene_rdl2::grid_util::LatencyItem::Key::MERGE_DEQ_ACCUMULATE);
 
 #   ifdef DEBUG_TIMING_LOG
-    uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
-    float deltaMillSec = static_cast<float>(deltaMicroSec) / 1000.0f;
+    const uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
+    const float deltaMillSec = static_cast<float>(deltaMicroSec) / 1000.0f;
     std::cerr << ">> FbMsgSingleFrame.cc mergeFirst " << deltaMillSec << " ms" << std::endl;
 #   endif // end DEBUG_TIMING_LOG
 }
 
 void
-FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb &fb,
-                             scene_rdl2::grid_util::LatencyLog &latencyLog)
+FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb& fb,
+                             scene_rdl2::grid_util::LatencyLog& latencyLog)
 //
 // Merge all received data without using partialMergeTile logic (i.e. merge whole image at onece)
 //
@@ -552,14 +588,14 @@ FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb &fb,
 
 void
 FbMsgSingleFrame::mergeAllFb(const unsigned partialMergeTilesTotal,
-                             scene_rdl2::grid_util::Fb &fb,
-                             scene_rdl2::grid_util::LatencyLog &latencyLog)
+                             scene_rdl2::grid_util::Fb& fb,
+                             scene_rdl2::grid_util::LatencyLog& latencyLog)
 //
 // Merge all received data with partial merge tile logic.
 //
 {
 #   ifdef DEBUG_TIMING_LOG
-    uint64_t cMicroSec = getCurrentMicroSec();
+    const uint64_t cMicroSec = getCurrentMicroSec();
 #   endif // end DEBUG_TIMING_LOG
 
     // generate partialMergeTiles table first to control merge task volume
@@ -580,9 +616,9 @@ FbMsgSingleFrame::mergeAllFb(const unsigned partialMergeTilesTotal,
 }
 
 void
-FbMsgSingleFrame::mergeSingleFb(const std::vector<char> *partialMergeTilesTbl,
+FbMsgSingleFrame::mergeSingleFb(const std::vector<char>* partialMergeTilesTbl,
                                 const int machineId,
-                                scene_rdl2::grid_util::Fb &fb)
+                                scene_rdl2::grid_util::Fb& fb)
 //
 // Merge one mcrt info with partial merge tile logic
 //
@@ -632,8 +668,8 @@ FbMsgSingleFrame::mergeSingleFb(const std::vector<char> *partialMergeTilesTbl,
 
 #ifdef TEST
 void
-FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb &fb,
-                             scene_rdl2::grid_util::LatencyLog &latencyLog)
+FbMsgSingleFrame::mergeAllFb(scene_rdl2::grid_util::Fb& fb,
+                             scene_rdl2::grid_util::LatencyLog& latencyLog)
 //
 // Test merge for tile base MT task distribution.
 //
@@ -680,7 +716,7 @@ FbMsgSingleFrame::verifyMergedResultNumSample(const scene_rdl2::grid_util::Fb& m
 }
 
 bool
-FbMsgSingleFrame::verifyMergedResultNumSampleSingleHost(int machineId,
+FbMsgSingleFrame::verifyMergedResultNumSampleSingleHost(const int machineId,
                                                         const scene_rdl2::grid_util::Fb& mergedFb) const
 {
     auto verifyNumSampleBuff =
@@ -698,16 +734,16 @@ FbMsgSingleFrame::verifyMergedResultNumSampleSingleHost(int machineId,
                 uint64_t srcMask = srcActivePixels.getTileMask(tileId);
                 for (unsigned y = 0; y < tilePixSize; ++y) {
                     for (unsigned x = 0; x < tilePixSize; ++x) {
-                        unsigned gx = tileX * tilePixSize + x;
-                        unsigned gy = tileY * tilePixSize + y;
+                        const unsigned gx = tileX * tilePixSize + x;
+                        const unsigned gy = tileY * tilePixSize + y;
                         if (gx >= width || gy >= height) continue;
 
-                        unsigned inTilePixOffset = y * tilePixSize + x;
-                        bool srcActiveFlag = srcMask & ((uint64_t)(0x1) << inTilePixOffset);
+                        const unsigned inTilePixOffset = y * tilePixSize + x;
+                        const bool srcActiveFlag = srcMask & ((uint64_t)(0x1) << inTilePixOffset);
                         
-                        unsigned pixOffset = tilePixOffset + inTilePixOffset;
-                        unsigned int srcNS = srcNSBuff.getData()[pixOffset];
-                        unsigned int mrgNS = mrgNSBuff.getData()[pixOffset];
+                        const unsigned pixOffset = tilePixOffset + inTilePixOffset;
+                        const unsigned int srcNS = srcNSBuff.getData()[pixOffset];
+                        const unsigned int mrgNS = mrgNSBuff.getData()[pixOffset];
                         if (mrgNS < srcNS) {
                             std::cerr << ">> FbMsgSingleFrame.cc verifyMergeResultNumSample FAILED"
                                       << " machineId:" << machineId
@@ -741,7 +777,7 @@ FbMsgSingleFrame::verifyMergedResultNumSampleSingleHost(int machineId,
 
 void
 FbMsgSingleFrame::partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
-                                          std::vector<char> &partialMergeTileTbl)
+                                          std::vector<char>& partialMergeTileTbl)
 //
 // partialMergeTilesTable generation function.
 //
@@ -752,7 +788,7 @@ FbMsgSingleFrame::partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
 {
     if (mFb.empty()) return;    // just in case
 
-    unsigned totalTiles = mFb[0].getTotalTiles();
+    const unsigned totalTiles = mFb[0].getTotalTiles();
     partialMergeTileTbl.resize(totalTiles, (char)false);
 
     if (partialMergeTilesTotal == 0) {
@@ -763,7 +799,7 @@ FbMsgSingleFrame::partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
         return;
     }
     
-    unsigned activeStartId = std::min(mPartialMergeStartTileId, totalTiles - 1);
+    const unsigned activeStartId = std::min(mPartialMergeStartTileId, totalTiles - 1);
     unsigned activeEndId = activeStartId + std::min(partialMergeTilesTotal, totalTiles);
 
     if (activeEndId <= totalTiles) {
@@ -784,12 +820,12 @@ FbMsgSingleFrame::partialMergeTilesTblGen(const unsigned partialMergeTilesTotal,
 }
 
 void
-FbMsgSingleFrame::timeLogUpdate(const std::string &msg,
-                                scene_rdl2::rec_time::RecTimeLog &timeLog,
+FbMsgSingleFrame::timeLogUpdate(const std::string& msg,
+                                scene_rdl2::rec_time::RecTimeLog& timeLog,
                                 const uint64_t startMicroSec) const
 {
-    uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
-    float deltaMillSec = static_cast<float>(deltaMicroSec) / 1000.0f;
+    const uint64_t deltaMicroSec = getCurrentMicroSec() - startMicroSec;
+    const float deltaMillSec = static_cast<float>(deltaMicroSec) / 1000.0f;
 
     timeLog.add(deltaMillSec);
     if (timeLog.getTotal() > 32) {
@@ -800,7 +836,7 @@ FbMsgSingleFrame::timeLogUpdate(const std::string &msg,
 }
 
 std::string
-FbMsgSingleFrame::showMessageAndReceived(const std::string &hd) const
+FbMsgSingleFrame::showMessageAndReceived(const std::string& hd) const
 {
     std::ostringstream ostr;
     ostr << hd << "mMessage (total:" << mMessage.size() << ") {\n";
@@ -816,7 +852,7 @@ FbMsgSingleFrame::showMessageAndReceived(const std::string &hd) const
 }
 
 std::string
-FbMsgSingleFrame::showAllReceivedAndProgress(const std::string &hd) const
+FbMsgSingleFrame::showAllReceivedAndProgress(const std::string& hd) const
 {
     std::ostringstream ostr;
     ostr << hd << "all (machineTotal:" << mReceivedAll.size() << ") {\n";
@@ -856,7 +892,7 @@ FbMsgSingleFrame::parserCommandMultiChan(Arg& arg)
 bool
 FbMsgSingleFrame::parserCommandFb(Arg& arg)
 {
-    unsigned machineId = (arg++).as<unsigned>(0);
+    const unsigned machineId = (arg++).as<unsigned>(0);
     if (machineId > mFb.size() - 1) {
         arg.fmtMsg("machineId:%d is out of range. max:%d\n", machineId, mMessage.size());
         return false;

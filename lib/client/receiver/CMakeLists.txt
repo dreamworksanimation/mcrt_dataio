@@ -1,4 +1,4 @@
-# Copyright 2023-2024 DreamWorks Animation LLC
+# Copyright 2023-2025 DreamWorks Animation LLC
 # SPDX-License-Identifier: Apache-2.0
 
 set(component client_receiver)
@@ -15,6 +15,8 @@ target_sources(${component}
         ClientReceiverDenoiser.cc
         ClientReceiverFb.cc
         ClientReceiverStats.cc
+	ScanConvert.cc
+	ScanConvertPolygon.cc
 	TelemetryDisplay.cc
 	TelemetryLayoutBase.cc
 	TelemetryLayoutCorePerf.cc
@@ -22,10 +24,13 @@ target_sources(${component}
 	TelemetryLayoutFeedback.cc
 	TelemetryLayoutNetIO.cc
 	TelemetryLayoutPanel.cc
+	TelemetryLayoutPathVis.cc
 	TelemetryOverlay.cc
+	TelemetryOverlayLine.cc
 	TelemetryPanel.cc
         TimingAnalysis.cc
         TimingRecorderHydra.cc
+	VectorPacketManager.cc
 )
 
 set_property(TARGET ${component}

@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "McrtControl.h"
 
 #include <mcrt_dataio/share/util/ClockDelta.h>
@@ -22,9 +21,10 @@ static constexpr char MCRT_CONTROL_COMMAND[]  = "MCRT-control";
 // McrtControl command format definition
 //
 static constexpr char CMD_CLOCKDELTACLIENT[] = "clockDeltaClient <nodeId> <serverName> <port> <path>";
-static constexpr char CMD_CLOCKOFFSET[]      = "clockOffset <hostName> <offsetMs>";
-static constexpr char CMD_COMPLETED[]        = "completed <syncId>";
-static constexpr char CMD_GLOBALPROGRESS[]   = "globalProgress <syncId> <fraction>";
+static constexpr char CMD_CLOCKOFFSET[] = "clockOffset <hostName> <offsetMs>";
+static constexpr char CMD_COMPLETED[] = "completed <syncId>";
+static constexpr char CMD_GLOBALPROGRESS[] = "globalProgress <syncId> <fraction>";
+static constexpr char CMD_FORCE_RENDERSTART[] = "forceRenderStart";
 
 using TokenArray = std::vector<std::string>;
 using callBackEvalCmd = std::function<void(const TokenArray &tokenArray)>;
@@ -53,7 +53,8 @@ isCmd(const std::string& cmdLine,
       const callBackEvalCmd& callBack_clockDeltaClient = nullptr,
       const callBackEvalCmd& callBack_clockOffset = nullptr,
       const callBackEvalCmd& callBack_completed = nullptr,
-      const callBackEvalCmd& callBack_globalProgress = nullptr)
+      const callBackEvalCmd& callBack_globalProgress = nullptr,
+      const callBackEvalCmd& callBack_forceRenderStart = nullptr)
 {
     auto convCmdLineToTokenArray = [&]() -> std::vector<std::string> {
         std::vector<std::string> tokenArray;
@@ -68,7 +69,7 @@ isCmd(const std::string& cmdLine,
                                     const std::vector<std::string>& tokenArray) -> bool {
         auto cmdParse = [](const std::string& cmdName,
                            const std::vector<std::string>& tokenArray,
-                           int numArg) -> bool {
+                           const int numArg) -> bool {
             if (tokenArray.size() < 2) return false;
             if (tokenArray[0] != MCRT_CONTROL_COMMAND) return false; // This is not a MCRT-control command
             if (tokenArray[1] != cmdName) return false;
@@ -94,6 +95,10 @@ isCmd(const std::string& cmdLine,
     } else if (isMcrtControlCommand(CMD_GLOBALPROGRESS, tokenArray)) {
         if (callBack_globalProgress) {
             callBack_globalProgress(tokenArray);
+        }
+    } else if (isMcrtControlCommand(CMD_FORCE_RENDERSTART, tokenArray)) {
+        if (callBack_forceRenderStart) {
+            callBack_forceRenderStart(tokenArray);
         }
     } else {
         return false;
@@ -158,6 +163,15 @@ McrtControl::msgGen_globalProgress(const uint32_t syncId,
 }
 
 // static function
+std::string
+McrtControl::msgGen_forceRenderStart()
+{
+    std::ostringstream ostr;
+    ostr << MCRT_CONTROL_COMMAND << ' ' << CMD_FORCE_RENDERSTART;
+    return ostr.str();
+}
+
+// static function
 bool
 McrtControl::isCommand(const std::string& cmdLine)
 {
@@ -167,7 +181,8 @@ McrtControl::isCommand(const std::string& cmdLine)
 bool
 McrtControl::run(const std::string& cmdLine,
                  const std::function<bool(uint32_t syncId)>& callBackRenderStopProcedure,
-                 const std::function<void(uint32_t syncId, float fraction)>& callBackGlobalProgressUpdate)
+                 const std::function<void(uint32_t syncId, float fraction)>& callBackGlobalProgressUpdate,
+                 const std::function<void()>& callBackForceRenderStart)
 {
     bool returnFlag = true;
     isCmd(cmdLine,
@@ -214,10 +229,18 @@ McrtControl::run(const std::string& cmdLine,
               float fraction = std::stof(tokenArray[3]);
 #             ifdef DEBUG_MESSAGE
               std::cerr << ">> McrtControl.cc ===>>> run globalProgress <<<==="
-                        << " syncId:" syncId
+                        << " syncId:" << syncId
                         << " fraction:" << fraction << '\n';
 #             endif // end DEBUG_MESSAGE              
               callBackGlobalProgressUpdate(syncId, fraction);
+          },
+
+          [&](const std::vector<std::string>& tokenArray) {
+              // MCRT-control forceRenderStart
+#             ifdef DEBUG_MESSAGE
+              std::cerr << ">> McrtControl.cc ===>>> run forceRenderStart <<<===\n";
+#             endif // end DEBUG_MESSAGE              
+              callBackForceRenderStart();
           }
           );
     return returnFlag;

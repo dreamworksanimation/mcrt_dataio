@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #pragma once
@@ -14,6 +14,7 @@ class GlobalNodeInfo;
 
 namespace telemetry {
 
+class Display;
 class DisplayInfo;
 
 class LayoutBase
@@ -31,11 +32,12 @@ public:
 
     virtual void drawMain(const DisplayInfo& info) = 0;
 
+    static std::string colFg(const C3& c);
+    static std::string colBg(const C3& c);
+
     Parser& getParser() { return mParser; }
 
 protected:
-
-    void parserConfigure();
 
     unsigned getFontStepX() {
         return (mOverlay->getFontStepX() == 0) ? mFont->getFontSizePoint() : mOverlay->getFontStepX();
@@ -44,99 +46,97 @@ protected:
     //
     // draw utility functions
     //
-    std::string colFg(const C3& c) const;
-    std::string colBg(const C3& c) const;
     std::string colReset() const { return colFg(mCharFg) + colBg(mCharBg); }
 
     //------------------------------
 
-    std::string strFps(float v) const;
-    std::string strPct(float fraction) const;
-    std::string strSec(float sec) const;
+    std::string strFps(const float v) const;
+    std::string strPct(const float fraction) const;
+    std::string strSec(const float sec) const;
     std::string strMillisec(float millisec) const;
-    std::string strByte(size_t size, size_t minOutStrLen = 8) const;
-    std::string strBps(float bps, size_t minOutStrLen = 10) const;
-    std::string strBar(unsigned barWidth,
-                       unsigned fontStepX,
+    std::string strByte(const size_t size, const size_t minOutStrLen = 8) const;
+    std::string strBps(const float bps, const size_t minOutStrLen = 10) const;
+    std::string strBar(const unsigned barWidth,
+                       const unsigned fontStepX,
                        const std::string& title,
-                       float fraction,
-                       bool usageMode,
+                       const float fraction,
+                       const bool usageMode,
                        unsigned* barStartOffsetPixX = nullptr,
                        unsigned* barEndOffsetPixX = nullptr,
                        unsigned* barHeight = nullptr) const;
-    std::string strBool(bool flag) const;
+    std::string strBool(const bool flag) const;
     std::string strSimpleHostName(const std::string& hostName) const;
     std::string strFrameStatus(const mcrt::BaseFrame::Status& status,
                                const float renderPrepProgress) const;
-    std::string strPassStatus(bool isCoarsePass) const;
+    std::string strPassStatus(const bool isCoarsePass) const;
     std::string strExecMode(const McrtNodeInfo::ExecMode& execMode) const;
 
     //------------------------------
 
     // horizontal box bar
-    void drawHBoxBar(unsigned leftX, unsigned leftY,
-                     unsigned barStartOffsetPixX, unsigned barEndOffsetPixX,
-                     unsigned barHeight,
-                     float fraction,
-                     const C3& c, unsigned char alpha);
+    void drawHBoxBar(const unsigned leftX, const unsigned leftY,
+                     const unsigned barStartOffsetPixX, const unsigned barEndOffsetPixX,
+                     const unsigned barHeight,
+                     const float fraction,
+                     const C3& c, const unsigned char alpha);
 
     // horizontal box bar that consists of 2 consecutive sections
-    void drawHBoxBar2Sections(unsigned leftX, unsigned leftY,
-                              unsigned barStartOffsetPixX, unsigned barEndOffsetPixX,
-                              unsigned barHeight,
-                              float fractionA,
-                              const C3& cA, unsigned char alphaA,
-                              float fractionB,
-                              const C3& cB, unsigned char alphaB);
+    void drawHBoxBar2Sections(const unsigned leftX, const unsigned leftY,
+                              const unsigned barStartOffsetPixX, const unsigned barEndOffsetPixX,
+                              const unsigned barHeight,
+                              const float fractionA,
+                              const C3& cA, const unsigned char alphaA,
+                              const float fractionB,
+                              const C3& cB, const unsigned char alphaB);
 
     // horizontal bar with title
-    void drawHBarWithTitle(unsigned barLeftBottomX,
-                           unsigned barLeftBottomY,
-                           unsigned barWidth,
+    void drawHBarWithTitle(const unsigned barLeftBottomX,
+                           const unsigned barLeftBottomY,
+                           const unsigned barWidth,
                            const std::string& title,
-                           float fraction,
-                           bool usageMode);
+                           const float fraction,
+                           const bool usageMode);
 
     // borizontal bar that consists of 2 consecutive sections with title
-    void drawHBar2SectionsWithTitle(unsigned barLeftBottomX,
-                                    unsigned barLeftBottomY,
-                                    unsigned barWidth,
+    void drawHBar2SectionsWithTitle(const unsigned barLeftBottomX,
+                                    const unsigned barLeftBottomY,
+                                    const unsigned barWidth,
                                     const std::string& title,
-                                    float fractionA,
-                                    float fractionB,
-                                    bool usageMode);
+                                    const float fractionA,
+                                    const float fractionB,
+                                    const bool usageMode);
 
     // vertical line
-    void drawVLine(unsigned x, unsigned minY, unsigned maxY, const C3& c, unsigned char alpha);
+    void drawVLine(const unsigned x, const unsigned minY, const unsigned maxY, const C3& c, const unsigned char alpha);
 
     // vertical bar graph
-    void drawVBarGraph(unsigned leftBottomX,
-                       unsigned leftBottomY,
-                       unsigned rightTopX,
-                       unsigned rightTopY,
-                       unsigned rulerYSize,
+    void drawVBarGraph(const unsigned leftBottomX,
+                       const unsigned leftBottomY,
+                       const unsigned rightTopX,
+                       const unsigned rightTopY,
+                       const unsigned rulerYSize,
                        const ValueTimeTracker& vtt,
                        const C3& c,
-                       unsigned char alpha,
-                       float graphTopY, // auto adjust display Y range if this value is 0 or negative
+                       const unsigned char alpha,
+                       const float graphTopY, // auto adjust display Y range if this value is 0 or negative
                        float& maxValue,
                        float& currValue);
 
     // vertical bar graph with title for bps value
-    void drawBpsVBarGraphWithTitle(unsigned leftBottomX,
-                                   unsigned leftBottomY,
-                                   unsigned rightTopX,
-                                   unsigned rightTopY,
-                                   unsigned rulerYSize,
+    void drawBpsVBarGraphWithTitle(const unsigned leftBottomX,
+                                   const unsigned leftBottomY,
+                                   const unsigned rightTopX,
+                                   const unsigned rightTopY,
+                                   const unsigned rulerYSize,
                                    const ValueTimeTracker& vtt,
                                    const C3& c,
-                                   unsigned char alpha,
-                                   float graphTopY, // auto adjust display Y range if this val is 0 or negative
+                                   const unsigned char alpha,
+                                   const float graphTopY, // auto adjust display Y range if this val is 0 or negative
                                    const std::string& title);
 
     //------------------------------
 
-    Overlay::BBox2i setBBox(int minX, int minY, int maxX, int maxY) const {
+    Overlay::BBox2i setBBox(const int minX, const int minY, const int maxX, const int maxY) const {
         return Overlay::BBox2i {scene_rdl2::math::Vec2i {minX, minY}, scene_rdl2::math::Vec2i {maxX, maxY}};
     }
 
@@ -146,6 +146,10 @@ protected:
 
     unsigned char getArgC0255(Arg& arg) const;
     C3 getArgC3(Arg& arg) const;
+
+    //------------------------------
+
+    void parserConfigure();
 
     //==============================
 
@@ -162,7 +166,7 @@ protected:
 
     unsigned mMaxYLines {0};
     unsigned mOffsetBottomPixY {0};
-    unsigned mStepPixY {0};
+    unsigned mStepPixY {0}; // single char height w/ spaceY computed by Overlay::getMaxYLines()
 
     std::string mError;
 
@@ -184,42 +188,50 @@ protected:
     void subPanelTitle(const DisplayInfo& info);
 
     // Single string sub-panel
-    void subPanelMessage(unsigned x,
-                         unsigned y,
+    void subPanelMessage(const unsigned x,
+                         const unsigned y,
                          const std::string& str,
                          Overlay::BBox2i& bbox);
+    void subPanelMessageUpperRight(const unsigned x, // upper right X
+                                   const unsigned y, // upper right Y
+                                   const std::string& str,
+                                   Overlay::BBox2i& bbox);
+    void subPanelMessageCenter(const unsigned x, // center X
+                               const unsigned y, // center Y
+                               const std::string& str,
+                               Overlay::BBox2i& bbox);
 
     // Global Info
-    void subPanelGlobalInfo(unsigned x,
-                            unsigned y,
+    void subPanelGlobalInfo(const unsigned x,
+                            const unsigned y,
                             const DisplayInfo& info,
                             Overlay::BBox2i& bbox);
 
     // Global progress bar
-    void subPanelGlobalProgressBar(unsigned barLeftBottomX,
-                                   unsigned barLeftBottomY,
-                                   unsigned barWidth,
+    void subPanelGlobalProgressBar(const unsigned barLeftBottomX,
+                                   const unsigned barLeftBottomY,
+                                   const unsigned barWidth,
                                    const DisplayInfo& info,
                                    Overlay::BBox2i& bboxGlobalProgressBar);
 
     // NetIO, Cpu/Mem monitor, RenderPrep/MCRT progress
-    void subPanelNetIOCpuMemAndProgress(unsigned leftBottomX,
-                                        unsigned leftBottomY,
-                                        unsigned rightTopX,
-                                        unsigned rightTopY,
-                                        float graphTopY, // auto adjust Y if this value is 0 or negative
-                                        unsigned rulerYSize,
+    void subPanelNetIOCpuMemAndProgress(const unsigned leftBottomX,
+                                        const unsigned leftBottomY,
+                                        const unsigned rightTopX,
+                                        const unsigned rightTopY,
+                                        const float graphTopY, // auto adjust Y if this value is 0 or negative
+                                        const unsigned rulerYSize,
                                         const std::string& title,
-                                        int cpuTotal,
-                                        float cpuFraction,
-                                        size_t memTotal, // byte
-                                        float memFraction,
-                                        float renderPrepFraction,
-                                        float mcrtProgress,
-                                        float mcrtGlobalProgress,
+                                        const int cpuTotal,
+                                        const float cpuFraction,
+                                        const size_t memTotal, // byte
+                                        const float memFraction,
+                                        const float renderPrepFraction,
+                                        const float mcrtProgress,
+                                        const float mcrtGlobalProgress,
                                         const ValueTimeTracker& sendVtt,
                                         const ValueTimeTracker& recvVtt,
-                                        bool activeBgColFlag,
+                                        const bool activeBgColFlag,
                                         Overlay::BBox2i& bbox);
 
     //------------------------------
@@ -229,12 +241,14 @@ protected:
 };
 
 class LayoutDevel : public LayoutPanel
+//
+// Telemetry Layout for "devel" (most standard) panel.
+//
 {
 public:
     using Arg = scene_rdl2::grid_util::Arg;
     using FontShPtr = std::shared_ptr<Font>;
     using OverlayShPtr = std::shared_ptr<Overlay>;
-    using Parser = scene_rdl2::grid_util::Parser;
 
     LayoutDevel(const std::string& name, OverlayShPtr overlay, FontShPtr font)
         : LayoutPanel(name, overlay, font)
@@ -271,6 +285,9 @@ private:
 };
 
 class LayoutCorePerf : public LayoutPanel
+//
+// Telemetry Layout for "corePerf" (Core Performance) panel.
+//
 {
 public:
     using FontShPtr = std::shared_ptr<Font>;
@@ -329,6 +346,9 @@ private:
 };
 
 class LayoutNetIO : public LayoutPanel
+//
+// Telemetry Layout for "netIO" (Network I/O) panel.
+//
 {
 public:
     LayoutNetIO(const std::string& name, OverlayShPtr overlay, FontShPtr font)
@@ -340,7 +360,6 @@ public:
     void drawMain(const DisplayInfo& info) override;
 
 private:
-
     void parserConfigure();
 
     void setupPanelPosition(const DisplayInfo& info);
@@ -377,6 +396,9 @@ private:
 };
 
 class LayoutFeedback : public LayoutPanel
+//
+// Telemetry Layout for "feedback" panel. This is experimental for multi-machine adaptive sampling
+//
 {
 public:    
     using FontShPtr = std::shared_ptr<Font>;
@@ -398,6 +420,75 @@ private:
     Overlay::BBox2i mBBoxGlobalProgressBar;
     Overlay::BBox2i mBBoxMergeComputation;
     Overlay::BBox2i mBBoxMcrtComputation;
+};
+
+class LayoutPathVis : public LayoutPanel
+//
+// Telemetry Layout for "pathVis" (path visualizer) panel
+//
+{
+public:
+    LayoutPathVis(const std::string& name, OverlayShPtr overlay, FontShPtr font,
+                  const Display& display)
+        : LayoutPanel(name, overlay, font)
+        , mDisplay {display}
+    {
+        parserConfigure();
+    }
+
+    void drawMain(const DisplayInfo& info) override;
+
+    std::string show() const;
+
+private:
+    void parserConfigure();
+
+    void drawGlobalProgressBar(const DisplayInfo& info);
+    void drawVector(const DisplayInfo& info);
+    void drawVectorTest0(); // drawVectorTestPatternA() w=1
+    void drawVectorTest1(); // drawVectorTestPatternA() w=0~16
+    void drawVectorTest2(); // drawVectorTestPatternA() w=0~16, len=change
+    void drawVectorTest3(); // clipping version of 1
+    void drawVectorTest4(); // clipping version of 2
+    void drawVectorTest5(); // circleFill test
+    void drawVectorTest6(); // vLine/hLine and boxOutline test
+
+    // Draw spinner test pattern based on the mTestCounter value.
+    void drawVectorTestPatternA(const unsigned segmentTotal,
+                                const float angleStart, const float angleEnd,
+                                const float lenScale,
+                                const float widthMax,
+                                const bool constLen,
+                                const bool constWidth);
+
+    // Draw test pattern for VLine, HLine, and BoxOutline based on the mTestCounter value.
+    void drawVectorTestPatternB(const unsigned segmentTotal, const float lineRatio);
+
+    void drawVectorProfile(const std::function<void()>& func);
+
+    void drawPathVisCtrlInfo(const DisplayInfo& info);
+    void drawPathVisClientInfo();
+    void drawPathVisCurrInfo(const DisplayInfo& info);
+    void drawPathVisHotKeyHelp();
+
+    //------------------------------
+
+    bool mTestMode {false};
+    unsigned mTestType {0};
+    int mTestCounter {0};
+    unsigned mProfileLoopMax {0};
+
+    bool mLineDrawOnly {false};
+    bool mHotKeyHelp {false};
+
+    const Display& mDisplay;
+
+    Overlay::BBox2i mBBoxGlobalInfo;
+    Overlay::BBox2i mBBoxGlobalProgressBar;
+    Overlay::BBox2i mBBoxPathVisCtrlInfo;
+    Overlay::BBox2i mBBoxPathVisClientInfo;
+    Overlay::BBox2i mBBoxPathVisCurrentInfo;
+    Overlay::BBox2i mBBoxPathVisHotKeyHelp;
 };
 
 } // namespace telemetry

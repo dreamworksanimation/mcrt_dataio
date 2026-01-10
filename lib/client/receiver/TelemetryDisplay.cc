@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #include "TelemetryDisplay.h"
@@ -142,6 +142,16 @@ Display::switchPanelToChild()
 }
 
 std::string
+Display::getCurrentTelemetryPanelName() const
+{
+    if (!mActive) return ""; // telemetry is disabled
+
+    PanelTableStack::PanelShPtr panel = mPanelTableStack.getCurrentPanel();
+    if (!panel) return "";
+    return panel->getName();
+}
+
+std::string
 Display::show() const
 {
     using scene_rdl2::str_util::addIndent;
@@ -187,6 +197,7 @@ Display::setupRootPanelTable()
     }
     */
     currPanelTbl->push_back_panel(genPanel("feedback", "feedback", ""));
+    currPanelTbl->push_back_panel(genPanel("pathVis", "pathVis", ""));
 
     mRootPanelTable = currPanelTbl;
     mRootPanelTable->setCurrId(0);
@@ -224,6 +235,8 @@ Display::genLayout(const std::string& panelName, const std::string& layoutName) 
         return std::make_shared<LayoutFeedback>(panelName, mOverlay, mFont);
     } else if (layoutName == "netIO") {
         return std::make_shared<LayoutNetIO>(panelName, mOverlay, mFont);
+    } else if (layoutName == "pathVis") {
+        return std::make_shared<LayoutPathVis>(panelName, mOverlay, mFont, *this);
     }
     return nullptr;
 }
@@ -266,6 +279,7 @@ Display::setupTestFont()
         }
         catch (scene_rdl2::except::RuntimeError& e) {
             std::cerr << ">> TelemetryDisplay.cc ERROR : setupTestFont() failed."
+                      << " please set proper Font by \"testFont\" command."
                       << " RuntimeError:" << e.what() << '\n';
             mTestFont.reset(nullptr);
             return false;
@@ -302,7 +316,7 @@ Display::testBakeOverlayRgb888(const DisplayInfo& info,
                     static_cast<unsigned char>(mTestBgCol[3]),
                     mDoParallel);
 
-    mOverlay->drawStrClear();
+    mOverlay->drawClearAllItems();
     if (!mOverlay->drawStr(*mTestFont, mTestStrX, mTestStrY,
                            mTestMsg,
                            {static_cast<unsigned char>(mTestStrCol[0]),
@@ -312,7 +326,7 @@ Display::testBakeOverlayRgb888(const DisplayInfo& info,
         std::cerr << ">> TelemetryDisplay.cc testBakeOverlayRgb888 mOverlay->drawStr() failed. " << mError << '\n';
         return;
     }
-    mOverlay->drawStrFlush(mDoParallel);
+    mOverlay->drawFlushAllItems(mDoParallel);
 
     finalizeOverlayRgb888(info, rgbFrame, top2bottomFlag, mTestHAlign, mTestVAlign, bakeWithPrevArchive);
 }
@@ -349,13 +363,9 @@ Display::stdBakeOverlayRgb888(const DisplayInfo& info,
         sectionStartTime = mRecTime.end();
     }
     {
-        mOverlay->drawBoxClear();
-        mOverlay->drawVLineClear();
-        mOverlay->drawStrClear();
+        mOverlay->drawClearAllItems();
         drawOverlay(info);
-        mOverlay->drawBoxFlush(mDoParallel);
-        mOverlay->drawVLineFlush(mDoParallel);
-        mOverlay->drawStrFlush(mDoParallel);
+        mOverlay->drawFlushAllItems(mDoParallel); 
     }
     if (mTimingProfile) mDrawStrTime.set(mRecTime.end() - sectionStartTime);
 

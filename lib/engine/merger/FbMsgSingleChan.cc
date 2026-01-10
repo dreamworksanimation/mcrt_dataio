@@ -1,4 +1,4 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 
 #include "FbMsgSingleChan.h"
@@ -44,7 +44,9 @@ std::string
 FbMsgSingleChan::show(const std::string &hd) const
 {
     std::ostringstream ostr;
-    ostr << hd << "FbMsgSingleChan (total:" << mDataArray.size() << ") {\n";
+    ostr << hd
+         << "FbMsgSingleChan (DataType:" << dataTypeStr(mDataType) << ") "
+         << "(total:" << mDataArray.size() << ") {\n";
     for (size_t i = 0; i < mDataArray.size(); ++i) {
         size_t maxDispSize = 1024;
         ostr << FbMsgUtil::hexDump(hd + "  ",
@@ -61,15 +63,33 @@ FbMsgSingleChan::show(const std::string &hd) const
 std::string
 FbMsgSingleChan::show() const
 {
-    int w = scene_rdl2::str_util::getNumberOfDigits(static_cast<unsigned>(mDataSize.size()));
+    const int w = scene_rdl2::str_util::getNumberOfDigits(static_cast<unsigned>(mDataSize.size()));
 
     std::ostringstream ostr;
-    ostr << "FbMsgSingleChan (total:" << mDataArray.size() << ") {\n";
+    ostr << "FbMsgSingleChan"
+         << " (DataType:" << dataTypeStr(mDataType) << ")"
+         << " (total:" << mDataArray.size() << ") {\n";
     for (size_t i = 0; i < mDataSize.size(); ++i) {
-        ostr << "  i:" << std::setw(w) << i << " size:" << scene_rdl2::str_util::byteStr(mDataSize[i]) << '\n';
+        ostr << "  i:" << std::setw(w) << i
+             << " size:" << scene_rdl2::str_util::byteStr(mDataSize[i])
+             << " dataAddr:0x" << std::hex << reinterpret_cast<uintptr_t>(mDataArray[i].get()) << std::dec
+             << '\n';
     }
     ostr << "}";
     return ostr.str();
+}
+
+// static function
+std::string
+FbMsgSingleChan::dataTypeStr(const DataType type)
+{
+    switch (type) {
+    case DataType::FB_DATA: return "FB_DATA";
+    case DataType::LATENCY_LOG: return "LATENCY_LOG";
+    case DataType::VEC_PACKET: return "VEC_PACKET";
+    case DataType::UNKNOWN: return "UNKNOWN";
+    default : return "?";
+    }
 }
 
 } // namespace mcrt_dataio

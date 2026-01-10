@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "ClientReceiverFb.h"
 
 #include "ClientReceiverConsoleDriver.h"
@@ -9,7 +8,9 @@
 #include "TelemetryDisplay.h"
 #include "TimingAnalysis.h"
 #include "TimingRecorderHydra.h"
+#include "VectorPacketManager.h"
 
+#include <mcrt_dataio/engine/mcrt/McrtNodeInfo.h>
 #include <mcrt_dataio/engine/merger/GlobalNodeInfo.h>
 #include <mcrt_dataio/share/codec/InfoRec.h>
 #include <mcrt_dataio/share/util/FpsTracker.h>
@@ -18,6 +19,7 @@
 
 #include <scene_rdl2/common/grid_util/PackTiles.h>
 #include <scene_rdl2/common/grid_util/PackTilesPassPrecision.h>
+#include <scene_rdl2/common/grid_util/ProgressiveFrameBufferName.h>
 #include <scene_rdl2/common/grid_util/ShmFbOutput.h>
 #include <scene_rdl2/common/rec_time/RecTime.h>
 #include <scene_rdl2/render/util/StrUtil.h>
@@ -29,6 +31,7 @@
 #include <json/writer.h>
 #include <limits>
 #include <mutex>
+#include <string>
 #include <tbb/parallel_for.h>
 
 // This directive is used only for debug purpose.
@@ -296,6 +299,12 @@ public:
     void switchTelemetryPanelToPrev();
     void switchTelemetryPanelToParent();
     void switchTelemetryPanelToChild();
+    std::string getCurrentTelemetryPanelName() const;
+
+    void setTelemetryPanelPathVisClientInfoCallBack(const std::function<std::string()>& callBack)
+    {
+        mTelemetryDisplay.setTelemetryPanelPathVisClientInfoCallBack(callBack);
+    }
 
 private:
     std::string mClientMessage;
@@ -353,6 +362,10 @@ private:
 
     //------------------------------
 
+    vectorPacket::Manager mVectorPacketManager;
+
+    //------------------------------
+
     scene_rdl2::rec_time::RecTime mElapsedTimeFromStart; // elapsed time information from image = STARTED
 
     uint64_t mRecvMsgSize {0};      // last message's size
@@ -403,7 +416,9 @@ private:
     //------------------------------
 
     template <typename F>
-    bool getDataMTSafe(unsigned& width, unsigned& height, F getFuncMain) {
+    bool
+    getDataMTSafe(unsigned& width, unsigned& height, F getFuncMain)
+    {
         initErrorMsg();
         bool result;
         {
@@ -416,7 +431,9 @@ private:
     }
 
     template <typename F>
-    bool getData(F getFunctionMain) {
+    bool
+    getData(F getFunctionMain)
+    {
         initErrorMsg();
         return getFunctionMain();
     }
@@ -512,6 +529,10 @@ private:
     std::string showShmFbInfo() const;
 
     void telemetryResetTest(); // for the telemetry testing purposes
+
+    std::string cmdGetOrbitCamAutoFocusPoint() const;
+    scene_rdl2::math::Vec3f getOrbitCamAutoFocusPoint() const;
+    
 }; // ClientReceiverFb::Impl
 
 //------------------------------------------------------------------------------------------
@@ -531,6 +552,8 @@ ClientReceiverFb::Impl::Impl(bool initialTelemetryOverlayCondition)
     mGlobalNodeInfo.setClientCpuTotal(SysUsage::getCpuTotal());
     mGlobalNodeInfo.setClientMemTotal(SysUsage::getMemTotal());
     mSysUsage.updateNetIO();
+
+    mVectorPacketManager.setTelemetryDisplay(&mTelemetryDisplay);
 }
 
 void
@@ -681,6 +704,9 @@ ClientReceiverFb::Impl::decodeProgressiveFrame(const mcrt::ProgressiveFrame &mes
             } else {
                 mFb.resetExceptColor();
             }
+
+            mVectorPacketManager.resetPushedData(); // clean up all old vector packet data
+
             callBackFuncAtStartedCondition();
         }
     }
@@ -1601,6 +1627,12 @@ ClientReceiverFb::Impl::switchTelemetryPanelToChild()
     mTelemetryDisplay.switchPanelToChild();
 }
 
+std::string
+ClientReceiverFb::Impl::getCurrentTelemetryPanelName() const
+{
+    return mTelemetryDisplay.getCurrentTelemetryPanelName();
+}
+
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
 
@@ -2050,8 +2082,6 @@ ClientReceiverFb::Impl::getRenderOutputF4Main(T aovIdentifierInfo,
                                     data);
 }
 
-//------------------------------------------------------------------------------
-
 void
 ClientReceiverFb::Impl::addErrorMsg(const std::string& msg)
 {
@@ -2082,7 +2112,7 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
 {
     if (!buffer.mDataLength) return true; // empty data somehow -> skip
 
-    if (!std::strcmp(buffer.mName, "latencyLog")) {
+    if (!std::strcmp(buffer.mName, scene_rdl2::grid_util::ProgressiveFrameBufferName::LatencyLog)) {
         mLatencyLog.decode(buffer.mData.get(), buffer.mDataLength);
 
         /* useful debug dump
@@ -2097,7 +2127,7 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
         */
         return true;
 
-    } else if (!std::strcmp(buffer.mName, "latencyLogUpstream")) {
+    } else if (!std::strcmp(buffer.mName, scene_rdl2::grid_util::ProgressiveFrameBufferName::LatencyLogUpstream)) {
         mLatencyLogUpstream.decode(buffer.mData.get(), buffer.mDataLength);
 
         /* useful debug dump
@@ -2113,10 +2143,22 @@ ClientReceiverFb::Impl::decodeProgressiveFrameBuff(const mcrt::BaseFrame::DataBu
         return true;
     }
 
-    if (!std::strcmp(buffer.mName, "auxInfo")) {
+    if (!std::strcmp(buffer.mName, scene_rdl2::grid_util::ProgressiveFrameBufferName::AuxInfo)) {
         decodeAuxInfo(buffer);
         return true;
     }
+
+    int rankId;
+    if (scene_rdl2::grid_util::ProgressiveFrameBufferName::isVecPacket(buffer.mName, rankId)) {
+        // vector packet
+        if (rankId >= 0) {
+            mVectorPacketManager.pushData(rankId, buffer.mData, buffer.mDataLength);
+            return true;
+        } else {
+            std::cerr << ">> ClientReceiverFb.cc vecPacket name:" << buffer.mName << " unknown RankId\n";
+            return false;
+        }
+    } 
 
     //
     // PackTile codec data
@@ -2815,6 +2857,11 @@ ClientReceiverFb::Impl::setupTelemetryDisplayInfo(telemetry::DisplayInfo& displa
     displayInfo.mReceiveImageDataFps = getRecvImageDataFps();
 
     displayInfo.mGlobalNodeInfo = &mGlobalNodeInfo;
+
+    //
+    // vector packet
+    //
+    displayInfo.mVectorPacketManagerObsrPtr = &mVectorPacketManager;
 }
 
 void
@@ -2889,6 +2936,11 @@ ClientReceiverFb::Impl::parserConfigure()
                 [&](Arg& arg) { return arg.msg(showShmFbInfo() + '\n'); });
     mParser.opt("shmFbOutput", "...command...", "shmFb output command",
                 [&](Arg& arg) { return mShmFbOutput.getParser().main(arg.childArg()); });
+    mParser.opt("vecPktMgr", "...command...", "vectorPacketManager command",
+                [&](Arg& arg) { return mVectorPacketManager.getParser().main(arg.childArg()); });
+
+    mParser.opt("getOrbitCamAutoFocusPoint", "", "get orbit cam auto focuse point",
+                [&](Arg& arg) { return arg.msg(cmdGetOrbitCamAutoFocusPoint() + '\n'); });
 }
 
 std::string
@@ -2971,6 +3023,35 @@ ClientReceiverFb::Impl::telemetryResetTest()
 {
     mProgress = -1.0;
     mStatus = mcrt::BaseFrame::FINISHED;
+}
+
+std::string
+ClientReceiverFb::Impl::cmdGetOrbitCamAutoFocusPoint() const
+{
+    scene_rdl2::math::Vec3f v = getOrbitCamAutoFocusPoint();
+
+    std::ostringstream ostr;
+    ostr << v[0] << ' ' << v[1] << ' ' << v[2];
+    return ostr.str();
+}
+
+scene_rdl2::math::Vec3f
+ClientReceiverFb::Impl::getOrbitCamAutoFocusPoint() const
+{
+    scene_rdl2::math::Vec3f p (NAN, NAN, NAN);
+    mGlobalNodeInfo.crawlAllMcrtNodeInfo([&](mcrt_dataio::GlobalNodeInfo::McrtNodeInfoShPtr node) {
+        if (node->isReadyOrbitCamAutoFocusPoint()) {
+            p = node->getOrbitCamAutoFocusPoint();
+            /* for debug
+            std::cerr << ">> ClientReceiverFb.cc getOrbitCamAutoFocusPoint() "
+                      << "(" << p[0] << ", " << p[1] << ", " << p[2] << ")\n";
+            */
+            return false; // early exit of crawlAllMcrtNodeInfo loop
+        }
+        return true;
+    });
+
+    return p;
 }
 
 //==========================================================================================
@@ -3787,6 +3868,18 @@ void
 ClientReceiverFb::switchTelemetryPanelToChild()
 {
     mImpl->switchTelemetryPanelToChild();
+}
+
+std::string
+ClientReceiverFb::getCurrentTelemetryPanelName() const
+{
+    return mImpl->getCurrentTelemetryPanelName();
+}
+
+void
+ClientReceiverFb::setTelemetryPanelPathVisClientInfoCallBack(const std::function<std::string()>& callBack)
+{
+    mImpl->setTelemetryPanelPathVisClientInfoCallBack(callBack);
 }
 
 } // namespace mcrt_dataio

@@ -1,6 +1,5 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #pragma once
 
 //
@@ -38,10 +37,23 @@ namespace mcrt_dataio {
 class FbMsgSingleChan
 {
 public:
-    using DataPtr = std::shared_ptr<const uint8_t>;
+    using DataPtr = std::shared_ptr<uint8_t>;
+
+    enum class DataType : unsigned {
+        FB_DATA,
+        LATENCY_LOG,
+        VEC_PACKET,
+        UNKNOWN
+    };
+
+    FbMsgSingleChan(const DataType dataType)
+        : mDataType {dataType}
+    {}
 
     finline void reset();
     finline bool push(DataPtr dataPtr, const size_t dataLength);
+
+    DataType getDataType() const { return mDataType; }
 
     // encode data and store into vContainerPush : used by latencyLog info
     void encode(scene_rdl2::rdl2::ValueContainerEnq &vContainerEnq) const;
@@ -55,7 +67,11 @@ public:
     std::string show(const std::string &hd) const;
     std::string show() const;
 
+    static std::string dataTypeStr(const DataType type);
+
 protected:
+    const DataType mDataType {DataType::UNKNOWN};
+
     //
     // We are keeping shared_ptr instead data itself here.
     // This reduce the cost of progmcrt_merge onMessage() 
@@ -76,6 +92,12 @@ FbMsgSingleChan::reset()
 finline bool
 FbMsgSingleChan::push(DataPtr dataPtr, const size_t dataLength)
 {
+    if (mDataType == DataType::VEC_PACKET) {
+        // This is a special case for vectorPacket. We only keep the last vectorPacket and throw away the old one.
+        mDataArray.clear();
+        mDataSize.clear();
+    }
+
     try {
         mDataArray.emplace_back(dataPtr);
     }

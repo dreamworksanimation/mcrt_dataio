@@ -1,7 +1,7 @@
-// Copyright 2023-2024 DreamWorks Animation LLC
+// Copyright 2023-2025 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
-
 #include "TelemetryOverlay.h"
+#include "TelemetryLayout.h"
 
 #include <scene_rdl2/common/except/exceptions.h>
 
@@ -11,11 +11,6 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
-
-// This directive set memory pool logic ON for telemetry overlay draw items and this should be
-// enabled for the release version. Disabling this directive is only used for performance
-// comparison purposes.
-#define ENABLE_MEMPOOL
 
 FT_Pos min(const FT_Pos a, const FT_Pos b) { return a < b ? a : b; }
 FT_Pos max(const FT_Pos a, const FT_Pos b) { return a < b ? b : a; }
@@ -52,11 +47,25 @@ emptyFreeTypeBBox()
 
 //------------------------------------------------------------------------------------------
 
+std::string
+C3::panelStr() const
+{
+    std::ostringstream ostr;
+    ostr << LayoutBase::colFg(bestContrastCol()) << LayoutBase::colBg(*this) << '('
+         << std::setw(3) << static_cast<int>(mR) << ","
+         << std::setw(3) << static_cast<int>(mG) << ","
+         << std::setw(3) << static_cast<int>(mB)
+         << ')';
+    return ostr.str();
+}
+
+//------------------------------------------------------------------------------------------
+
 FontCacheItem::FontCacheItem(const char c,
                              const FT_Bitmap& bitmap,
-                             unsigned bitmapLeft,
-                             unsigned bitmapTop,
-                             unsigned advanceX)
+                             const unsigned bitmapLeft,
+                             const unsigned bitmapTop,
+                             const unsigned advanceX)
     : mC(c)
     , mRows(bitmap.rows)
     , mWidth(bitmap.width)
@@ -77,9 +86,9 @@ FontCacheItem::FontCacheItem(const char c,
 //------------------------------------------------------------------------------------------
 
 Font::FontCacheItemShPtr
-Font::getFontCacheItem(char c)
+Font::getFontCacheItem(const char c)
 {
-    unsigned glyphIndex = FT_Get_Char_Index(mFace, c);
+    const unsigned glyphIndex = FT_Get_Char_Index(mFace, c);
     auto itr = mFontCacheMap.find(glyphIndex);
     if (itr != mFontCacheMap.end()) {
         // found
@@ -142,14 +151,29 @@ OverlayCharItem::getBBox() const
                         {mFontBasePos.x + mFontSize.x, mFontBasePos.y + offsetY              });
 }
 
+void
+OverlayCharItem::move(const int deltaX, const int deltaY)
+//
+// deltaX, deltaY should be regular coordinate value (not a FreeType coordinate)
+//
+{
+    const FT_Pos ftDeltaX = Font::iToftPos(deltaX);
+    const FT_Pos ftDeltaY = Font::iToftPos(deltaY);
+
+    mFontBasePos.x += ftDeltaX;
+    mFontBasePos.y -= ftDeltaY;
+    mFontDataPos.x += ftDeltaX;
+    mFontDataPos.y -= ftDeltaY;
+}
+
 std::string
-OverlayCharItem::show(unsigned winHeight) const
+OverlayCharItem::show(const unsigned winHeight) const
 {
     auto showFTVec = [](const FT_Vector& v, unsigned wHeight) {
         std::ostringstream ostr;
         ostr << "x:" << v.x << " (ix:" << Font::ftPosToi(v.x) << ") ";
 
-        int iy = Font::ftPosToi(v.y);
+        const int iy = Font::ftPosToi(v.y);
         if (wHeight == 0) {
             ostr << "y:" << v.y << " (iy:" << iy << ")";
         } else {
@@ -314,11 +338,22 @@ OverlayStrItem::getBBox() const
     return bbox;
 }
 
+void
+OverlayStrItem::move(const int deltaX, const int deltaY)
+{
+    mStartX += deltaX;
+    mStartY += deltaY;
+
+    for (OverlayCharItemShPtr item : mCharItemArray) {
+        item->move(deltaX, deltaY);
+    }
+}
+
 bool
 OverlayStrItem::entryNewCharItem(Overlay& overlay,
                                  Font& font,
                                  const FT_Vector& fontPos,
-                                 char c,
+                                 const char c,
                                  const C3& fgC3,
                                  const C3& bgC3)
 {
@@ -340,7 +375,7 @@ OverlayStrItem::entryNewCharItem(Overlay& overlay,
 //------------------------------------------------------------------------------------------
 
 void    
-Overlay::clear(const C3& c3, const unsigned char alpha, bool doParallel)
+Overlay::clear(const C3& c3, const unsigned char alpha, const bool doParallel)
 {
     if (!doParallel) {
         for (size_t i = 0; i < mPixelsRGBA.size(); i += 4) {
@@ -364,28 +399,270 @@ Overlay::clear(const C3& c3, const unsigned char alpha, bool doParallel)
 }
 
 void
-Overlay::boxFill(const BBox2i& bbox, const C3& c3, const unsigned char alpha, bool doParallel)
+Overlay::boxFill(const BBox2i& bbox, const C3& c3, const unsigned char alpha, const bool doParallel)
 {
+    auto boxScanlineFill = [&](const size_t y) {
+        unsigned char *ptr = getPixDataAddr(bbox.lower.x, y);
+        for (unsigned x = bbox.lower.x; x <= bbox.upper.x; ++x) {
+            setCol4(c3, alpha, ptr);
+            ptr += 4;
+        }
+    };
+
     if (!doParallel) {
         for (unsigned y = bbox.lower.y; y <= bbox.upper.y; ++y) {
-            unsigned char *ptr = getPixDataAddr(bbox.lower.x, y);
-            for (unsigned x = bbox.lower.x; x <= bbox.upper.x; ++x) {
-                setCol4(c3, alpha, ptr);
-                ptr += 4;
-            }
+            boxScanlineFill(y);
         }
     } else {
-        tbb::blocked_range<size_t> range(bbox.lower.y, bbox.upper.y, 1);
+        tbb::blocked_range<size_t> range(bbox.lower.y, bbox.upper.y + 1, 1);
         tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
                 for (size_t y = range.begin(); y < range.end(); ++y) {
-                    unsigned char *ptr = getPixDataAddr(bbox.lower.x, y);
-                    for (unsigned x = bbox.lower.x; x <= bbox.upper.x; ++x) {
-                        setCol4(c3, alpha, ptr);
-                        ptr += 4;
-                    }
+                    boxScanlineFill(y);
                 }
             });
     }
+}
+
+void
+Overlay::boxOutline(const BBox2i& bbox, const C3& c3, const unsigned char alpha, const bool doParallel)
+{
+    if (!doParallel) {
+        hLine(bbox.lower.x, bbox.upper.x, bbox.lower.y, c3, alpha);
+        vLine(bbox.upper.x, bbox.lower.y, bbox.upper.y, c3, alpha);
+        hLine(bbox.lower.x, bbox.upper.x, bbox.upper.y, c3, alpha);
+        vLine(bbox.lower.x, bbox.lower.y, bbox.upper.y, c3, alpha);
+    } else {
+        tbb::blocked_range<size_t> range(0, 4, 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            switch (range.begin()) {
+            case 0 : hLine(bbox.lower.x, bbox.upper.x, bbox.lower.y, c3, alpha); break;
+            case 1 : vLine(bbox.upper.x, bbox.lower.y, bbox.upper.y, c3, alpha); break;
+            case 2 : hLine(bbox.lower.x, bbox.upper.x, bbox.upper.y, c3, alpha); break;
+            case 3 : vLine(bbox.lower.x, bbox.lower.y, bbox.upper.y, c3, alpha); break;
+            default : break;
+            }
+        });
+    }
+}
+
+void
+Overlay::polygonFill(const std::vector<Vec2f>& polygon,
+                     const unsigned xSubSamples, const unsigned ySubSamples,
+                     const C3& c3, const unsigned char alpha)
+{
+    auto showInputParam = [&]() { // for debug
+        std::ostringstream ostr;
+        ostr << "polygon (size:" << polygon.size() << ")"
+             << " width:" << getWidth() << " height:" << getHeight() << " {\n";
+        for (size_t i = 0; i < polygon.size(); ++i) {
+            ostr << "  i:" << i << " (" << polygon[i][0] << ',' << polygon[i][1] << ")\n"; 
+        }
+        ostr << "}";
+        return ostr.str();
+    }; // showInputParam()
+
+    auto calcMinMaxY = [&](unsigned& min, unsigned& max) {
+        float currMin = polygon[0][1];
+        float currMax = currMin;
+        for (const auto& p : polygon) {
+            currMin = std::min(currMin, p[1]);
+            currMax = std::max(currMax, p[1]);
+        }
+        if (currMax <= 0.0f || currMin >= static_cast<float>(getHeight())) return false; // outside window
+        min = static_cast<unsigned>(std::max(0, static_cast<int>(std::floor(currMin))));
+        max = std::min(static_cast<unsigned>(getHeight()) - 1, static_cast<unsigned>(std::floor(currMax)));
+        return true;
+    }; // calcMinMaxY()
+
+    class Edge
+    {
+    public:
+        Edge(const Vec2f& btm, const Vec2f& top)
+            : mBtm {btm}
+            , mTop {top}
+            , mLeftX {(btm[0] < top[0]) ? btm[0] : top[0]}
+        {}
+
+        const Vec2f& mBtm;
+        const Vec2f& mTop;
+        const float mLeftX {0.0f};
+    };
+    
+    std::vector<std::unique_ptr<Edge>> edgeTbl;
+    for (size_t i = 0; i < polygon.size(); ++i) {
+        const Vec2f& a = polygon[i];
+        const Vec2f& b = polygon[(i + 1) % polygon.size()];
+        if (a[1] < b[1]) edgeTbl.emplace_back(std::make_unique<Edge>(a, b));
+        else             edgeTbl.emplace_back(std::make_unique<Edge>(b, a));
+    }
+    std::sort(edgeTbl.begin(), edgeTbl.end(),
+              [](const std::unique_ptr<Edge>& a, const std::unique_ptr<Edge>& b) { return a->mLeftX < b->mLeftX; });
+        
+    const float w = getWidth();
+    auto edgeXScan = [&edgeTbl, &ySubSamples, &w](const unsigned y, const unsigned ySubPixReso,
+                                                  std::vector<float> iTbl[], unsigned& sPix, unsigned& ePix) {
+        auto calcIsectX = [](const float y, const Vec2f& btm, const Vec2f& top) {
+            return btm[0] + ((y - btm[1]) / (top[1] - btm[1])) * (top[0] - btm[0]);
+        }; // calcIsectX()
+
+        auto subScanlines = [&](const unsigned y, const unsigned ySubPixReso,
+                                std::vector<float> iTbl[], const Vec2f& btm, const Vec2f& top) {
+            const float subPixH = 1.0f / static_cast<float>(ySubPixReso);
+            float scanlineY = static_cast<float>(y) + subPixH * 0.5f;
+            for (unsigned subY = 0; subY < ySubPixReso; ++subY) {
+                if ((btm[1] <= scanlineY && scanlineY < top[1])) {
+                    iTbl[subY].push_back(calcIsectX(scanlineY, btm, top));
+                } 
+                scanlineY += subPixH;
+            }
+        }; // subScanlines()
+
+        auto subScanlinesFullCover = [&](const unsigned y, const unsigned ySubPixReso,
+                                         std::vector<float> iTbl[], const Vec2f& btm, const Vec2f& top) {
+            const float subPixH = 1.0f / static_cast<float>(ySubPixReso);
+            const float scanlineY = static_cast<float>(y) + subPixH * 0.5f;
+            float isectX = calcIsectX(scanlineY, btm, top);
+            const float stepX = (1.0f / static_cast<float>(ySubPixReso)) / (top[1] - btm[1]) * (top[0] - btm[0]);
+            for (unsigned subY = 0; subY < ySubPixReso; ++subY) {
+                iTbl[subY].push_back(isectX);
+                isectX += stepX;
+            }
+        }; // subScanlineFullCover()
+
+        for (unsigned subY = 0; subY < ySubPixReso; ++subY) iTbl[subY].clear();            
+
+        for (size_t i = 0; i < edgeTbl.size(); ++i) {
+            const Vec2f& btm = edgeTbl[i]->mBtm;
+            const Vec2f& top = edgeTbl[i]->mTop;
+            if (top[1] <= static_cast<float>(y) || static_cast<float>(y + 1) <= btm[1]) continue;
+            if ((btm[1] <= static_cast<float>(y) && static_cast<float>(y + 1) <= top[1])) {
+                subScanlinesFullCover(y, ySubPixReso, iTbl, btm, top);
+            } else {
+                subScanlines(y, ySubPixReso, iTbl, btm, top);
+            }
+        }
+
+        float xSegmentStart = w;
+        float xSegmentEnd = 0.0f;
+        for (unsigned subY = 0; subY < ySubPixReso; ++subY) {
+            if (iTbl[subY].size() >= 2) {
+                xSegmentStart = std::min(xSegmentStart, iTbl[subY].front());
+                xSegmentEnd = std::max(xSegmentEnd, iTbl[subY].back());
+            }
+        }
+        if (xSegmentStart >= xSegmentEnd) return false; // no intersection -> skip this scanline.
+        if (xSegmentStart >= w || xSegmentEnd <= 0.0f) return false;
+        sPix = static_cast<unsigned>(std::floor(std::max(0.0f, xSegmentStart)));
+        ePix = static_cast<unsigned>(std::floor(std::min(w - 1.0f, xSegmentEnd)));
+        return true;
+    }; // edgeXScan()
+
+    scanConvert(xSubSamples, ySubSamples, c3, alpha, calcMinMaxY, edgeXScan);
+}
+
+void
+Overlay::circleFill(const Vec2f& center, const float radius, const C3& c3, const unsigned char alpha)
+{
+    auto calcMinMaxY = [&](unsigned& min, unsigned& max) {
+        const float minF = center[1] - radius;
+        const float maxF = center[1] + radius;
+        if (maxF <= 0.0f || minF >= static_cast<float>(getHeight())) return false; // outside window
+        min = static_cast<unsigned>(std::max(0, static_cast<int>(std::floor(minF))));
+        max = std::min(static_cast<unsigned>(getHeight()) - 1, static_cast<unsigned>(std::floor(maxF)));
+        return true;
+    }; // calcMinMaxY()
+
+    auto circleXScan = [&](const unsigned y, const int ySubPixReso,
+                           std::vector<float> iTbl[], unsigned& sPix, unsigned& ePix) {
+        auto calcIsectSpan = [&](const float scanlineY, float& x0, float& x1) {
+            const float deltaY = scanlineY - center[1];
+            const float sq = radius * radius - deltaY * deltaY;
+            if (sq < 0.0f) return false;
+            const float deltaX = sqrtf(sq);
+            x0 = center[0] - deltaX;
+            x1 = center[0] + deltaX;
+            return true;
+        }; // calcIsectSpan()
+
+        const float subPixH = 1.0f / static_cast<float>(ySubPixReso);
+        float xSegmentStart = static_cast<float>(getWidth());
+        float xSegmentEnd = 0.0f;
+        for (unsigned subY = 0; subY < ySubPixReso; ++subY) {
+            const float scanlineY = static_cast<float>(y) + subPixH * (static_cast<float>(subY) + 0.5f);
+            iTbl[subY].clear();
+
+            float x0, x1;
+            if (calcIsectSpan(scanlineY, x0, x1)) {
+                iTbl[subY].push_back(x0);
+                iTbl[subY].push_back(x1);
+                xSegmentStart = std::min(xSegmentStart, iTbl[subY].front());
+                xSegmentEnd = std::max(xSegmentEnd, iTbl[subY].back());
+            }
+        }
+        if (xSegmentStart >= xSegmentEnd) return false; // no intersection -> skip this scanline
+        if (xSegmentStart >= static_cast<float>(getWidth()) || xSegmentEnd <= 0.0f) return false;
+        sPix = static_cast<unsigned>(std::floor(std::max(0.0f, xSegmentStart)));
+        ePix = static_cast<unsigned>(std::floor(std::min(static_cast<float>(getWidth() - 1), xSegmentEnd)));
+        return true;
+    }; // circleIntersection()
+
+    scanConvert(8, 8, c3, alpha, calcMinMaxY, circleXScan);
+}
+
+void
+Overlay::circle(const Vec2f& center, const float radius, const float width, const C3& c3, const unsigned char alpha)
+{
+    auto calcMinMaxY = [&](unsigned& min, unsigned& max) {
+        const float widthH = width * 0.5001f;
+        const float minF = center[1] - radius - widthH;
+        const float maxF = center[1] + radius + widthH;
+        if (maxF <= 0.0f || minF >= static_cast<float>(getHeight())) return false; // outside window
+        min = static_cast<unsigned>(std::max(0, static_cast<int>(std::floor(minF))));
+        max = std::min(static_cast<unsigned>(getHeight()) - 1, static_cast<unsigned>(std::floor(maxF)));
+        return true;
+    }; // calcMinMaxY()
+
+    auto circleXScan = [&](const unsigned y, const int ySubPixReso,
+                           std::vector<float> iTbl[], unsigned& sPix, unsigned& ePix) {
+        auto calcIsectSpan = [&](const float currRadius, const float scanlineY, float& x0, float& x1) {
+            const float deltaY = scanlineY - center[1];
+            const float sq = currRadius * currRadius - deltaY * deltaY;
+            if (sq < 0.0f) return false;
+            const float deltaX = sqrtf(sq);
+            x0 = center[0] - deltaX;
+            x1 = center[0] + deltaX;
+            return true;
+        }; // calcIsectSpan()
+
+        const float subPixH = 1.0f / static_cast<float>(ySubPixReso);
+        float xSegmentStart = static_cast<float>(getWidth());
+        float xSegmentEnd = 0.0f;
+        const float radiusOuter = radius + width * 0.5001f;
+        const float radiusInner = radius - width * 0.5001f;
+        for (unsigned subY = 0; subY < ySubPixReso; ++subY) {
+            const float scanlineY = static_cast<float>(y) + subPixH * (static_cast<float>(subY) + 0.5f);
+            iTbl[subY].clear();
+
+            float x0, x1, x2, x3;
+            if (calcIsectSpan(radiusOuter, scanlineY, x0, x1)) {
+                iTbl[subY].push_back(x0);
+                if (calcIsectSpan(radiusInner, scanlineY, x2, x3)) {
+                    iTbl[subY].push_back(x2);
+                    iTbl[subY].push_back(x3);
+                }
+                iTbl[subY].push_back(x1);
+                xSegmentStart = std::min(xSegmentStart, iTbl[subY].front());
+                xSegmentEnd = std::max(xSegmentEnd, iTbl[subY].back());
+            }
+        }
+        if (xSegmentStart >= xSegmentEnd) return false; // no intersection -> skip this scanline
+        if (xSegmentStart >= static_cast<float>(getWidth()) || xSegmentEnd <= 0.0f) return false;
+        sPix = static_cast<unsigned>(std::floor(std::max(0.0f, xSegmentStart)));
+        ePix = static_cast<unsigned>(std::floor(std::min(static_cast<float>(getWidth() - 1), xSegmentEnd)));
+        return true;
+    }; // circleIntersection()
+
+    scanConvert(8, 8, c3, alpha, calcMinMaxY, circleXScan);
 }
 
 void
@@ -393,7 +670,7 @@ Overlay::vLine(const unsigned x, const unsigned minY, const unsigned maxY,
                const C3& c3, const unsigned char alpha)
 {
     unsigned char *ptr = getPixDataAddr(x, minY);
-    int offset = mWidth * 4;
+    const int offset = mWidth * 4;
     for (unsigned y = minY; y <= maxY; ++y) {
         setCol4(c3, alpha, ptr);
         ptr += offset;
@@ -401,7 +678,18 @@ Overlay::vLine(const unsigned x, const unsigned minY, const unsigned maxY,
 }
 
 void
-Overlay::fill(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+Overlay::hLine(const unsigned minX, const unsigned maxX, const unsigned y,
+               const C3& c3, const unsigned char alpha)
+{
+    unsigned char *ptr = getPixDataAddr(minX, y);
+    for (unsigned x = minX; x <= maxX; ++x) {
+        setCol4(c3, alpha, ptr);
+        ptr += 4;
+    }
+}
+
+void
+Overlay::fill(const unsigned char r, const unsigned char g, const unsigned char b, const unsigned char a)
 {
     for (size_t i = 0; i < mPixelsRGBA.size() / 4; ++i) {
         setCol4(C3(r, g, b), a, &mPixelsRGBA[i * 4]);
@@ -412,27 +700,37 @@ unsigned
 Overlay::getMaxYLines(const Font& font, unsigned& offsetBottomPixY, unsigned& stepPixY) const
 {
     stepPixY = static_cast<unsigned>(font.getFontSizePoint() * lineSpacingScale);
-    unsigned maxYLines =  mHeight / stepPixY;
-    unsigned spaceY = mHeight - maxYLines * stepPixY;
+    const unsigned maxYLines =  mHeight / stepPixY;
+    const unsigned spaceY = mHeight - maxYLines * stepPixY;
     offsetBottomPixY = spaceY / 2.0f;
     return maxYLines;
 }
 
 void
-Overlay::drawStrClear()
+Overlay::drawClearAllItems()
 {
-    for (auto itr : mDrawStrArray) {
-        setMemOverlayStrItem(itr);
-    }
+    drawLineClear();
+    drawCircleClear();
+    drawBoxClear();
+    drawBoxOutlineClear();
+    drawVLineClear();
+    drawHLineClear();
+    drawStrClear();
+}
 
-    if (mOverlayStrItemMemPool.size() > mMaxOverlayStrItemMemPool) {
-        mMaxOverlayStrItemMemPool = mOverlayStrItemMemPool.size();
-    }
-    if (mOverlayCharItemMemPool.size() > mMaxOverlayCharItemMemPool) {
-        mMaxOverlayCharItemMemPool = mOverlayCharItemMemPool.size();
-    }
-
-    mDrawStrArray.clear();
+void
+Overlay::drawFlushAllItems(const bool doParallel)
+{
+    //
+    // Order does matter
+    //
+    drawLineFlush(doParallel);
+    drawCircleFlush(doParallel);
+    drawBoxFlush(doParallel);
+    drawBoxOutlineFlush(doParallel);
+    drawVLineFlush(doParallel);
+    drawHLineFlush(doParallel);
+    drawStrFlush(doParallel);
 }
 
 bool
@@ -443,15 +741,14 @@ Overlay::drawStr(Font& font,
                  std::string& error)
 {
     try {
-        OverlayStrItemShPtr item = getMemOverlayStrItem();
+        OverlayStrItemShPtr item = mStrItemMemMgr.getMemItem();
         item->set(*this, font, startX, startY, mHeight, str, c3);
         mDrawStrArray.push_back(item);
         mFontStepX = item->getFirstCharStepX();
     }
     catch (scene_rdl2::except::RuntimeError& e) {
         std::ostringstream ostr;
-        ostr << "ERROR : construct new OverlayStrItem failed."
-             << " RuntimeError:" << e.what();
+        ostr << "ERROR : construct new OverlayStrItem failed." << " RuntimeError:" << e.what();
         error = ostr.str();
         return false;
     }
@@ -459,143 +756,77 @@ Overlay::drawStr(Font& font,
     return true;
 }
 
-void
-Overlay::drawStrFlush(bool doParallel)
-{
-    std::vector<OverlayCharItemShPtr> charItemArray;
-    for (size_t i = 0; i < mDrawStrArray.size(); ++i) {
-        mDrawStrArray[i]->setupAllCharItems(charItemArray);
-    }
-
-    if (!doParallel) {
-        for (size_t cId = 0; cId < charItemArray.size(); ++cId) {
-            overlayDrawFontCache(charItemArray[cId]);
-        }
-    } else {
-        tbb::blocked_range<size_t> range(0, charItemArray.size(), 1);
-        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
-                for (size_t cId = range.begin(); cId < range.end(); ++cId) {
-                    overlayDrawFontCache(charItemArray[cId]);
-                }
-            });
-    }
-}
-
-void
-Overlay::drawBoxClear()
-{
-    for (auto itr : mDrawBoxArray) {
-        setMemOverlayBoxItem(itr);
-    }
-    for (auto itr : mDrawBoxBarArray) {
-        setMemOverlayBoxItem(itr);
-    }
-
-    if (mOverlayBoxItemMemPool.size() > mMaxOverlayBoxItemMemPool) {
-        mMaxOverlayBoxItemMemPool = mOverlayBoxItemMemPool.size();
-    }
-
-    mDrawBoxArray.clear();
-    mDrawBoxBarArray.clear();
-}
-
 void    
-Overlay::drawBox(const BBox2i box,
-                 const C3& c3,
-                 const unsigned char alpha)
+Overlay::drawBox(const BBox2i& box, const C3& c3, const unsigned char alpha)
 {
-    OverlayBoxItemShPtr item = getMemOverlayBoxItem();
+    OverlayBoxItemShPtr item = mBoxItemMemMgr.getMemItem();
     item->set(box, c3, alpha);
     mDrawBoxArray.push_back(item);
 }
 
 void    
-Overlay::drawBoxBar(const BBox2i box,
-                    const C3& c3,
-                    const unsigned char alpha)
+Overlay::drawBoxBar(const BBox2i& box, const C3& c3, const unsigned char alpha)
 {
-    OverlayBoxItemShPtr item = getMemOverlayBoxItem();
+    OverlayBoxItemShPtr item = mBoxItemMemMgr.getMemItem();
     item->set(box, c3, alpha);
     mDrawBoxBarArray.push_back(item);
 }
 
 void    
-Overlay::drawBoxFlush(bool doParallel)
+Overlay::drawBoxOutline(const BBox2i& box, const C3& c3, const unsigned char alpha)
 {
-    auto drawBoxArray = [&](std::vector<OverlayBoxItemShPtr>& boxArray) {
-        if (!doParallel) {
-            for (size_t id = 0; id < boxArray.size(); ++id) {
-                boxFill(boxArray[id]->getBBox(),
-                        boxArray[id]->getC(),
-                        boxArray[id]->getAlpha(),
-                        false);
-            }
-        } else {
-            tbb::blocked_range<size_t> range(0, boxArray.size(), 1);
-            tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
-                    for (size_t id = range.begin(); id < range.end(); ++id) {
-                        boxFill(boxArray[id]->getBBox(),
-                                boxArray[id]->getC(),
-                                boxArray[id]->getAlpha(),
-                                true);
-                    }
-                });
-        }
-    };
-
-    drawBoxArray(mDrawBoxArray);
-    drawBoxArray(mDrawBoxBarArray);
+    OverlayBoxOutlineItemShPtr item = mBoxOutlineItemMemMgr.getMemItem();
+    item->set(box, c3, alpha);
+    mDrawBoxOutlineArray.push_back(item);
 }
 
 void
-Overlay::drawVLineClear()
+Overlay::drawVLine(const unsigned x, const unsigned minY, const unsigned maxY, const C3& c3, const unsigned char alpha)
 {
-    for (auto itr : mDrawVLineArray) {
-        setMemOverlayVLineItem(itr);
-    }
-
-    if (mOverlayVLineItemMemPool.size() > mMaxOverlayVLineItemMemPool) {
-        mMaxOverlayVLineItemMemPool = mOverlayVLineItemMemPool.size();
-    }
-
-    mDrawVLineArray.clear();
-}
-
-void
-Overlay::drawVLine(const unsigned x,
-                   const unsigned minY,
-                   const unsigned maxY,
-                   const C3& c3,
-                   const unsigned char alpha)
-{
-    OverlayVLineItemShPtr item = getMemOverlayVLineItem();
+    OverlayVLineItemShPtr item = mVLineItemMemMgr.getMemItem();
     item->set(x, minY, maxY, c3, alpha);
     mDrawVLineArray.push_back(item);
 }
 
 void
-Overlay::drawVLineFlush(bool doParallel)
+Overlay::drawHLine(const unsigned minX, const unsigned maxX, const unsigned y, const C3& c3, const unsigned char alpha)
 {
-    if (!doParallel) {
-        for (size_t id = 0; id < mDrawVLineArray.size(); ++id) {
-            vLine(mDrawVLineArray[id]->getX(),
-                  mDrawVLineArray[id]->getMinY(),
-                  mDrawVLineArray[id]->getMaxY(),
-                  mDrawVLineArray[id]->getC(),
-                  mDrawVLineArray[id]->getAlpha());
-        }
-    } else {
-        tbb::blocked_range<size_t> range(0, mDrawVLineArray.size(), 1);
-        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
-                for (size_t id = range.begin(); id < range.end(); ++id) {
-                    vLine(mDrawVLineArray[id]->getX(),
-                          mDrawVLineArray[id]->getMinY(),
-                          mDrawVLineArray[id]->getMaxY(),
-                          mDrawVLineArray[id]->getC(),
-                          mDrawVLineArray[id]->getAlpha());
-                }
-            });
-    }
+    OverlayHLineItemShPtr item = mHLineItemMemMgr.getMemItem();
+    item->set(minX, maxX, y, c3, alpha);
+    mDrawHLineArray.push_back(item);
+}
+
+void
+Overlay::drawLine(const unsigned sx,
+                  const unsigned sy,
+                  const unsigned ex,
+                  const unsigned ey,
+                  const float width,
+                  const bool drawStartPoint,
+                  const float radiusStartPoint,
+                  const bool drawEndPoint,
+                  const float radiusEndPoint,
+                  const C3& c3,
+                  const unsigned char alpha)
+{
+    OverlayLineItemShPtr item = mLineItemMemMgr.getMemItem();
+    item->set(sx, sy, ex, ey, width,
+              drawStartPoint, radiusStartPoint, drawEndPoint, radiusEndPoint,
+               c3, alpha);
+    mDrawLineArray.push_back(item);
+}
+
+void
+Overlay::drawCircle(const unsigned sx,
+                    const unsigned sy,
+                    const float radius,
+                    const float width,
+                    const C3& c3,
+                    const unsigned char alpha)
+{
+    OverlayCircleItemShPtr item = mCircleItemMemMgr.getMemItem();
+    item->set(sx, sy, radius, width, c3, alpha);
+    mDrawCircleArray.push_back(item);
 }
 
 Overlay::BBox2i
@@ -606,7 +837,7 @@ Overlay::calcDrawBbox(const size_t startStrItemId, const size_t endStrItemId) co
         bbox.extend(mDrawStrArray[i]->getBBox());
     }        
 
-    auto flipY = [&](unsigned y) {
+    auto flipY = [&](const unsigned y) {
         return mHeight - 1 - y;
     };
 
@@ -619,14 +850,21 @@ Overlay::calcDrawBbox(const size_t startStrItemId, const size_t endStrItemId) co
 }
 
 void
+Overlay::moveStr(const size_t strItemId, const int deltaX, const int deltaY)
+{
+    if (strItemId >= mDrawStrArray.size()) return; // just in case
+    mDrawStrArray[strItemId]->move(deltaX, deltaY);
+}
+
+void
 Overlay::finalizeRgb888(std::vector<unsigned char>& rgbFrame,
-                        unsigned frameWidth,
-                        unsigned frameHeight,
-                        bool top2bottomFlag,
-                        Align hAlign,
-                        Align vAlign,
+                        const unsigned frameWidth,
+                        const unsigned frameHeight,
+                        const bool top2bottomFlag,
+                        const Align hAlign,
+                        const Align vAlign,
                         std::vector<unsigned char>* bgArchive,
-                        bool doParallel) const
+                        const bool doParallel) const
 {
     resizeRgb888(rgbFrame, frameWidth, frameHeight);
     if (bgArchive) {
@@ -711,24 +949,247 @@ Overlay::msgDisplayWidth(const std::string& msg)
 
 //------------------------------------------------------------------------------------------
 
+// This directive enables runtime verification for scan convert code. This should be used
+// for debugging purposes and should be commented out for the release vesion.
+//#define RUNTIME_SCAN_CONVERT_VERIFY
+
+void
+Overlay::scanConvert(const unsigned xSubSamples, const unsigned ySubSamples,
+                     const C3& c3, const unsigned char alpha,
+                     const std::function<bool(unsigned& min, unsigned& max)>& calcMinMaxY,
+                     const std::function<bool(const unsigned y, const unsigned ySubPixReso,
+                                              std::vector<float> iTbl[], unsigned& sPix,
+                                              unsigned& ePix)>& xScan)
+{
+    auto showIsectTbl = [](const std::vector<float> iTbl[], const unsigned ySubSamples) { // for debug
+        std::ostringstream ostr;
+        ostr << "iTbl (size:" << ySubSamples << ") {\n";
+        for (unsigned ySub = 0; ySub < ySubSamples; ++ySub) {
+            ostr << "  iTbl[ySub:" << ySub << "] (size:" << iTbl[ySub].size() << ") {\n";
+            for (size_t i = 0; i < iTbl[ySub].size(); ++i) {
+                ostr << "    i:" << i << ' ' << iTbl[ySub][i] << '\n';
+            }
+            ostr << "  }\n";
+        }
+        ostr << "}";
+        return ostr.str();
+    }; // showIsectTbl()
+
+    auto setupCoverageTbl = [](const unsigned sPix, const unsigned ePix, std::vector<unsigned>& coverageTbl) {
+        const size_t tblSize = ePix - sPix + 1;
+        if (coverageTbl.size() < tblSize) coverageTbl.resize(tblSize);
+        std::memset(coverageTbl.data(), 0, coverageTbl.size() * sizeof(unsigned));
+    }; // setupCoverageTbl()
+
+    //
+    // The following code uses nested lambda function definitions. There are several reasons for adopting
+    // this style, even at the cost of reduced readability.
+    //
+    //   1 Ability to limit scope (prevents unintended exposure)
+    //     A nested lambda is not visible outside its parent lambda, making it ideal for defining small
+    //     helper functions while avoiding name collisions. (However, since lambdas are variables, they
+    //     cannot be forward-declared. As a result, child lambdas must be defined at the beginning of the
+    //     parent lambda, which can reduce readability-this requires caution.) Unfortunately, C++
+    //     currently does not provide an equivalent mechanism for nesting regular functions.
+    //   2 Shared capture with the parent lambda
+    //     A child lambda can reference the parent lambda's capture directly, so there is no need to
+    //     construct complex capture chains manually.
+    //   3 Clear separation of logic
+    //     Using child lambdas as helpers inside the parent lambda can make the structure and intent of
+    //     the implementation clearer.
+    //   4 Function-level inlining
+    //     If the child lambda is sufficiently small, the compiler can easily inline it, making the runtime
+    //     overhead effectively zero. Compared to function pointers or std::function, lambdas are much
+    //     lighter-weight and incur no additional runtime cost-they are essentially lightweight function
+    //     objects.
+    //
+    // Even at the cost of reduced readability, these advantages make nested lambda functions worthwhile.
+    // In the code below, execution speed is the top priority, which is why this nested-lambda
+    // implementation approach is used.
+    // A nearly identical structure implemented via class inheritance exists in
+    //
+    //     mcrt_dataio::telemetry::ScanConvert
+    //
+    // but the lambda-based implementation is approximately 20% to 30% faster. For understanding the logic,
+    // the ScanConvert class and its derived ScanConvertPolygon class provide a clearer, more readable
+    // structure, so please refer to those as well.
+    //
+    auto calcCoverage = [](const unsigned ySubSamples, const unsigned xSubSamples,
+                           const unsigned sPix, const unsigned ePix,
+                           const std::vector<float> isectTbl[],
+                           std::vector<unsigned>& coverageXTbl) {
+        auto pixXLoop = [](const unsigned xSubPixReso,
+                           const unsigned sPix, const unsigned ePix,
+                           const std::vector<float>& isectTbl,
+                           std::vector<unsigned>& coverageXTbl) {
+#ifdef RUNTIME_SCAN_CONVERT_VERIFY
+            auto verifyEdgeCoverage = [](const unsigned xSubPixReso,
+                                         const unsigned x, const float xSegmentStart, const float xSegmentEnd,
+                                         const unsigned coverage) {
+                unsigned verifyCoverage = 0;
+                for (unsigned subPix = 0; subPix < xSubPixReso; ++subPix) {
+                    const float xPos = static_cast<float>(x) +
+                        (static_cast<float>(subPix) + 0.5f) / static_cast<float>(xSubPixReso);
+                    if (xSegmentStart >= 0.0f && xSegmentEnd >= 0.0f) {
+                        if (xSegmentStart <= xPos && xPos < xSegmentEnd) verifyCoverage++;
+                    } else if (xSegmentStart >= 0.0f && xSegmentEnd < 0.0f) {
+                        if (xSegmentStart <= xPos) verifyCoverage++;
+                    } else if (xSegmentStart < 0.0f && xSegmentEnd >= 0.0f) {
+                        if (xPos < xSegmentEnd) verifyCoverage++;
+                    }
+                }
+                if (verifyCoverage != coverage) std::cerr << ">> TelemetryOverlay.cc edgePix verify-ERROR\n";
+            }; // verifyEdgeCoverage()
+#endif // end of RUNTIME_SCAN_CONVERT_VERIFY
+
+            auto calcSubPixId = [](const float edgeX, const unsigned xSubPixReso) {
+                float intPart;
+                const float fraction =
+                    std::modf((edgeX - std::floor(edgeX)) * static_cast<float>(xSubPixReso), &intPart);
+                return static_cast<int>(intPart + (fraction > 0.5f));
+            }; // calcSubPixId()
+
+            auto edgePix = [&](const unsigned xSubPixReso, const unsigned x,
+                               const unsigned sPix, const float xSegmentStart, const float xSegmentEnd,
+                               std::vector<unsigned>& coverageXTbl) {
+                const int subPixIdStart = calcSubPixId(xSegmentStart, xSubPixReso);
+                const int subPixIdEnd = calcSubPixId(xSegmentEnd, xSubPixReso) - 1;
+                const unsigned coverage = subPixIdEnd - subPixIdStart + 1;
+#ifdef RUNTIME_SCAN_CONVERT_VERIFY
+                verifyEdgeCoverage(xSubPixReso, x, xSegmentStart, xSegmentEnd, coverage);
+#endif // end of RUNTIME_SCAN_CONVERT_VERIFY
+                coverageXTbl[x - sPix] += coverage;
+            }; // edgePix()
+
+            auto edgePixL = [&](const unsigned xSubPixReso, const unsigned x,
+                                const unsigned sPix, const float xSegmentStart,
+                                std::vector<unsigned>& coverageXTbl) {
+                const int subPixIdStart = calcSubPixId(xSegmentStart, xSubPixReso);
+                const unsigned coverage = xSubPixReso - subPixIdStart;
+#ifdef RUNTIME_SCAN_CONVERT_VERIFY
+                verifyEdgeCoverage(xSubPixReso, x, xSegmentStart, -1.0f, coverage);
+#endif // end of RUNTIME_SCAN_CONVERT_VERIFY
+                coverageXTbl[x - sPix] += coverage;
+            }; // edgePixL()
+
+            auto edgePixR = [&](const unsigned xSubPixReso, const unsigned x,
+                                const unsigned sPix, const float xSegmentEnd,
+                               std::vector<unsigned>& coverageXTbl) {
+                const int subPixIdEnd = calcSubPixId(xSegmentEnd, xSubPixReso) - 1;
+                const unsigned coverage = subPixIdEnd + 1;
+#ifdef RUNTIME_SCAN_CONVERT_VERIFY
+                verifyEdgeCoverage(xSubPixReso, x, -1.0f, xSegmentEnd, coverage);
+#endif // end of RUNTIME_SCAN_CONVERT_VERIFY
+                coverageXTbl[x - sPix] += coverage;
+            }; // edgePixR()
+
+            for (size_t i = 0; i < isectTbl.size(); i += 2) {
+                const float xSegmentStart = isectTbl[i];
+                const float xSegmentEnd = isectTbl[i + 1];
+                const unsigned s = static_cast<unsigned>(std::floor(std::max(0.0f, xSegmentStart)));
+                const unsigned e = std::min(ePix, static_cast<unsigned>(std::floor(xSegmentEnd)));
+                if (e < s) continue;
+                if (s == e) {
+                    edgePix(xSubPixReso, s, sPix, xSegmentStart, xSegmentEnd, coverageXTbl);
+                } else if (s + 1 == e) {
+                    edgePixL(xSubPixReso, s, sPix, xSegmentStart, coverageXTbl);
+                    edgePixR(xSubPixReso, e, sPix, xSegmentEnd, coverageXTbl);
+                } else {
+                    edgePixL(xSubPixReso, s, sPix, xSegmentStart, coverageXTbl);
+                    const unsigned currMax = std::min(e - 1, ePix);
+                    for (unsigned xPix = s + 1; xPix <= currMax; ++xPix) {
+                        coverageXTbl[xPix - sPix] += xSubPixReso; 
+                    }
+                    edgePixR(xSubPixReso, e, sPix, xSegmentEnd, coverageXTbl);
+                }
+            }
+        }; // pixXLoop()
+
+        for (unsigned subY = 0; subY < ySubSamples; ++subY) { 
+            if (isectTbl[subY].size() < 2) continue;
+            pixXLoop(xSubSamples, sPix, ePix, isectTbl[subY], coverageXTbl);
+        }
+    }; // calcCoverage()
+
+    auto scanlineFill = [&](const unsigned y, const unsigned sPix, const unsigned ePix, const float invSubSamples,
+                            const std::vector<unsigned>& coverageXTbl) {
+        for (unsigned xPix = sPix ; xPix <= ePix ; ++xPix) {
+            const float coverage = coverageXTbl[xPix - sPix] * invSubSamples;
+            if (coverage > 0.0f) {
+                const float currAlpha = static_cast<unsigned char>(std::clamp(static_cast<float>(alpha) * coverage, 0.0f, 255.0f));
+                pixMaxFill(xPix, y, c3, currAlpha);
+            }
+        }
+    }; // scanlineFill()
+
+    //------------------------------
+
+    float invSubSamples = 1.0f / static_cast<float>(xSubSamples * ySubSamples);
+
+#ifdef SC_TIMELOG
+    mScanConvertTimeLog.start();
+#endif // end of SC_TIMELOG
+
+    unsigned minY, maxY;
+    if (!calcMinMaxY(minY, maxY)) {
+#ifdef SC_TIMELOG
+        mScanConvertTimeLog.endCalcMinMaxY();
+#endif // end of SC_TIMELOG
+        return;  // outside window
+    }
+#ifdef SC_TIMELOG
+    mScanConvertTimeLog.endCalcMinMaxY();
+#endif // end of SC_TIMELOG
+
+    std::vector<float> iTbl[ySubSamples];
+    std::vector<unsigned> cTbl;
+    for (unsigned y = minY ; y <= maxY ; ++y) {
+        unsigned sPix, ePix;
+        if (!xScan(y, ySubSamples, iTbl, sPix, ePix)) {
+#ifdef SC_TIMELOG
+            mScanConvertTimeLog.endXScan();
+#endif // end of SC_TIMELOG
+            continue;
+        }
+#ifdef SC_TIMELOG
+        mScanConvertTimeLog.endXScan();
+#endif // end of SC_TIMELOG
+
+        setupCoverageTbl(sPix, ePix, cTbl);
+#ifdef SC_TIMELOG
+        mScanConvertTimeLog.endSetupCoverageTbl();
+#endif // end of SC_TIMELOG
+
+        calcCoverage(ySubSamples, xSubSamples, sPix, ePix, iTbl, cTbl);
+#ifdef SC_TIMELOG
+        mScanConvertTimeLog.endCalcCoverage();
+#endif // end of SC_TIMELOG
+
+        scanlineFill(y, sPix, ePix, invSubSamples, cTbl);
+#ifdef SC_TIMELOG
+        mScanConvertTimeLog.endScanlineFill();
+#endif // end of SC_TIMELOG
+    }
+}
+
 void
 Overlay::overlayDrawFontCache(const OverlayCharItemShPtr charItem)
 {
-    auto flipY = [&](unsigned freeTypeY) {
+    auto flipY = [&](const unsigned freeTypeY) {
         return mHeight - 1 - freeTypeY;
     };
 
     const C3& bgC3 = charItem->getBgC3();
     if (!bgC3.isBlack()) {
 
-        unsigned offsetY =
+        const unsigned offsetY =
             (charItem->getBgYAdjustScale() > 0.0f)
             ? charItem->getHeight() * charItem->getBgYAdjustScale()
             : 0;
         for (unsigned y = 0; y < charItem->getHeight(); ++y) {
-            unsigned fbSpaceY = flipY(charItem->getBaseY() - y + offsetY);
+            const unsigned fbSpaceY = flipY(charItem->getBaseY() - y + offsetY);
             for (unsigned x = 0; x < charItem->getWidth(); ++x) {
-                unsigned fbSpaceX = charItem->getBaseX() + x;
+                const unsigned fbSpaceX = charItem->getBaseX() + x;
                 setCol4(bgC3, 255, getPixDataAddr(fbSpaceX, fbSpaceY));                
             }
         }
@@ -737,13 +1198,13 @@ Overlay::overlayDrawFontCache(const OverlayCharItemShPtr charItem)
     const FontCacheItem* fontCacheItem = charItem->getFontCacheItem().get();
     if (fontCacheItem->isSpace()) return;
 
-    unsigned freeTypeX = charItem->getPosX();
-    unsigned freeTypeY = charItem->getPosY();
+    const unsigned freeTypeX = charItem->getPosX();
+    const unsigned freeTypeY = charItem->getPosY();
     const C3& fgC3 = charItem->getFgC3();
     for (unsigned by = 0; by < fontCacheItem->getRows(); ++by) {
-        unsigned fbY = flipY(freeTypeY + by);
+        const unsigned fbY = flipY(freeTypeY + by);
         for (unsigned bx = 0; bx < fontCacheItem->getWidth(); ++bx) {
-            unsigned char alpha = fontCacheItem->get(bx, by);
+            const unsigned char alpha = fontCacheItem->get(bx, by);
             if (alpha) {
                 unsigned fbX = freeTypeX + bx;
                 if (isPixInside(fbX, fbY)) {
@@ -751,6 +1212,269 @@ Overlay::overlayDrawFontCache(const OverlayCharItemShPtr charItem)
                 }
             }
         }
+    }
+}
+
+void
+Overlay::drawStrClear()
+{
+    for (auto itr : mDrawStrArray) {
+        itr->resetCharItemArray(*this); 
+        mStrItemMemMgr.setMemItem(itr);
+    }
+    mStrItemMemMgr.updateMax();
+    mCharItemMemMgr.updateMax();
+
+    mDrawStrArray.clear();
+}
+
+void
+Overlay::drawStrFlush(const bool doParallel)
+{
+    std::vector<OverlayCharItemShPtr> charItemArray;
+    for (size_t i = 0; i < mDrawStrArray.size(); ++i) {
+        mDrawStrArray[i]->setupAllCharItems(charItemArray);
+    }
+
+    if (!doParallel) {
+        for (size_t cId = 0; cId < charItemArray.size(); ++cId) {
+            overlayDrawFontCache(charItemArray[cId]);
+        }
+    } else {
+        tbb::blocked_range<size_t> range(0, charItemArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t cId = range.begin(); cId < range.end(); ++cId) {
+                overlayDrawFontCache(charItemArray[cId]);
+            }
+        });
+    }
+}
+
+void
+Overlay::drawBoxClear()
+{
+    for (auto itr : mDrawBoxArray) {
+        mBoxItemMemMgr.setMemItem(itr);
+    }
+    for (auto itr : mDrawBoxBarArray) {
+        mBoxItemMemMgr.setMemItem(itr);
+    }
+    mBoxItemMemMgr.updateMax();
+
+    mDrawBoxArray.clear();
+    mDrawBoxBarArray.clear();
+}
+
+void    
+Overlay::drawBoxFlush(const bool doParallel)
+{
+    auto drawBoxFill = [&](const OverlayBoxItemShPtr boxItem, const bool doParallel) {
+        boxFill(boxItem->getBBox(), boxItem->getC(), boxItem->getAlpha(), doParallel);
+    };
+
+    auto drawBoxArray = [&](std::vector<OverlayBoxItemShPtr>& boxArray) {
+        if (!doParallel) {
+            for (size_t id = 0; id < boxArray.size(); ++id) {
+                drawBoxFill(boxArray[id], false);
+            }
+        } else {
+            tbb::blocked_range<size_t> range(0, boxArray.size(), 1);
+            tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+                for (size_t id = range.begin(); id < range.end(); ++id) {
+                    drawBoxFill(boxArray[id], true);
+                }
+            });
+        }
+    };
+
+    drawBoxArray(mDrawBoxArray);
+    drawBoxArray(mDrawBoxBarArray);
+}
+
+void
+Overlay::drawBoxOutlineClear()
+{
+    for (auto itr : mDrawBoxOutlineArray) {
+        mBoxOutlineItemMemMgr.setMemItem(itr);
+    }
+    mBoxOutlineItemMemMgr.updateMax();
+
+    mDrawBoxOutlineArray.clear();
+}
+
+void    
+Overlay::drawBoxOutlineFlush(const bool doParallel)
+{
+    auto drawBoxOutline = [&](const OverlayBoxOutlineItemShPtr boxItem, const bool doParallel) {
+        boxOutline(boxItem->getBBox(), boxItem->getC(), boxItem->getAlpha(), doParallel);
+    };
+
+    if (!doParallel) {
+        for (size_t id = 0; id < mDrawBoxOutlineArray.size(); ++id) {
+            drawBoxOutline(mDrawBoxOutlineArray[id], false);
+        }
+    } else {
+        tbb::blocked_range<size_t> range(0, mDrawBoxOutlineArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t id = range.begin(); id < range.end(); ++id) {
+                drawBoxOutline(mDrawBoxOutlineArray[id], true);
+            }
+        });
+    }
+}
+
+void
+Overlay::drawVLineClear()
+{
+    for (auto itr : mDrawVLineArray) {
+        mVLineItemMemMgr.setMemItem(itr);
+    }
+    mVLineItemMemMgr.updateMax();
+
+    mDrawVLineArray.clear();
+}
+
+void
+Overlay::drawVLineFlush(const bool doParallel)
+{
+    auto drawLine = [&](const size_t id) {
+        vLine(mDrawVLineArray[id]->getX(), mDrawVLineArray[id]->getMinY(), mDrawVLineArray[id]->getMaxY(),
+              mDrawVLineArray[id]->getC(), mDrawVLineArray[id]->getAlpha());
+    };
+
+    if (!doParallel) {
+        for (size_t id = 0; id < mDrawVLineArray.size(); ++id) {
+            drawLine(id);
+        }
+    } else {
+        tbb::blocked_range<size_t> range(0, mDrawVLineArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t id = range.begin(); id < range.end(); ++id) {
+                drawLine(id);
+            }
+        });
+    }
+}
+
+void
+Overlay::drawHLineClear()
+{
+    for (auto itr : mDrawHLineArray) {
+        mHLineItemMemMgr.setMemItem(itr);
+    }
+    mHLineItemMemMgr.updateMax();
+
+    mDrawHLineArray.clear();
+}
+
+void
+Overlay::drawHLineFlush(const bool doParallel)
+{
+    auto drawLine = [&](const size_t id) {
+        hLine(mDrawHLineArray[id]->getMinX(), mDrawHLineArray[id]->getMaxX(), mDrawHLineArray[id]->getY(),
+              mDrawHLineArray[id]->getC(), mDrawHLineArray[id]->getAlpha());
+    };
+
+    if (!doParallel) {
+        for (size_t id = 0; id < mDrawHLineArray.size(); ++id) {
+            drawLine(id);
+        }
+    } else {
+        tbb::blocked_range<size_t> range(0, mDrawHLineArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t id = range.begin(); id < range.end(); ++id) {
+                drawLine(id);
+            }
+        });
+    }
+}
+
+void
+Overlay::drawLineClear()
+{
+    for (auto itr : mDrawLineArray) {
+        mLineItemMemMgr.setMemItem(itr);
+    }
+    mLineItemMemMgr.updateMax();
+
+    mDrawLineArray.clear();
+}
+
+void
+Overlay::drawLineFlush(const bool doParallel)
+{
+    auto drawLine = [&](const size_t id) {
+        const OverlayLineItemShPtr linePtr = mDrawLineArray[id];
+        line(Vec2f(linePtr->getSx(), linePtr->getSy()),
+             Vec2f(linePtr->getEx(), linePtr->getEy()),
+             linePtr->getWidth(),
+             linePtr->getDrawStartPoint(), linePtr->getRadiusStartPoint(),
+             linePtr->getDrawEndPoint(), linePtr->getRadiusEndPoint(),
+             linePtr->getC(), linePtr->getAlpha());
+    };
+
+    if (!mDrawLineArray.size()) return;
+
+    if (!doParallel) {
+        for (size_t id = 0; id < mDrawLineArray.size(); ++id) {
+            drawLine(id);
+        }
+    } else {
+        //
+        // Strictly speaking, we don't have an atomic operation of frame buffer I/O, and
+        // multiple threads might access the same pixel at the same time during line segment
+        // drawing. This situation might create the wrong color of that pixel. However, it
+        // might be acceptable in most cases, and the important point is that this is not a
+        // crash issue.
+        // Considering the runtime performance, I'm going to keep this code as is. In the future,
+        // if this wrong pixel color regarding the multi-thread causes the issue, we should
+        // consider more deeply.
+        //
+        tbb::blocked_range<size_t> range(0, mDrawLineArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t id = range.begin(); id < range.end(); ++id) {
+                drawLine(id);
+            }
+        });
+    }
+}
+
+void
+Overlay::drawCircleClear()
+{
+    for (auto itr : mDrawCircleArray) {
+        mCircleItemMemMgr.setMemItem(itr);
+    }
+    mCircleItemMemMgr.updateMax();
+
+    mDrawCircleArray.clear();
+}
+
+void
+Overlay::drawCircleFlush(const bool doParallel)
+{
+    auto drawCircle = [&](const size_t id) {
+        const OverlayCircleItemShPtr circlePtr = mDrawCircleArray[id];
+        circle(Vec2f(circlePtr->getX(), circlePtr->getY()),
+               circlePtr->getRadius(),
+               circlePtr->getWidth(),
+               circlePtr->getC(),
+               circlePtr->getAlpha());
+    };
+
+    if (!mDrawCircleArray.size()) return;
+
+    if (!doParallel) {
+        for (size_t id = 0; id < mDrawCircleArray.size(); ++id) {
+            drawCircle(id);
+        }
+    } else {
+        tbb::blocked_range<size_t> range(0, mDrawCircleArray.size(), 1);
+        tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t id = range.begin(); id < range.end(); ++id) {
+                drawCircle(id);
+            }
+        });
     }
 }
 
@@ -787,7 +1511,7 @@ Overlay::bakeOverlayMainRgb888(const std::vector<unsigned char>& fgFrameRGBA,
                                const bool top2bottomFlag,
                                const bool doParallel) const
 {
-    auto adjustSrcRange = [](const unsigned fgSize, const unsigned bgSize, Align align,
+    auto adjustSrcRange = [](const unsigned fgSize, const unsigned bgSize, const Align align,
                              unsigned& fgMin, unsigned& fgMax) {
         if (fgSize <= bgSize) {
             fgMin = 0;
@@ -800,7 +1524,7 @@ Overlay::bakeOverlayMainRgb888(const std::vector<unsigned char>& fgFrameRGBA,
             }
         }
     };
-    auto adjustDstStartPos = [](const unsigned fgSize, const unsigned bgSize, Align align, bool flip) {
+    auto adjustDstStartPos = [](const unsigned fgSize, const unsigned bgSize, const Align align, const bool flip) {
         unsigned pos;
         if (fgSize < bgSize) {
             switch (align) {
@@ -816,8 +1540,8 @@ Overlay::bakeOverlayMainRgb888(const std::vector<unsigned char>& fgFrameRGBA,
         }
         return pos;
     };
-    auto calcFgDataAddr = [&](unsigned x, unsigned y) { return &fgFrameRGBA[(y * fgWidth + x) * 4]; };
-    auto calcBgDataAddr = [&](unsigned x, unsigned y) { return &bgFrameRGB[(y * bgWidth + x) * 3]; };
+    auto calcFgDataAddr = [&](const unsigned x, const unsigned y) { return &fgFrameRGBA[(y * fgWidth + x) * 4]; };
+    auto calcBgDataAddr = [&](const unsigned x, const unsigned y) { return &bgFrameRGB[(y * bgWidth + x) * 3]; };
 
     unsigned fgXmin, fgXmax, fgYmin, fgYmax;
     adjustSrcRange(fgWidth, bgWidth, hAlign, fgXmin, fgXmax);
@@ -826,7 +1550,7 @@ Overlay::bakeOverlayMainRgb888(const std::vector<unsigned char>& fgFrameRGBA,
     if (!doParallel) {
         // single thread execution
         unsigned bgY = adjustDstStartPos(fgHeight, bgHeight, vAlign, top2bottomFlag);
-        unsigned bgX = adjustDstStartPos(fgWidth, bgWidth, hAlign, false);
+        const unsigned bgX = adjustDstStartPos(fgWidth, bgWidth, hAlign, false);
 
         for (unsigned fgY = fgYmin ; fgY <= fgYmax; ++fgY) {
             const unsigned char* fgPtrC4 = calcFgDataAddr(fgXmin, fgY);
@@ -840,13 +1564,13 @@ Overlay::bakeOverlayMainRgb888(const std::vector<unsigned char>& fgFrameRGBA,
         }
     } else {
         // multi-thread execution
-        unsigned fgYsize = fgYmax - fgYmin + 1;
+        const unsigned fgYsize = fgYmax - fgYmin + 1;
         constexpr size_t grainSize = 2;
         tbb::blocked_range<size_t> range(0, fgYsize, grainSize);
         tbb::parallel_for(range, [&](const tbb::blocked_range<size_t>& range) {
                 unsigned bgY = adjustDstStartPos(fgHeight, bgHeight, vAlign, top2bottomFlag);
                 bgY += ((top2bottomFlag) ? - range.begin() : range.begin());
-                unsigned bgX = adjustDstStartPos(fgWidth, bgWidth, hAlign, false);
+                const unsigned bgX = adjustDstStartPos(fgWidth, bgWidth, hAlign, false);
                 for (size_t fgYoffset = range.begin(); fgYoffset < range.end(); ++fgYoffset) {
                     unsigned fgY = fgYmin + fgYoffset;
 
@@ -877,106 +1601,16 @@ Overlay::showPixFrameRGBA(const std::vector<unsigned char>& frameRGBA,
     };
     auto showPixCol = [](const unsigned char *pix) {
         std::ostringstream ostr;
-        ostr
-        << "(r:" << static_cast<int>(pix[0])
-        << ",g:" << static_cast<int>(pix[1])
-        << ",b:" << static_cast<int>(pix[2])
-        << ",a:" << static_cast<int>(pix[3]) << ')';
+        ostr << "(r:" << static_cast<int>(pix[0])
+             << ",g:" << static_cast<int>(pix[1])
+             << ",b:" << static_cast<int>(pix[2])
+             << ",a:" << static_cast<int>(pix[3]) << ')';
         return ostr.str();
     };
 
     std::ostringstream ostr;
     ostr << "pix " << showPos() << ' ' << showPixCol(&frameRGBA[(pixY * frameWidth + pixX) * 4]);
     return ostr.str();
-}
-
-Overlay::OverlayStrItemShPtr
-Overlay::getMemOverlayStrItem()
-{
-    if (mOverlayStrItemMemPool.empty()) {
-        return std::make_shared<OverlayStrItem>();
-    }
-
-    OverlayStrItemShPtr overlayStrItem = mOverlayStrItemMemPool.front();
-    mOverlayStrItemMemPool.pop_front();
-    return overlayStrItem;
-}
-
-void
-Overlay::setMemOverlayStrItem(OverlayStrItemShPtr ptr)
-{
-    ptr->resetCharItemArray(*this);
-#   ifdef ENABLE_MEMPOOL
-    mOverlayStrItemMemPool.push_front(ptr);
-#   else // else ENABLE_MEMPOOL    
-    ptr.reset();
-#   endif // end !ENABLE_MEMPOOL
-}
-
-Overlay::OverlayCharItemShPtr
-Overlay::getMemOverlayCharItem()
-{
-    if (mOverlayCharItemMemPool.empty()) {
-        return std::make_shared<OverlayCharItem>();
-    }
-
-    OverlayCharItemShPtr overlayCharItem = mOverlayCharItemMemPool.front();
-    mOverlayCharItemMemPool.pop_front();
-    return overlayCharItem;
-}
-
-void
-Overlay::setMemOverlayCharItem(OverlayCharItemShPtr ptr)
-{
-#   ifdef ENABLE_MEMPOOL
-    mOverlayCharItemMemPool.push_front(ptr);
-#   else // else ENABLE_MEMPOOL    
-    ptr.reset();
-#   endif // end !ENABLE_MEMPOOL
-}
-
-Overlay::OverlayBoxItemShPtr
-Overlay::getMemOverlayBoxItem()
-{
-    if (mOverlayBoxItemMemPool.empty()) {
-        return std::make_shared<OverlayBoxItem>();
-    }
-
-    OverlayBoxItemShPtr overlayBoxItem = mOverlayBoxItemMemPool.front();
-    mOverlayBoxItemMemPool.pop_front();
-    return overlayBoxItem;
-}
-
-void
-Overlay::setMemOverlayBoxItem(OverlayBoxItemShPtr ptr)
-{
-#   ifdef ENABLE_MEMPOOL
-    mOverlayBoxItemMemPool.push_front(ptr);
-#   else // else ENABLE_MEMPOOL    
-    ptr.reset();
-#   endif // end !ENABLE_MEMPOOL
-}
-
-Overlay::OverlayVLineItemShPtr
-Overlay::getMemOverlayVLineItem()
-{
-    if (mOverlayVLineItemMemPool.empty()) {
-        return std::make_shared<OverlayVLineItem>();
-    }
-
-    OverlayVLineItemShPtr overlayVLineItem = mOverlayVLineItemMemPool.front();
-    mOverlayVLineItemMemPool.pop_front();
-    return overlayVLineItem;
-}
-
-void
-Overlay::setMemOverlayVLineItem(OverlayVLineItemShPtr ptr)
-{
-#   ifdef ENABLE_MEMPOOL
-    mOverlayVLineItemMemPool.push_front(ptr);
-#   else // else ENABLE_MEMPOOL    
-    ptr.reset();
-#   endif // end !ENABLE_MEMPOOL
 }
 
 void
@@ -986,26 +1620,65 @@ Overlay::parserConfigure()
 
     mParser.opt("showMemPoolSize", "", "show memory pool information",
                 [&](Arg& arg) { return arg.msg(showMemPoolSize() + '\n'); });
+    mParser.opt("lineDrawType", "<bresenham|dda|wu|wuHQ|ol|ol2|hybrid|show>", "set line drawing logic type",
+                [&](Arg& arg) {
+                    if (arg() != "show") {
+                        if (arg() == "bresenham") setLineDrawFunc(LineDrawType::BRESENHAM);
+                        else if (arg() == "dda") setLineDrawFunc(LineDrawType::DDA);
+                        else if (arg() == "wu") setLineDrawFunc(LineDrawType::WU);
+                        else if (arg() == "wuHQ") setLineDrawFunc(LineDrawType::WU_HQ);
+                        else if (arg() == "ol") setLineDrawFunc(LineDrawType::OUTLINE_STROKE);
+                        else if (arg() == "ol2") setLineDrawFunc(LineDrawType::OUTLINE_STROKE2);
+                        else if (arg() == "hybrid") setLineDrawFunc(LineDrawType::HYBRID);
+                        else {
+                            std::ostringstream ostr;
+                            ostr << "unknown lineDrawType:" << arg();
+                            return arg.msg(ostr.str() + '\n');
+                        }
+                    }
+                    arg++;
+                    return arg.msg(showLineDrawType() + '\n');
+                });
 }
 
 std::string
 Overlay::showMemPoolSize() const
 {
-    size_t strItemSize = mMaxOverlayStrItemMemPool * sizeof(OverlayStrItem);
-    size_t charItemSize = mMaxOverlayCharItemMemPool * sizeof(OverlayCharItem);
-    size_t boxItemSize = mMaxOverlayBoxItemMemPool * sizeof(OverlayBoxItem);
-    size_t vLineItemSize = mMaxOverlayVLineItemMemPool * sizeof(OverlayVLineItem);
-
-    using scene_rdl2::str_util::byteStr;
-
     std::ostringstream ostr;
     ostr << "memPool {\n"
-         << "  mMaxOverlayStrItemMemPool:" << mMaxOverlayStrItemMemPool << " (" << byteStr(strItemSize) << ")\n"
-         << "  mMaxOverlayCharItemMemPool:" << mMaxOverlayCharItemMemPool << " (" << byteStr(charItemSize) << ")\n"
-         << "  mMaxOverlayBoxItemMemPool:" << mMaxOverlayBoxItemMemPool << " (" << byteStr(boxItemSize) << ")\n"
-         << "  mMaxOverlayVLineItemMemPool:" << mMaxOverlayVLineItemMemPool << " (" << byteStr(vLineItemSize) << ")\n"
+         << "  mStrItemMemMgr: " << mStrItemMemMgr.showSize() << '\n'
+         << "  mCharItemMemMgr: " << mCharItemMemMgr.showSize() << '\n'
+         << "  mBoxItemMemMgr: " << mBoxItemMemMgr.showSize() << '\n'
+         << "  mBoxOutlineItemMemMgr: " << mBoxOutlineItemMemMgr.showSize() << '\n'
+         << "  mVLineItemMemMgr: " << mVLineItemMemMgr.showSize() << '\n'
+         << "  mHLineItemMemMgr: " << mHLineItemMemMgr.showSize() << '\n'
+         << "  mLineItemMemMgr: " << mLineItemMemMgr.showSize() << '\n'
+         << "  mCircleitemMemMgr: " << mCircleItemMemMgr.showSize() << '\n'
          << "}";
     return ostr.str();
+}
+
+std::string
+Overlay::showLineDrawType() const
+{
+    std::ostringstream ostr;
+    ostr << "mLineDrawType:" << lineDrawStr(mLineDrawType);
+    return ostr.str();
+}
+
+std::string
+Overlay::lineDrawStr(const LineDrawType type)
+{
+    switch (type) {
+    case LineDrawType::BRESENHAM : return "BRESENHAM";
+    case LineDrawType::DDA : return "DDA";
+    case LineDrawType::WU : return "WU";
+    case LineDrawType::WU_HQ : return "WU_HQ";
+    case LineDrawType::OUTLINE_STROKE : return "OUTLINE_STROKE";
+    case LineDrawType::OUTLINE_STROKE2 : return "OUTLINE_STROKE2";
+    case LineDrawType::HYBRID : return "HYBRID";
+    default : return "?";
+    }
 }
 
 } // namespace telemetry

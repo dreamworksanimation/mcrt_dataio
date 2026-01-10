@@ -1,4 +1,4 @@
-# Copyright 2023-2024 DreamWorks Animation LLC
+# Copyright 2023-2025 DreamWorks Animation LLC
 # SPDX-License-Identifier: Apache-2.0
 
 set(component share_codec)
@@ -29,6 +29,7 @@ target_include_directories(${component}
 
 target_link_libraries(${component}
     PUBLIC
+        SceneRdl2::common_math
         SceneRdl2::render_util
         ${PROJECT_NAME}::share_util
         JsonCpp::JsonCpp

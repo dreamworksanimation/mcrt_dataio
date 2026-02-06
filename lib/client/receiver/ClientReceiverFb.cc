@@ -1,4 +1,4 @@
-// Copyright 2023-2025 DreamWorks Animation LLC
+// Copyright 2023-2026 DreamWorks Animation LLC
 // SPDX-License-Identifier: Apache-2.0
 #include "ClientReceiverFb.h"
 
@@ -1208,10 +1208,13 @@ ClientReceiverFb::Impl::getRenderOutputMTSafe(const unsigned id,
                                               std::vector<float>& data, unsigned& w, unsigned& h,
                                               const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    return getDataMTSafe(w, h,
-                         [&]() {
-                             return getRenderOutputMain(id, data, top2bottom, closestFilterDepthOutput);
-                         }); 
+    int numChan;
+    bool flag = getDataMTSafe(w, h,
+                              [&]() {
+                                  numChan = getRenderOutputMain(id, data, top2bottom, closestFilterDepthOutput);
+                                  return (numChan >= 0) ? true : false;
+                              });
+    return flag ? numChan : -1;
 }
 
 int    
@@ -1219,10 +1222,13 @@ ClientReceiverFb::Impl::getRenderOutputMTSafe(const std::string& aovName,
                                               std::vector<float>& data, unsigned& w, unsigned& h,
                                               const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    return getDataMTSafe(w, h,
-                         [&]() {
-                             return getRenderOutputMain(aovName, data, top2bottom, closestFilterDepthOutput);
-                         });
+    int numChan;
+    bool flag = getDataMTSafe(w, h,
+                              [&]() {
+                                  numChan = getRenderOutputMain(aovName, data, top2bottom, closestFilterDepthOutput);
+                                  return (numChan >= 0) ? true : false;
+                              });
+    return flag ? numChan : -1;
 }
 
 int    
@@ -1246,10 +1252,13 @@ ClientReceiverFb::Impl::getRenderOutputF4MTSafe(const unsigned id,
                                                 std::vector<float>& data, unsigned& w, unsigned& h,
                                                 const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    return getDataMTSafe(w, h,
-                         [&]() {
-                             return getRenderOutputF4Main(id, data, top2bottom, closestFilterDepthOutput);
-                         });
+    int numChan;
+    bool flag = getDataMTSafe(w, h,
+                              [&]() {
+                                  numChan = getRenderOutputF4Main(id, data, top2bottom, closestFilterDepthOutput);
+                                  return (numChan >= 0) ? true : false;
+                              });
+    return flag ? numChan : -1;
 }
 
 int    
@@ -1257,10 +1266,13 @@ ClientReceiverFb::Impl::getRenderOutputF4MTSafe(const std::string& aovName,
                                                 std::vector<float>& data, unsigned& w, unsigned& h,
                                                 const bool top2bottom, const bool closestFilterDepthOutput)
 {
-    return getDataMTSafe(w, h,
-                         [&]() {
-                             return getRenderOutputF4Main(aovName, data, top2bottom, closestFilterDepthOutput);
-                         });
+    int numChan;
+    bool flag = getDataMTSafe(w, h,
+                              [&]() {
+                                  numChan = getRenderOutputF4Main(aovName, data, top2bottom, closestFilterDepthOutput);
+                                  return (numChan >= 0) ? true : false;
+                              });
+    return flag ? numChan : -1;
 }
 
 int    

@@ -4,7 +4,7 @@
 //
 //
 #pragma once
-
+#include <cstdint>
 #include <mcrt_dataio/share/sock/SockServerInet.h>
 
 #include <string>

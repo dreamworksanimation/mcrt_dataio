@@ -2,11 +2,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 find_path(FreeType_INCLUDE_DIR
-    NAMES ft2build.h
-    PATH_SUFFIXES freetype2
+    NAMES freetype.h
+    PATH_SUFFIXES freetype2/freetype
     HINTS $ENV{FREETYPE_ROOT}/include /usr/local/include)
 
-# need to find <freetype2/ft2build.h.h>
+# need to find <freetype2/ft2build.h>
 set(FreeType_INCLUDE_DIRS ${FreeType_INCLUDE_DIR} ${FreeType_INCLUDE_DIR}/..)
 
 find_library(FreeType_LIBRARIES

@@ -7,6 +7,7 @@
 
 #include <mcrt_dataio/share/sock/SockServerInet.h>
 
+#include <cstdint>
 #include <string>
 
 namespace mcrt_dataio {
